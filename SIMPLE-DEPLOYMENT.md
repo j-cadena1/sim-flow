@@ -204,10 +204,10 @@ curl http://localhost:8080/health
 
 ### Problem: "Port 8080 is already in use"
 
-**Solution:** Change the port in `docker-compose.yml`
+**Solution:** Change the port in `docker-compose.yaml`
 
 ```bash
-nano docker-compose.yml
+nano docker-compose.yaml
 ```
 
 Find this line:
@@ -327,7 +327,7 @@ Before using in production:
 - [ ] Regular backups of VM (use Proxmox backup)
 - [ ] Access restricted to authorized users
 - [ ] Health checks working (`curl http://localhost:8080/health`)
-- [ ] Container auto-restarts (`restart: unless-stopped` in docker-compose.yml ✓)
+- [ ] Container auto-restarts (`restart: unless-stopped` in docker-compose.yaml ✓)
 
 ---
 

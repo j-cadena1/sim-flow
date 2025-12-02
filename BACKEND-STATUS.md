@@ -49,7 +49,7 @@
 - ✅ Network isolation
 - ✅ Automatic restart policies
 
-**Location:** `/docker-compose.yml`
+**Location:** `/docker-compose.yaml`
 
 ### 5. **Nginx Configuration** ✓
 - ✅ API proxy to backend (`/api/*`)
@@ -150,7 +150,7 @@ api/
 └── hooks.ts                         # React Query hooks
 
 package.json                         # Updated with React Query + Axios
-docker-compose.yml                   # Updated for 3 services
+docker-compose.yaml                   # Updated for 3 services
 nginx.conf                           # Updated with API proxy
 ```
 

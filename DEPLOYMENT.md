@@ -133,7 +133,7 @@ You should see the Sim-Flow Dashboard!
 
 ### 4.1 Change Port (Optional)
 
-Edit `docker-compose.yml`:
+Edit `docker-compose.yaml`:
 ```yaml
 ports:
   - "80:80"  # Change 8080 to 80 for standard HTTP

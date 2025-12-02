@@ -254,7 +254,7 @@ sim-flow/
 │   ├── init.sql          # Schema + seed data
 │   └── migrations/       # Future migrations
 │
-├── docker-compose.yml    # Updated with 3 services
+├── docker-compose.yaml    # Updated with 3 services
 └── nginx.conf           # Updated to proxy /api
 ```
 
