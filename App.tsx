@@ -1,5 +1,6 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SimFlowProvider } from './context/SimFlowContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
@@ -10,6 +11,17 @@ import { Dashboard } from './components/Dashboard';
 import { NewRequest } from './components/NewRequest';
 import { RequestList } from './components/RequestList';
 import { RequestDetail } from './components/RequestDetail';
+
+// Create React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5000,
+    },
+  },
+});
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -31,23 +43,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <ToastProvider>
-        <ModalProvider>
-          <SimFlowProvider>
-            <Router>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/requests" element={<RequestList />} />
-                  <Route path="/requests/:id" element={<RequestDetail />} />
-                  <Route path="/new" element={<NewRequest />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Layout>
-            </Router>
-          </SimFlowProvider>
-        </ModalProvider>
-      </ToastProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <ModalProvider>
+            <SimFlowProvider>
+              <Router>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/requests" element={<RequestList />} />
+                    <Route path="/requests/:id" element={<RequestDetail />} />
+                    <Route path="/new" element={<NewRequest />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Layout>
+              </Router>
+            </SimFlowProvider>
+          </ModalProvider>
+        </ToastProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };
