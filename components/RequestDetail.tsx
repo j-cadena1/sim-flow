@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSimFlow } from '../context/SimFlowContext';
+import { useModal } from './Modal';
+import { useToast } from './Toast';
 import { RequestStatus, UserRole } from '../types';
+import { validateComment } from '../utils/validation';
 import { CheckCircle, XCircle, Clock, UserPlus, ArrowLeft, MessageSquare, AlertTriangle, User as UserIcon } from 'lucide-react';
 
 export const RequestDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { requests, currentUser, updateRequestStatus, assignEngineer, addComment, getUsersByRole } = useSimFlow();
+  const { showConfirm, showPrompt } = useModal();
+  const { showToast } = useToast();
 
   const request = requests.find(r => r.id === id);
   const engineers = getUsersByRole(UserRole.ENGINEER);
@@ -15,6 +20,7 @@ export const RequestDetail: React.FC = () => {
   const [assignee, setAssignee] = useState(engineers[0]?.id || '');
   const [hours, setHours] = useState(8);
   const [comment, setComment] = useState('');
+  const [commentError, setCommentError] = useState('');
 
   if (!request) return <div>Request not found</div>;
 
@@ -22,43 +28,72 @@ export const RequestDetail: React.FC = () => {
 
   const handleApproveFeasibility = () => {
     updateRequestStatus(request.id, RequestStatus.RESOURCE_ALLOCATION);
+    showToast('Request approved for resource allocation', 'success');
   };
 
   const handleDeny = () => {
-    if(!confirm("Are you sure you want to deny this request?")) return;
-    updateRequestStatus(request.id, RequestStatus.DENIED);
+    showConfirm(
+      'Deny Request',
+      'Are you sure you want to deny this request? This action cannot be undone.',
+      () => {
+        updateRequestStatus(request.id, RequestStatus.DENIED);
+        showToast('Request denied', 'success');
+      }
+    );
   };
 
   const handleAssign = () => {
+    if (hours < 1) {
+      showToast('Estimated hours must be at least 1', 'error');
+      return;
+    }
     assignEngineer(request.id, assignee, hours);
+    showToast('Engineer assigned successfully', 'success');
   };
 
   const handleEngineerAccept = () => {
     updateRequestStatus(request.id, RequestStatus.IN_PROGRESS);
+    showToast('Work accepted and started', 'success');
   };
 
   const handleEngineerComplete = () => {
     updateRequestStatus(request.id, RequestStatus.COMPLETED);
+    showToast('Work marked as completed', 'success');
   };
 
   const handleRevisionRequest = () => {
-    const reason = prompt("Reason for revision:");
-    if (reason) {
-      addComment(request.id, `REVISION REQUESTED: ${reason}`);
-      updateRequestStatus(request.id, RequestStatus.REVISION_REQUESTED);
-    }
+    showPrompt(
+      'Request Revision',
+      'Please provide a reason for the revision request:',
+      (reason) => {
+        if (reason.trim()) {
+          addComment(request.id, `REVISION REQUESTED: ${reason}`);
+          updateRequestStatus(request.id, RequestStatus.REVISION_REQUESTED);
+          showToast('Revision requested', 'success');
+        }
+      }
+    );
   };
 
   const handleAccept = () => {
-    addComment(request.id, "Work accepted by requester.");
+    addComment(request.id, 'Work accepted by requester.');
     updateRequestStatus(request.id, RequestStatus.ACCEPTED);
+    showToast('Work accepted successfully', 'success');
   };
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comment.trim()) return;
+    setCommentError('');
+
+    const validation = validateComment(comment);
+    if (!validation.isValid) {
+      setCommentError(validation.error || 'Invalid comment');
+      return;
+    }
+
     addComment(request.id, comment);
     setComment('');
+    showToast('Comment added', 'success');
   };
 
   // --- RENDER HELPERS ---
@@ -227,17 +262,28 @@ export const RequestDetail: React.FC = () => {
               </div>
             ))}
           </div>
-          <form onSubmit={handlePostComment} className="relative">
-            <input 
-              type="text" 
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white pr-12 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="Add a comment..."
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-            />
-            <button type="submit" className="absolute right-2 top-2 p-1.5 bg-blue-600 rounded-md text-white hover:bg-blue-500">
-              <ArrowLeft size={16} className="rotate-180" />
-            </button>
+          <form onSubmit={handlePostComment} className="space-y-2">
+            <div className="relative">
+              <input
+                type="text"
+                className={`w-full bg-slate-950 border ${commentError ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-3 text-white pr-12 focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+                placeholder="Add a comment..."
+                value={comment}
+                onChange={e => {
+                  setComment(e.target.value);
+                  if (commentError) setCommentError('');
+                }}
+              />
+              <button type="submit" className="absolute right-2 top-2 p-1.5 bg-blue-600 rounded-md text-white hover:bg-blue-500">
+                <ArrowLeft size={16} className="rotate-180" />
+              </button>
+            </div>
+            {commentError && (
+              <p className="text-sm text-red-400 flex items-center gap-1">
+                <AlertTriangle size={14} />
+                {commentError}
+              </p>
+            )}
           </form>
         </div>
       </div>

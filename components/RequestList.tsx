@@ -1,26 +1,14 @@
 import React from 'react';
 import { useSimFlow } from '../context/SimFlowContext';
 import { RequestStatus, UserRole } from '../types';
+import { STATUS_COLORS, PRIORITY_COLORS } from '../constants';
 import { Link } from 'react-router-dom';
 import { Clock, User as UserIcon, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export const RequestList: React.FC = () => {
   const { requests, currentUser } = useSimFlow();
 
-  const getStatusColor = (status: RequestStatus) => {
-    switch (status) {
-      case RequestStatus.SUBMITTED: return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
-      case RequestStatus.FEASIBILITY_REVIEW: return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-      case RequestStatus.RESOURCE_ALLOCATION: return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
-      case RequestStatus.ENGINEERING_REVIEW: return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
-      case RequestStatus.IN_PROGRESS: return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      case RequestStatus.COMPLETED: return 'bg-green-500/10 text-green-500 border-green-500/20';
-      case RequestStatus.ACCEPTED: return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case RequestStatus.DENIED: return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case RequestStatus.REVISION_REQUESTED: return 'bg-pink-500/10 text-pink-500 border-pink-500/20';
-      default: return 'bg-slate-700 text-slate-300';
-    }
-  };
+  const getStatusColor = (status: RequestStatus) => STATUS_COLORS[status] || 'bg-slate-700 text-slate-300';
 
   const filteredRequests = requests.filter(req => {
     if (currentUser.role === UserRole.USER) {
@@ -65,7 +53,7 @@ export const RequestList: React.FC = () => {
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(req.status)}`}>
                       {req.status}
                     </span>
-                    <span className={`text-xs font-bold ${req.priority === 'High' ? 'text-red-400' : req.priority === 'Medium' ? 'text-yellow-400' : 'text-green-400'}`}>
+                    <span className={`text-xs font-bold ${PRIORITY_COLORS[req.priority]}`}>
                       {req.priority} Priority
                     </span>
                   </div>

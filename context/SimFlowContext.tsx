@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { SimRequest, User, UserRole, MOCK_USERS, RequestStatus, Comment } from '../types';
+import { loadRequestsFromStorage, saveRequestsToStorage } from '../utils/storage';
+import { sanitizeInput } from '../utils/sanitize';
 
 interface SimFlowContextType {
   currentUser: User;
@@ -24,14 +26,15 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Simulating Auth
   const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]);
 
-  // Simulating Database
-  const [requests, setRequests] = useState<SimRequest[]>(() => {
-    const saved = localStorage.getItem('sim-flow-requests');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Simulating Database with safe localStorage handling
+  const [requests, setRequests] = useState<SimRequest[]>(loadRequestsFromStorage);
 
   useEffect(() => {
-    localStorage.setItem('sim-flow-requests', JSON.stringify(requests));
+    const saved = saveRequestsToStorage(requests);
+    if (!saved) {
+      console.error('Failed to save requests to localStorage');
+      // Could trigger a toast notification here
+    }
   }, [requests]);
 
   const switchUser = (role: UserRole) => {
@@ -42,9 +45,9 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
   const addRequest = (title: string, description: string, vendor: string, priority: 'Low' | 'Medium' | 'High') => {
     const newRequest: SimRequest = {
       id: crypto.randomUUID(),
-      title,
-      description,
-      vendor,
+      title: sanitizeInput(title),
+      description: sanitizeInput(description),
+      vendor: sanitizeInput(vendor),
       priority,
       status: RequestStatus.SUBMITTED,
       createdBy: currentUser.id,
@@ -75,11 +78,17 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const addComment = (requestId: string, content: string) => {
+    const sanitizedContent = sanitizeInput(content);
+    if (!sanitizedContent.trim()) {
+      console.warn('Cannot add empty comment');
+      return;
+    }
+
     const newComment: Comment = {
       id: crypto.randomUUID(),
       authorName: currentUser.name,
       authorRole: currentUser.role,
-      content,
+      content: sanitizedContent,
       timestamp: new Date().toISOString()
     };
     setRequests(prev => prev.map(req =>
@@ -89,8 +98,8 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const getUsersByRole = (role: UserRole) => MOCK_USERS.filter(u => u.role === role);
 
-  return (
-    <SimFlowContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       currentUser,
       switchUser,
       requests,
@@ -98,8 +107,13 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
       updateRequestStatus,
       assignEngineer,
       addComment,
-      getUsersByRole
-    }}>
+      getUsersByRole,
+    }),
+    [currentUser, requests]
+  );
+
+  return (
+    <SimFlowContext.Provider value={contextValue}>
       {children}
     </SimFlowContext.Provider>
   );
