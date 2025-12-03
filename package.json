@@ -12,8 +12,9 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@azure/msal-node": "^3.8.3",
     "@tanstack/react-query": "^5.17.19",
-    "axios": "^1.6.5",
+    "axios": "^1.13.2",
     "dompurify": "^3.3.0",
     "lucide-react": "^0.555.0",
     "react": "^19.2.0",

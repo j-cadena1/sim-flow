@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, List, Cpu, FolderOpen, LogOut } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, List, Cpu, FolderOpen, LogOut, Settings } from 'lucide-react';
 import { useSimFlow } from '../context/SimFlowContext';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
@@ -18,6 +18,10 @@ export const Sidebar: React.FC = () => {
 
     if (currentUser.role === UserRole.USER) {
       links.push({ to: '/new', icon: PlusCircle, label: 'New Request' });
+    }
+
+    if (currentUser.role === UserRole.ADMIN) {
+      links.push({ to: '/settings', icon: Settings, label: 'Settings' });
     }
 
     return links;
@@ -56,7 +60,7 @@ export const Sidebar: React.FC = () => {
 
       <div className="p-4 border-t border-slate-800 space-y-3">
         <div className="flex items-center space-x-3 bg-slate-950 p-3 rounded-lg border border-slate-800">
-          <img src={currentUser.avatar} alt="User" className="w-8 h-8 rounded-full bg-slate-700" />
+          <img src={currentUser.avatarUrl || currentUser.avatar} alt="User" className="w-8 h-8 rounded-full bg-slate-700" />
           <div className="overflow-hidden">
             <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
             <p className="text-xs text-slate-400 truncate">{currentUser.role}</p>

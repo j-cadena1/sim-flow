@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogIn, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
@@ -11,6 +11,25 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
+  const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
+
+  // Check if SSO is enabled on mount
+  useEffect(() => {
+    const checkSSOStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/sso/status');
+        if (response.ok) {
+          const data = await response.json();
+          setSsoEnabled(data.enabled);
+        }
+      } catch (error) {
+        console.error('Error checking SSO status:', error);
+      }
+    };
+
+    checkSSOStatus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +44,31 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
       await onLogin(email, password);
     } catch (err) {
       // Error will be handled by parent component
+    }
+  };
+
+  const handleSSOLogin = async () => {
+    try {
+      setSsoLoading(true);
+      setLocalError('');
+
+      const response = await fetch('/api/auth/sso/login');
+      if (!response.ok) {
+        throw new Error('Failed to initiate SSO login');
+      }
+
+      const data = await response.json();
+
+      if (data.authUrl) {
+        // Redirect to Microsoft login
+        window.location.href = data.authUrl;
+      } else {
+        throw new Error('No authorization URL received');
+      }
+    } catch (error) {
+      console.error('SSO login error:', error);
+      setLocalError('Failed to initiate SSO login. Please try again.');
+      setSsoLoading(false);
     }
   };
 
@@ -109,6 +153,43 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
               )}
             </button>
           </form>
+
+          {/* SSO Section */}
+          {ssoEnabled && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-700"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-slate-800 text-slate-400">Or continue with</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSSOLogin}
+                disabled={ssoLoading}
+                className="w-full bg-white hover:bg-gray-100 disabled:bg-slate-700 disabled:cursor-not-allowed text-gray-900 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 border border-gray-300"
+              >
+                {ssoLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-900 rounded-full animate-spin" />
+                    Redirecting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" viewBox="0 0 23 23" fill="none">
+                      <path d="M0 0h11v11H0z" fill="#f25022"/>
+                      <path d="M12 0h11v11H12z" fill="#00a4ef"/>
+                      <path d="M0 12h11v11H0z" fill="#7fba00"/>
+                      <path d="M12 12h11v11H12z" fill="#ffb900"/>
+                    </svg>
+                    Sign in with Microsoft
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Footer */}

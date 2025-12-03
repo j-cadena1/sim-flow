@@ -29,7 +29,8 @@ export interface User {
   id: string;
   name: string;
   role: UserRole;
-  avatar: string;
+  avatar?: string; // Legacy - use avatarUrl instead
+  avatarUrl?: string; // Profile picture URL or data URL
 }
 
 export interface Comment {

@@ -12,7 +12,7 @@ export const Dashboard: React.FC = () => {
   // Memoize stats calculations
   const stats = useMemo(() => {
     const total = requests.length;
-    const inProgress = requests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+    const inProgress = requests.filter(r => [RequestStatus.IN_PROGRESS, RequestStatus.ENGINEERING_REVIEW, RequestStatus.DISCUSSION].includes(r.status)).length;
     const completed = requests.filter(r => r.status === RequestStatus.COMPLETED || r.status === RequestStatus.ACCEPTED).length;
     const pending = requests.filter(r => [RequestStatus.SUBMITTED, RequestStatus.FEASIBILITY_REVIEW, RequestStatus.RESOURCE_ALLOCATION].includes(r.status)).length;
     const denied = requests.filter(r => r.status === RequestStatus.DENIED).length;

@@ -25,35 +25,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state from localStorage or handle SSO callback
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const storedToken = localStorage.getItem(TOKEN_KEY);
-        const storedUser = localStorage.getItem(USER_KEY);
+        // Check if this is an SSO callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
 
-        if (storedToken && storedUser) {
-          // Verify token is still valid
-          const response = await fetch('/api/auth/verify', {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`,
-            },
-          });
+        if (code && state) {
+          // Handle SSO callback
+          const response = await fetch(`/api/auth/sso/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
 
           if (response.ok) {
             const data = await response.json();
+
+            // Store token and user
+            localStorage.setItem(TOKEN_KEY, data.token);
+            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+
+            setToken(data.token);
             setUser(data.user);
-            setToken(storedToken);
+
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
           } else {
-            // Token invalid, clear storage
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(USER_KEY);
+            const errorData = await response.json().catch(() => ({}));
+            setError(errorData.error || 'SSO login failed. Please try again.');
+          }
+        } else {
+          // Normal initialization - check for stored token
+          const storedToken = localStorage.getItem(TOKEN_KEY);
+          const storedUser = localStorage.getItem(USER_KEY);
+
+          if (storedToken && storedUser) {
+            // Verify token is still valid
+            const response = await fetch('/api/auth/verify', {
+              headers: {
+                'Authorization': `Bearer ${storedToken}`,
+              },
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              setUser(data.user);
+              setToken(storedToken);
+            } else {
+              // Token invalid, clear storage
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(USER_KEY);
+            }
           }
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
+        setError('Authentication failed. Please try again.');
       } finally {
         setIsLoading(false);
       }

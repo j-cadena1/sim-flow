@@ -8,6 +8,8 @@ import authRouter from './routes/auth';
 import requestsRouter from './routes/requests';
 import usersRouter from './routes/users';
 import projectsRouter from './routes/projects';
+import ssoRouter from './routes/sso';
+import userManagementRouter from './routes/userManagement';
 import pool from './db';
 
 // Load environment variables
@@ -50,7 +52,9 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/requests', requestsRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/users/management', userManagementRouter);
 app.use('/api/projects', projectsRouter);
+app.use('/api/sso', ssoRouter);
 
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response) => {
