@@ -385,3 +385,81 @@ export const useReviewDiscussionRequest = () => {
     },
   });
 };
+
+// Audit Logs API
+export const useAuditLogs = (filters?: {
+  userId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string | number;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}) => {
+  return useQuery({
+    queryKey: ['audit-logs', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.userId) params.append('userId', filters.userId.toString());
+      if (filters?.action) params.append('action', filters.action);
+      if (filters?.entityType) params.append('entityType', filters.entityType);
+      if (filters?.entityId) params.append('entityId', filters.entityId.toString());
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+
+      const { data } = await apiClient.get(`/audit-logs?${params.toString()}`);
+      return data;
+    },
+  });
+};
+
+export const useAuditStats = (filters?: {
+  startDate?: string;
+  endDate?: string;
+}) => {
+  return useQuery({
+    queryKey: ['audit-stats', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+
+      const { data } = await apiClient.get(`/audit-logs/stats?${params.toString()}`);
+      return data;
+    },
+  });
+};
+
+export const exportAuditLogsCSV = async (filters?: {
+  userId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string | number;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  const params = new URLSearchParams();
+  if (filters?.userId) params.append('userId', filters.userId.toString());
+  if (filters?.action) params.append('action', filters.action);
+  if (filters?.entityType) params.append('entityType', filters.entityType);
+  if (filters?.entityId) params.append('entityId', filters.entityId.toString());
+  if (filters?.startDate) params.append('startDate', filters.startDate);
+  if (filters?.endDate) params.append('endDate', filters.endDate);
+
+  const response = await apiClient.get(`/audit-logs/export?${params.toString()}`, {
+    responseType: 'blob',
+  });
+
+  // Create download link
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `audit-logs-${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

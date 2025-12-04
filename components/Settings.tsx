@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, TestTube2, Lock, AlertCircle, CheckCircle, Users, Trash2, RefreshCw, Edit2, Download } from 'lucide-react';
+import { Save, TestTube2, Lock, AlertCircle, CheckCircle, Users, Trash2, RefreshCw, Edit2, Download, Shield, Calendar, Filter, FileDown } from 'lucide-react';
 import { useToast } from './Toast';
+import { useAuditLogs, useAuditStats, exportAuditLogsCSV } from '../lib/api/hooks';
 
 interface SSOConfig {
   id: string;
@@ -33,7 +34,7 @@ interface DirectoryUser {
   isImported: boolean;
 }
 
-type ActiveTab = 'sso' | 'users';
+type ActiveTab = 'sso' | 'users' | 'audit';
 
 export const Settings: React.FC = () => {
   const { showToast } = useToast();
@@ -396,6 +397,20 @@ export const Settings: React.FC = () => {
           <Users className="w-4 h-4 inline mr-2" />
           User Management
           {activeTab === 'users' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('audit')}
+          className={`px-6 py-3 font-medium transition-colors relative ${
+            activeTab === 'audit'
+              ? 'text-blue-400'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          <Shield className="w-4 h-4 inline mr-2" />
+          Audit Log
+          {activeTab === 'audit' && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
           )}
         </button>
@@ -827,6 +842,293 @@ export const Settings: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Audit Log Tab */}
+      {activeTab === 'audit' && <AuditLogTab />}
+    </div>
+  );
+};
+
+// Audit Log Tab Component
+const AuditLogTab: React.FC = () => {
+  const { showToast } = useToast();
+  const [filters, setFilters] = useState({
+    action: '',
+    entityType: '',
+    startDate: '',
+    endDate: '',
+    limit: 50,
+    offset: 0,
+  });
+  const [isExporting, setIsExporting] = useState(false);
+
+  const { data: auditData, isLoading } = useAuditLogs(filters);
+  const { data: stats } = useAuditStats({
+    startDate: filters.startDate || undefined,
+    endDate: filters.endDate || undefined,
+  });
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      await exportAuditLogsCSV(filters);
+      showToast('Audit logs exported successfully', 'success');
+    } catch (error) {
+      showToast('Failed to export audit logs', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value, offset: 0 }));
+  };
+
+  const handlePageChange = (direction: 'next' | 'prev') => {
+    setFilters(prev => ({
+      ...prev,
+      offset: direction === 'next'
+        ? prev.offset + prev.limit
+        : Math.max(0, prev.offset - prev.limit)
+    }));
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  const getActionColor = (action: string) => {
+    if (action.includes('DELETE')) return 'text-red-400 bg-red-400/10';
+    if (action.includes('CREATE')) return 'text-green-400 bg-green-400/10';
+    if (action.includes('UPDATE') || action.includes('ASSIGN')) return 'text-yellow-400 bg-yellow-400/10';
+    if (action.includes('LOGIN')) return 'text-blue-400 bg-blue-400/10';
+    return 'text-slate-400 bg-slate-400/10';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header with Stats */}
+      <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-600/20 p-2 rounded-lg">
+              <Shield className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Audit Log</h2>
+              <p className="text-sm text-slate-400">Track all user actions and system events</p>
+            </div>
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            {isExporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+        </div>
+
+        {/* Quick Stats */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">{stats.totalEvents}</div>
+              <div className="text-sm text-slate-400">Total Events</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">
+                {Object.keys(stats.eventsByAction).length}
+              </div>
+              <div className="text-sm text-slate-400">Action Types</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">
+                {stats.topUsers.length}
+              </div>
+              <div className="text-sm text-slate-400">Active Users</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">
+                {stats.recentEvents.length}
+              </div>
+              <div className="text-sm text-slate-400">Recent Events</div>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              <Filter className="w-4 h-4 inline mr-1" />
+              Action
+            </label>
+            <select
+              value={filters.action}
+              onChange={(e) => handleFilterChange('action', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+            >
+              <option value="">All Actions</option>
+              <option value="LOGIN">Login</option>
+              <option value="SSO_LOGIN">SSO Login</option>
+              <option value="CREATE_REQUEST">Create Request</option>
+              <option value="UPDATE_REQUEST_STATUS">Update Status</option>
+              <option value="ASSIGN_ENGINEER">Assign Engineer</option>
+              <option value="DELETE_REQUEST">Delete Request</option>
+              <option value="UPDATE_USER_ROLE">Update User Role</option>
+              <option value="DELETE_USER">Delete User</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Entity Type
+            </label>
+            <select
+              value={filters.entityType}
+              onChange={(e) => handleFilterChange('entityType', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+            >
+              <option value="">All Types</option>
+              <option value="auth">Authentication</option>
+              <option value="request">Request</option>
+              <option value="user">User</option>
+              <option value="project">Project</option>
+              <option value="comment">Comment</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              <Calendar className="w-4 h-4 inline mr-1" />
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => handleFilterChange('startDate', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              End Date
+            </label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => handleFilterChange('endDate', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Audit Log Table */}
+      <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center text-slate-400">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
+            Loading audit logs...
+          </div>
+        ) : !auditData?.logs || auditData.logs.length === 0 ? (
+          <div className="p-8 text-center text-slate-400">
+            <Shield className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p>No audit logs found</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-800/50 border-b border-slate-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                      Timestamp
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                      User
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                      Action
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                      Entity
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                      Details
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                      IP Address
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {auditData.logs.map((log: any) => (
+                    <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-sm text-slate-300">
+                        {formatTimestamp(log.timestamp)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <div className="text-sm text-white">{log.user_name}</div>
+                          <div className="text-xs text-slate-400">{log.user_email}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionColor(
+                            log.action
+                          )}`}
+                        >
+                          {log.action.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-300">
+                        <div>{log.entity_type}</div>
+                        {log.entity_id && (
+                          <div className="text-xs text-slate-500">ID: {log.entity_id}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-400 max-w-xs truncate">
+                        {log.details ? JSON.stringify(log.details) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-400 font-mono">
+                        {log.ip_address || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="border-t border-slate-800 px-4 py-3 flex items-center justify-between">
+              <div className="text-sm text-slate-400">
+                Showing {filters.offset + 1} to {Math.min(filters.offset + filters.limit, auditData.pagination.total)} of{' '}
+                {auditData.pagination.total} events
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePageChange('prev')}
+                  disabled={filters.offset === 0}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors text-sm"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => handlePageChange('next')}
+                  disabled={!auditData.pagination.hasMore}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors text-sm"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

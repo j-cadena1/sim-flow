@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
+import { logRequestAudit, AuditAction, EntityType } from '../services/auditService';
 
 // Get all requests
 export const getAllRequests = async (req: Request, res: Response) => {
@@ -77,6 +78,15 @@ export const createRequest = async (req: Request, res: Response) => {
         VALUES ($1, $2, $3, $4)
       `, [result.rows[0].id, userId, 'created', { title }]);
     }
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.CREATE_REQUEST,
+      EntityType.REQUEST,
+      result.rows[0].id,
+      { title, vendor, priority, projectId }
+    );
 
     res.status(201).json({ request: toCamelCase(result.rows[0]) });
   } catch (error) {
@@ -275,6 +285,15 @@ export const updateRequestStatus = async (req: Request, res: Response) => {
       `, [id, userId, 'status_changed', JSON.stringify({ status })]);
     }
 
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.UPDATE_REQUEST_STATUS,
+      EntityType.REQUEST,
+      parseInt(id),
+      { status }
+    );
+
     res.json({ request: toCamelCase(result.rows[0]) });
   } catch (error) {
     logger.error('Error updating request status:', error);
@@ -320,6 +339,15 @@ export const assignEngineer = async (req: Request, res: Response) => {
         VALUES ($1, $2, $3, $4::jsonb)
       `, [id, userId, 'assigned', JSON.stringify({ engineerId, engineerName, estimatedHours })]);
     }
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.ASSIGN_ENGINEER,
+      EntityType.REQUEST,
+      parseInt(id),
+      { engineerId, engineerName, estimatedHours }
+    );
 
     res.json({ request: toCamelCase(result.rows[0]) });
   } catch (error) {

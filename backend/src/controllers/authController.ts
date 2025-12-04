@@ -11,6 +11,7 @@ import {
   extractUserInfo,
 } from '../services/msalService';
 import { getUserPhoto } from '../services/graphService';
+import { logAudit, AuditAction, EntityType, getIpFromRequest, getUserAgentFromRequest } from '../services/auditService';
 
 // JWT secret - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'sim-flow-secret-key-change-in-production';
@@ -78,6 +79,18 @@ export const login = async (req: Request, res: Response) => {
     };
 
     logger.info(`User logged in: ${user.id} (${email}) - Role: ${user.role}`);
+
+    // Log audit trail
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      action: AuditAction.LOGIN,
+      entityType: EntityType.AUTH,
+      ipAddress: getIpFromRequest(req),
+      userAgent: getUserAgentFromRequest(req),
+      details: { role: user.role },
+    });
 
     res.json({
       user: userResponse,
@@ -261,6 +274,18 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
       role: user.role,
       avatarUrl: user.avatarUrl,
     };
+
+    // Log audit trail for SSO login
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      action: AuditAction.SSO_LOGIN,
+      entityType: EntityType.AUTH,
+      ipAddress: getIpFromRequest(req),
+      userAgent: getUserAgentFromRequest(req),
+      details: { role: user.role, entraId: userInfo.oid },
+    });
 
     res.json({
       user: userResponse,

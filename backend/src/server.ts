@@ -10,6 +10,7 @@ import usersRouter from './routes/users';
 import projectsRouter from './routes/projects';
 import ssoRouter from './routes/sso';
 import userManagementRouter from './routes/userManagement';
+import auditLogsRouter from './routes/auditLogs';
 import pool from './db';
 
 // Load environment variables
@@ -55,6 +56,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/users/management', userManagementRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/sso', ssoRouter);
+app.use('/api/audit-logs', auditLogsRouter);
 
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response) => {

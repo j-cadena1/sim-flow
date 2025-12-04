@@ -1,0 +1,295 @@
+import { Request } from 'express';
+import pool from '../db';
+import logger from '../utils/logger';
+
+export enum AuditAction {
+  // Authentication
+  LOGIN = 'LOGIN',
+  LOGOUT = 'LOGOUT',
+  SSO_LOGIN = 'SSO_LOGIN',
+
+  // Request operations
+  CREATE_REQUEST = 'CREATE_REQUEST',
+  UPDATE_REQUEST = 'UPDATE_REQUEST',
+  DELETE_REQUEST = 'DELETE_REQUEST',
+  ASSIGN_ENGINEER = 'ASSIGN_ENGINEER',
+  UPDATE_REQUEST_STATUS = 'UPDATE_REQUEST_STATUS',
+
+  // Project operations
+  CREATE_PROJECT = 'CREATE_PROJECT',
+  UPDATE_PROJECT = 'UPDATE_PROJECT',
+  DELETE_PROJECT = 'DELETE_PROJECT',
+  ARCHIVE_PROJECT = 'ARCHIVE_PROJECT',
+
+  // User operations
+  CREATE_USER = 'CREATE_USER',
+  UPDATE_USER = 'UPDATE_USER',
+  DELETE_USER = 'DELETE_USER',
+  UPDATE_USER_ROLE = 'UPDATE_USER_ROLE',
+  SYNC_USER = 'SYNC_USER',
+  BULK_IMPORT_USERS = 'BULK_IMPORT_USERS',
+
+  // Comment operations
+  ADD_COMMENT = 'ADD_COMMENT',
+
+  // Time tracking
+  ADD_TIME_ENTRY = 'ADD_TIME_ENTRY',
+  UPDATE_PROJECT_HOURS = 'UPDATE_PROJECT_HOURS',
+
+  // Workflow operations
+  REQUEST_TITLE_CHANGE = 'REQUEST_TITLE_CHANGE',
+  APPROVE_TITLE_CHANGE = 'APPROVE_TITLE_CHANGE',
+  REJECT_TITLE_CHANGE = 'REJECT_TITLE_CHANGE',
+  CREATE_DISCUSSION = 'CREATE_DISCUSSION',
+  APPROVE_DISCUSSION = 'APPROVE_DISCUSSION',
+  REJECT_DISCUSSION = 'REJECT_DISCUSSION',
+
+  // SSO Configuration
+  UPDATE_SSO_CONFIG = 'UPDATE_SSO_CONFIG',
+  ENABLE_SSO = 'ENABLE_SSO',
+  DISABLE_SSO = 'DISABLE_SSO',
+}
+
+export enum EntityType {
+  REQUEST = 'request',
+  PROJECT = 'project',
+  USER = 'user',
+  COMMENT = 'comment',
+  TIME_ENTRY = 'time_entry',
+  TITLE_CHANGE = 'title_change',
+  DISCUSSION = 'discussion',
+  SSO_CONFIG = 'sso_config',
+  AUTH = 'auth',
+}
+
+interface AuditLogEntry {
+  userId?: string;
+  userEmail: string;
+  userName: string;
+  action: AuditAction;
+  entityType: EntityType;
+  entityId?: string | number;
+  details?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/**
+ * Log an audit entry to the database
+ */
+export const logAudit = async (entry: AuditLogEntry): Promise<void> => {
+  try {
+    const query = `
+      INSERT INTO audit_logs (
+        user_id, user_email, user_name, action, entity_type,
+        entity_id, details, ip_address, user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `;
+
+    const values = [
+      entry.userId || null,
+      entry.userEmail,
+      entry.userName,
+      entry.action,
+      entry.entityType,
+      entry.entityId || null,
+      entry.details ? JSON.stringify(entry.details) : null,
+      entry.ipAddress || null,
+      entry.userAgent || null,
+    ];
+
+    await pool.query(query, values);
+
+    logger.info('Audit log created', {
+      action: entry.action,
+      entityType: entry.entityType,
+      entityId: entry.entityId,
+      user: entry.userEmail,
+    });
+  } catch (error) {
+    // Don't throw - audit logging should not break application flow
+    logger.error('Failed to create audit log', { error, entry });
+  }
+};
+
+/**
+ * Extract user info from authenticated request
+ */
+export const getUserFromRequest = (req: Request): { id: string; email: string; name: string } => {
+  const user = (req as any).user;
+  if (!user) {
+    throw new Error('User not found in request');
+  }
+  return {
+    id: user.id || user.userId,
+    email: user.email,
+    name: user.name,
+  };
+};
+
+/**
+ * Extract IP address from request
+ */
+export const getIpFromRequest = (req: Request): string => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.connection.remoteAddress || 'unknown';
+};
+
+/**
+ * Extract user agent from request
+ */
+export const getUserAgentFromRequest = (req: Request): string => {
+  return req.headers['user-agent'] || 'unknown';
+};
+
+/**
+ * Helper to log request-related audit events
+ */
+export const logRequestAudit = async (
+  req: Request,
+  action: AuditAction,
+  entityType: EntityType,
+  entityId?: number,
+  details?: Record<string, any>
+): Promise<void> => {
+  try {
+    const user = getUserFromRequest(req);
+
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      action,
+      entityType,
+      entityId,
+      details,
+      ipAddress: getIpFromRequest(req),
+      userAgent: getUserAgentFromRequest(req),
+    });
+  } catch (error) {
+    logger.error('Failed to log request audit', { error, action, entityType, entityId });
+  }
+};
+
+/**
+ * Get audit logs with filtering and pagination
+ */
+export const getAuditLogs = async (filters: {
+  userId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string | number;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  offset?: number;
+}): Promise<any[]> => {
+  let query = `
+    SELECT
+      id, user_id, user_email, user_name, action, entity_type,
+      entity_id, details, ip_address, user_agent, timestamp
+    FROM audit_logs
+    WHERE 1=1
+  `;
+
+  const values: any[] = [];
+  let paramCount = 1;
+
+  if (filters.userId) {
+    query += ` AND user_id = $${paramCount++}`;
+    values.push(filters.userId);
+  }
+
+  if (filters.action) {
+    query += ` AND action = $${paramCount++}`;
+    values.push(filters.action);
+  }
+
+  if (filters.entityType) {
+    query += ` AND entity_type = $${paramCount++}`;
+    values.push(filters.entityType);
+  }
+
+  if (filters.entityId) {
+    query += ` AND entity_id = $${paramCount++}`;
+    values.push(filters.entityId);
+  }
+
+  if (filters.startDate) {
+    query += ` AND timestamp >= $${paramCount++}`;
+    values.push(filters.startDate);
+  }
+
+  if (filters.endDate) {
+    query += ` AND timestamp <= $${paramCount++}`;
+    values.push(filters.endDate);
+  }
+
+  query += ` ORDER BY timestamp DESC`;
+
+  if (filters.limit) {
+    query += ` LIMIT $${paramCount++}`;
+    values.push(filters.limit);
+  }
+
+  if (filters.offset) {
+    query += ` OFFSET $${paramCount++}`;
+    values.push(filters.offset);
+  }
+
+  const result = await pool.query(query, values);
+  return result.rows;
+};
+
+/**
+ * Get audit log count with filtering
+ */
+export const getAuditLogCount = async (filters: {
+  userId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string | number;
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<number> => {
+  let query = `SELECT COUNT(*) FROM audit_logs WHERE 1=1`;
+
+  const values: any[] = [];
+  let paramCount = 1;
+
+  if (filters.userId) {
+    query += ` AND user_id = $${paramCount++}`;
+    values.push(filters.userId);
+  }
+
+  if (filters.action) {
+    query += ` AND action = $${paramCount++}`;
+    values.push(filters.action);
+  }
+
+  if (filters.entityType) {
+    query += ` AND entity_type = $${paramCount++}`;
+    values.push(filters.entityType);
+  }
+
+  if (filters.entityId) {
+    query += ` AND entity_id = $${paramCount++}`;
+    values.push(filters.entityId);
+  }
+
+  if (filters.startDate) {
+    query += ` AND timestamp >= $${paramCount++}`;
+    values.push(filters.startDate);
+  }
+
+  if (filters.endDate) {
+    query += ` AND timestamp <= $${paramCount++}`;
+    values.push(filters.endDate);
+  }
+
+  const result = await pool.query(query, values);
+  return parseInt(result.rows[0].count);
+};
