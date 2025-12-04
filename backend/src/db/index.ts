@@ -7,7 +7,8 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'simflow',
   user: process.env.DB_USER || 'simflow_user',
   password: process.env.DB_PASSWORD || 'secure_password_change_me',
-  max: 20,
+  min: parseInt(process.env.DB_POOL_MIN || '2'),
+  max: parseInt(process.env.DB_POOL_MAX || '10'),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
