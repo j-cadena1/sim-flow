@@ -73,7 +73,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = toCamelCase(result.rows[0]);
+    const user = toCamelCase(result.rows[0]) as any;
     logger.info(`User ${id} role updated to ${role} by admin ${admin?.userId}`);
 
     // Log audit trail

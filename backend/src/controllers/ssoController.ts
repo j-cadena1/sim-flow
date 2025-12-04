@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
+import { logRequestAudit, AuditAction, EntityType } from '../services/auditService';
 
 interface SSOConfig {
   id: string;
@@ -128,6 +129,22 @@ export const updateSSOConfig = async (req: Request, res: Response) => {
     };
 
     logger.info(`SSO configuration updated by user ${user?.userId}. SSO enabled: ${enabled}`);
+
+    // Audit log - use specific action based on enabled state
+    const auditAction = enabled ? AuditAction.ENABLE_SSO : AuditAction.DISABLE_SSO;
+    await logRequestAudit(
+      req,
+      auditAction,
+      EntityType.SSO_CONFIG,
+      undefined,
+      {
+        enabled,
+        tenantId: tenantId || null,
+        clientId: clientId || null,
+        redirectUri: redirectUri || null,
+      }
+    );
+
     res.json({ config: safeConfig, message: 'SSO configuration updated successfully' });
   } catch (error) {
     logger.error('Error updating SSO configuration:', error);

@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import pool from '../db';
-import logger from '../utils/logger';
+import { logger } from '../middleware/logger';
 
 export enum AuditAction {
   // Authentication
@@ -152,7 +152,7 @@ export const logRequestAudit = async (
   req: Request,
   action: AuditAction,
   entityType: EntityType,
-  entityId?: number,
+  entityId?: string | number,
   details?: Record<string, any>
 ): Promise<void> => {
   try {

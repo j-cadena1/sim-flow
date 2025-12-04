@@ -160,7 +160,22 @@ export const requestTitleChange = async (req: Request, res: Response) => {
       RETURNING *
     `, [id, userId, userName, currentTitle, proposedTitle.trim(), 'Pending']);
 
-    res.status(201).json({ titleChangeRequest: toCamelCase(result.rows[0]) });
+    const titleChangeRequest = result.rows[0];
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.REQUEST_TITLE_CHANGE,
+      EntityType.TITLE_CHANGE,
+      titleChangeRequest.id,
+      {
+        requestId: parseInt(id),
+        currentTitle,
+        proposedTitle: proposedTitle.trim(),
+      }
+    );
+
+    res.status(201).json({ titleChangeRequest: toCamelCase(titleChangeRequest) });
   } catch (error) {
     logger.error('Error requesting title change:', error);
     res.status(500).json({ error: 'Failed to request title change' });
@@ -251,6 +266,23 @@ export const reviewTitleChangeRequest = async (req: Request, res: Response) => {
         JSON.stringify({ newTitle: titleChangeRequest.proposed_title })
       ]);
     }
+
+    // Audit log
+    const auditAction = approved
+      ? AuditAction.APPROVE_TITLE_CHANGE
+      : AuditAction.REJECT_TITLE_CHANGE;
+
+    await logRequestAudit(
+      req,
+      auditAction,
+      EntityType.TITLE_CHANGE,
+      parseInt(id),
+      {
+        requestId: titleChangeRequest.request_id,
+        currentTitle: titleChangeRequest.current_title,
+        proposedTitle: titleChangeRequest.proposed_title,
+      }
+    );
 
     res.json({ message: `Title change ${status.toLowerCase()}` });
   } catch (error) {
@@ -371,7 +403,18 @@ export const addComment = async (req: Request, res: Response) => {
       RETURNING *
     `, [id, userId || null, userName, userRole, content]);
 
-    res.status(201).json({ comment: toCamelCase(result.rows[0]) });
+    const comment = result.rows[0];
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.ADD_COMMENT,
+      EntityType.COMMENT,
+      comment.id,
+      { requestId: parseInt(id), content }
+    );
+
+    res.status(201).json({ comment: toCamelCase(comment) });
   } catch (error) {
     logger.error('Error adding comment:', error);
     res.status(500).json({ error: 'Failed to add comment' });
@@ -392,6 +435,14 @@ export const deleteRequest = async (req: Request, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Request not found' });
     }
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.DELETE_REQUEST,
+      EntityType.REQUEST,
+      parseInt(id)
+    );
 
     res.json({ message: 'Request deleted successfully', id: result.rows[0].id });
   } catch (error) {
@@ -431,7 +482,18 @@ export const addTimeEntry = async (req: Request, res: Response) => {
       RETURNING *
     `, [id, userId || null, userName, hours, description || '']);
 
-    res.status(201).json({ timeEntry: toCamelCase(result.rows[0]) });
+    const timeEntry = result.rows[0];
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.ADD_TIME_ENTRY,
+      EntityType.TIME_ENTRY,
+      timeEntry.id,
+      { requestId: parseInt(id), hours, description }
+    );
+
+    res.status(201).json({ timeEntry: toCamelCase(timeEntry) });
   } catch (error) {
     logger.error('Error adding time entry:', error);
     res.status(500).json({ error: 'Failed to add time entry' });
@@ -470,7 +532,18 @@ export const createDiscussionRequest = async (req: Request, res: Response) => {
       VALUES ($1, $2, $3, $4::jsonb)
     `, [id, userId, 'discussion_requested', JSON.stringify({ reason, suggestedHours })]);
 
-    res.status(201).json({ discussionRequest: toCamelCase(result.rows[0]) });
+    const discussionRequest = result.rows[0];
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.CREATE_DISCUSSION,
+      EntityType.DISCUSSION,
+      discussionRequest.id,
+      { requestId: parseInt(id), reason, suggestedHours }
+    );
+
+    res.status(201).json({ discussionRequest: toCamelCase(discussionRequest) });
   } catch (error) {
     logger.error('Error creating discussion request:', error);
     res.status(500).json({ error: 'Failed to create discussion request' });
@@ -566,6 +639,24 @@ export const reviewDiscussionRequest = async (req: Request, res: Response) => {
       `discussion_${action}`,
       JSON.stringify({ allocatedHours: finalHours, response: managerResponse })
     ]);
+
+    // Audit log
+    const auditAction = action === 'approve' || action === 'override'
+      ? AuditAction.APPROVE_DISCUSSION
+      : AuditAction.REJECT_DISCUSSION;
+
+    await logRequestAudit(
+      req,
+      auditAction,
+      EntityType.DISCUSSION,
+      parseInt(id),
+      {
+        requestId: discussionRequest.request_id,
+        action,
+        allocatedHours: finalHours,
+        managerResponse,
+      }
+    );
 
     res.json({ message: `Discussion request ${action}ed`, allocatedHours: finalHours });
   } catch (error) {

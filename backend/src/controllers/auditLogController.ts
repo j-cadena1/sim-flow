@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { getAuditLogs, getAuditLogCount } from '../services/auditService';
-import logger from '../utils/logger';
+import { logger } from '../middleware/logger';
 
 /**
  * Get audit logs with filtering and pagination

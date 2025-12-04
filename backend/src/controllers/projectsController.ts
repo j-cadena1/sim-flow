@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { query, getClient } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
+import { logRequestAudit, AuditAction, EntityType } from '../services/auditService';
 
 // Get all projects
 export const getAllProjects = async (req: Request, res: Response) => {
@@ -97,6 +98,16 @@ export const createProject = async (req: Request, res: Response) => {
 
     const project = toCamelCase(result.rows[0]) as any;
     logger.info(`Created project ${project.id} with auto-generated code ${code}`);
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.CREATE_PROJECT,
+      EntityType.PROJECT,
+      project.id,
+      { name, code, totalHours, status: projectStatus }
+    );
+
     res.status(201).json({ project });
   } catch (error) {
     logger.error('Error creating project:', error);
@@ -125,6 +136,16 @@ export const updateProjectName = async (req: Request, res: Response) => {
 
     const project = toCamelCase(result.rows[0]);
     logger.info(`Updated project ${id} name to "${name}"`);
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.UPDATE_PROJECT,
+      EntityType.PROJECT,
+      parseInt(id),
+      { name }
+    );
+
     res.json({ project });
   } catch (error) {
     logger.error('Error updating project name:', error);
@@ -153,6 +174,20 @@ export const updateProjectStatus = async (req: Request, res: Response) => {
 
     const project = toCamelCase(result.rows[0]);
     logger.info(`Updated project ${id} status to ${status}`);
+
+    // Audit log - use specific action for archiving
+    const auditAction = status === 'Archived'
+      ? AuditAction.ARCHIVE_PROJECT
+      : AuditAction.UPDATE_PROJECT;
+
+    await logRequestAudit(
+      req,
+      auditAction,
+      EntityType.PROJECT,
+      parseInt(id),
+      { status }
+    );
+
     res.json({ project });
   } catch (error) {
     logger.error('Error updating project status:', error);
@@ -220,6 +255,20 @@ export const updateProjectHours = async (req: Request, res: Response) => {
 
     const project = toCamelCase(result.rows[0]);
     logger.info(`Updated project ${id} hours: ${currentProject.used_hours}h -> ${newUsedHours}h (${hoursToAdd >= 0 ? '+' : ''}${hoursToAdd}h)`);
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.UPDATE_PROJECT_HOURS,
+      EntityType.PROJECT,
+      parseInt(id),
+      {
+        hoursToAdd,
+        previousUsedHours: currentProject.used_hours,
+        newUsedHours,
+      }
+    );
+
     res.json({ project });
   } catch (error) {
     // Rollback on any error
@@ -259,6 +308,15 @@ export const deleteProject = async (req: Request, res: Response) => {
     }
 
     logger.info(`Deleted project ${id}`);
+
+    // Audit log
+    await logRequestAudit(
+      req,
+      AuditAction.DELETE_PROJECT,
+      EntityType.PROJECT,
+      parseInt(id)
+    );
+
     res.json({ message: 'Project deleted successfully', id: result.rows[0].id });
   } catch (error) {
     logger.error('Error deleting project:', error);
