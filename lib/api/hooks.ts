@@ -463,3 +463,56 @@ export const exportAuditLogsCSV = async (filters?: {
   link.remove();
   window.URL.revokeObjectURL(url);
 };
+
+// ============================================================================
+// Analytics Hooks
+// ============================================================================
+
+/**
+ * Fetch dashboard statistics with optional date range
+ */
+export const useDashboardStats = (filters?: {
+  startDate?: string;
+  endDate?: string;
+}) => {
+  return useQuery({
+    queryKey: ['dashboard-stats', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+
+      const { data } = await apiClient.get(`/analytics/dashboard?${params.toString()}`);
+      return data.stats;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+/**
+ * Fetch time-to-completion analysis
+ */
+export const useCompletionAnalysis = () => {
+  return useQuery({
+    queryKey: ['completion-analysis'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/analytics/completion-time');
+      return data.analysis;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+/**
+ * Fetch hour allocation vs actual analysis
+ */
+export const useAllocationAnalysis = () => {
+  return useQuery({
+    queryKey: ['allocation-analysis'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/analytics/hour-allocation');
+      return data.analysis;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};

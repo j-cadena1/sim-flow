@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, List, Cpu, FolderOpen, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, List, Cpu, FolderOpen, LogOut, Settings, BarChart } from 'lucide-react';
 import { useSimFlow } from '../contexts/SimFlowContext';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
@@ -18,6 +18,11 @@ export const Sidebar: React.FC = () => {
 
     if (currentUser.role === UserRole.USER) {
       links.push({ to: '/new', icon: PlusCircle, label: 'New Request' });
+    }
+
+    // Analytics visible to Admin and Manager
+    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER) {
+      links.push({ to: '/analytics', icon: BarChart, label: 'Analytics' });
     }
 
     if (currentUser.role === UserRole.ADMIN) {

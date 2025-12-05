@@ -13,6 +13,7 @@ import { RequestList } from './components/RequestList';
 import { RequestDetail } from './components/RequestDetail';
 import { Projects } from './components/Projects';
 import { Settings } from './components/Settings';
+import Analytics from './components/Analytics';
 import Login from './components/Login';
 
 // Create React Query client
@@ -73,6 +74,7 @@ const AuthenticatedApp: React.FC = () => {
             <Route path="/requests/:id" element={<RequestDetail />} />
             <Route path="/new" element={<NewRequest />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
