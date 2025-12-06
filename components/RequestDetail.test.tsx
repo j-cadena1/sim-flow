@@ -22,7 +22,7 @@ const MOCK_REQUESTS: SimRequest[] = [
     title: 'Test Request',
     description: 'This is a test request description',
     vendor: 'FANUC',
-    status: RequestStatus.PENDING,
+    status: RequestStatus.SUBMITTED,
     priority: 'Medium',
     createdByName: 'Test User',
     createdAt: new Date().toISOString(),

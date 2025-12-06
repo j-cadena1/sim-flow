@@ -89,11 +89,20 @@ make clean        # Remove all containers and volumes
 - **Monitoring**: Prometheus metrics, structured logging
 - **Documentation**: OpenAPI/Swagger
 
+## 📐 Development Philosophy
+
+This project follows two core principles:
+
+1. **Docker-First Approach**: The application is designed to run anywhere Docker is installed. All services (frontend, backend, database) are containerized, ensuring consistent behavior across development, testing, and production environments. No local dependencies required beyond Docker.
+
+2. **Well-Documented Code**: All new features and code changes should be thoroughly documented. This includes JSDoc comments for functions, inline comments for complex logic, and updated README sections for user-facing features.
+
 ## 🔒 Security Configuration
 
 ### Default Credentials
 
 **Admin User:**
+
 - Email: `qadmin@simflow.local`
 - Password: `admin123`
 
@@ -134,6 +143,7 @@ NODE_ENV=production
 ### Prerequisites (for local development only)
 
 If you want to develop outside of Docker, you'll need:
+
 - Node.js 20+
 - PostgreSQL 16+
 
@@ -146,7 +156,7 @@ make dev-logs     # View logs
 
 ### Project Structure
 
-```
+```text
 sim-flow/
 ├── backend/              # Express API server
 │   ├── src/
@@ -209,6 +219,7 @@ npx playwright test --ui    # Interactive mode
 Prometheus metrics available at: `http://localhost:3001/metrics`
 
 Includes:
+
 - HTTP request counts and durations
 - Database connection pool stats
 - Active users
@@ -267,6 +278,7 @@ docker compose exec postgres psql -U simflow_user -d simflow
 Database migrations are automatically applied on container startup from `database/init.sql`.
 
 To add new migrations:
+
 1. Create SQL file in `database/migrations/`
 2. Add to `database/init.sql`
 3. Rebuild containers: `make prod-build`
@@ -363,6 +375,7 @@ make prod
 ## 🤝 Contributing
 
 Contributions welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
@@ -378,6 +391,7 @@ MIT License - See LICENSE file for details.
 ## 💬 Support
 
 For issues or questions:
+
 - Open an issue on GitHub
 - Check existing documentation
 - Review logs with `make prod-logs` or `make dev-logs`
