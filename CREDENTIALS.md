@@ -5,11 +5,13 @@ This document contains the default credentials for testing the Sim-Flow applicat
 ## Default Test Accounts
 
 ### Admin Account
+
 - **Email:** `qadmin@simflow.local`
 - **Password:** `admin123`
 - **Permissions:** Full unrestricted access to all features
 
 ### Manager Account
+
 - **Email:** `bob@simflow.local`
 - **Password:** `manager123`
 - **Permissions:**
@@ -20,6 +22,7 @@ This document contains the default credentials for testing the Sim-Flow applicat
   - Review discussion requests
 
 ### Engineer Account
+
 - **Email:** `charlie@simflow.local`
 - **Password:** `engineer123`
 - **Permissions:**
@@ -29,6 +32,7 @@ This document contains the default credentials for testing the Sim-Flow applicat
   - Update work progress
 
 ### End-User Account
+
 - **Email:** `alice@simflow.local`
 - **Password:** `user123`
 - **Permissions:**
@@ -41,16 +45,18 @@ This document contains the default credentials for testing the Sim-Flow applicat
 
 - These are **test credentials only** and should be changed in production
 - All passwords are hashed using bcrypt with 10 salt rounds
-- JWT tokens are used for authentication with 24-hour expiration
-- Tokens are stored in browser localStorage
+- Session-based authentication with HTTP-only cookies
+- Sessions are stored in the database and automatically cleaned up
 
 ## Changing Passwords
 
 To change a password, you'll need to:
+
 1. Generate a new bcrypt hash
 2. Update the `password_hash` column in the `users` table
 
 Example using Node.js:
+
 ```javascript
 const bcrypt = require('bcrypt');
 const hash = bcrypt.hashSync('new-password', 10);

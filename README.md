@@ -12,7 +12,7 @@ A role-based engineering simulation request management system with comprehensive
 - **Analytics Dashboard**: Real-time insights into team productivity and resource utilization
 - **Discussion Workflow**: Engineers can request hour adjustments with manager approval
 - **Title Change Approval**: Controlled request title modifications
-- **Security**: JWT with refresh tokens, rate limiting, structured logging
+- **Security**: Session-based authentication, rate limiting, structured logging
 - **Monitoring**: Prometheus metrics, health checks, API documentation
 
 ## 🚀 Quick Start (Docker-First)
@@ -84,7 +84,7 @@ make clean        # Remove all containers and volumes
 - **Frontend**: React + TypeScript + Vite + TailwindCSS
 - **Backend**: Node.js + Express + TypeScript
 - **Database**: PostgreSQL 16
-- **Authentication**: JWT + Microsoft Entra ID PKCE flow
+- **Authentication**: Session cookies + Microsoft Entra ID PKCE flow
 - **Deployment**: Docker + Docker Compose
 - **Monitoring**: Prometheus metrics, structured logging
 - **Documentation**: OpenAPI/Swagger
@@ -116,8 +116,8 @@ Create a `.env` file for production (optional - defaults are provided):
 # Database
 DB_PASSWORD=YourStrongPasswordHere123!@#
 
-# JWT Secret (REQUIRED for production)
-JWT_SECRET=$(openssl rand -base64 32)
+# SSO Encryption (for storing SSO client secrets)
+SSO_ENCRYPTION_KEY=$(openssl rand -base64 32)
 
 # CORS (restrict to your domain in production)
 CORS_ORIGIN=https://your-domain.com
@@ -129,8 +129,8 @@ NODE_ENV=production
 ### Production Security Checklist
 
 - [ ] Change default admin password
-- [ ] Set a strong `JWT_SECRET` in `.env`
 - [ ] Set a strong `DB_PASSWORD` in `.env`
+- [ ] Set `SSO_ENCRYPTION_KEY` if using SSO
 - [ ] Configure `CORS_ORIGIN` to your domain
 - [ ] Use HTTPS with a reverse proxy (nginx/Traefik/Caddy)
 - [ ] Restrict database port (5432) to localhost only
