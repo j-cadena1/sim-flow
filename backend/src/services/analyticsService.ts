@@ -1,6 +1,28 @@
+/**
+ * @fileoverview Analytics Service
+ *
+ * Provides comprehensive analytics and reporting for the Sim-Flow dashboard.
+ * Aggregates data from requests, projects, users, and time entries.
+ *
+ * Key Metrics:
+ * - Overview statistics (counts, totals)
+ * - Request distribution by status and priority
+ * - Request trends over time
+ * - Project utilization (budget vs. used hours)
+ * - Engineer workload distribution
+ * - Vendor analysis
+ * - Completion time analysis
+ * - Hour allocation accuracy
+ *
+ * @module services/analyticsService
+ */
+
 import pool from '../db';
 import { logger } from '../middleware/logger';
 
+/**
+ * Comprehensive dashboard statistics structure
+ */
 export interface DashboardStats {
   overview: {
     totalRequests: number;
@@ -60,6 +82,13 @@ export interface DashboardStats {
 
 /**
  * Get comprehensive dashboard statistics
+ *
+ * Aggregates data from multiple tables to provide a complete overview
+ * of system activity, project utilization, and team performance.
+ *
+ * @param startDate - Optional start date for filtering requests
+ * @param endDate - Optional end date for filtering requests
+ * @returns Complete dashboard statistics object
  */
 export const getDashboardStats = async (
   startDate?: Date,
@@ -76,8 +105,7 @@ export const getDashboardStats = async (
       SELECT
         COUNT(*) as total_requests,
         COUNT(*) FILTER (WHERE status NOT IN ('Completed', 'Cancelled')) as active_requests,
-        COUNT(*) FILTER (WHERE status = 'Completed') as completed_requests,
-        COALESCE(SUM(estimated_hours), 0) as total_hours_allocated
+        COUNT(*) FILTER (WHERE status = 'Completed') as completed_requests
       FROM requests
       ${dateFilter}
     `;
@@ -86,6 +114,7 @@ export const getDashboardStats = async (
       SELECT
         COUNT(*) as total_projects,
         COUNT(*) FILTER (WHERE status = 'Approved') as active_projects,
+        COALESCE(SUM(total_hours), 0) as total_hours_budget,
         COALESCE(SUM(used_hours), 0) as total_hours_used
       FROM projects
     `;
@@ -105,7 +134,7 @@ export const getDashboardStats = async (
       totalProjects: parseInt(projectsResult.rows[0].total_projects) || 0,
       activeProjects: parseInt(projectsResult.rows[0].active_projects) || 0,
       totalUsers: parseInt(usersResult.rows[0].total_users) || 0,
-      totalHoursAllocated: parseFloat(overviewResult.rows[0].total_hours_allocated) || 0,
+      totalHoursAllocated: parseFloat(projectsResult.rows[0].total_hours_budget) || 0,
       totalHoursUsed: parseFloat(projectsResult.rows[0].total_hours_used) || 0,
     };
 
@@ -138,10 +167,9 @@ export const getDashboardStats = async (
       GROUP BY priority
       ORDER BY
         CASE priority
-          WHEN 'Critical' THEN 1
-          WHEN 'High' THEN 2
-          WHEN 'Medium' THEN 3
-          WHEN 'Low' THEN 4
+          WHEN 'High' THEN 1
+          WHEN 'Medium' THEN 2
+          WHEN 'Low' THEN 3
         END
     `;
     const priorityResult = await pool.query(priorityQuery, dateParams);
@@ -205,13 +233,13 @@ export const getDashboardStats = async (
       SELECT
         u.id as engineer_id,
         u.name as engineer_name,
-        COUNT(r.id) FILTER (WHERE r.status NOT IN ('Completed', 'Cancelled')) as assigned_requests,
+        COUNT(r.id) FILTER (WHERE r.status NOT IN ('Completed', 'Cancelled', 'Denied')) as assigned_requests,
         COUNT(r.id) FILTER (WHERE r.status = 'Completed') as completed_requests,
-        COALESCE(SUM(r.estimated_hours) FILTER (WHERE r.status NOT IN ('Completed', 'Cancelled')), 0) as total_hours_allocated,
+        COALESCE(SUM(r.estimated_hours) FILTER (WHERE r.status NOT IN ('Completed', 'Cancelled', 'Denied')), 0) as total_hours_allocated,
         COALESCE(SUM(te.hours), 0) as total_hours_logged,
         AVG(EXTRACT(EPOCH FROM (r.updated_at - r.created_at)) / 86400) FILTER (WHERE r.status = 'Completed') as avg_completion_days
       FROM users u
-      LEFT JOIN requests r ON r.assigned_engineer_id = u.id
+      LEFT JOIN requests r ON r.assigned_to = u.id
       LEFT JOIN time_entries te ON te.engineer_id = u.id
       WHERE u.role = 'Engineer'
       GROUP BY u.id, u.name
@@ -287,7 +315,12 @@ export const getDashboardStats = async (
 };
 
 /**
- * Get time-to-completion analysis
+ * Get time-to-completion analysis by priority
+ *
+ * Analyzes completed requests to understand how long requests take
+ * to complete based on priority level. Includes statistical measures.
+ *
+ * @returns Array of completion time statistics grouped by priority
  */
 export const getTimeToCompletionAnalysis = async (): Promise<any> => {
   const query = `
@@ -303,10 +336,9 @@ export const getTimeToCompletionAnalysis = async (): Promise<any> => {
     GROUP BY priority
     ORDER BY
       CASE priority
-        WHEN 'Critical' THEN 1
-        WHEN 'High' THEN 2
-        WHEN 'Medium' THEN 3
-        WHEN 'Low' THEN 4
+        WHEN 'High' THEN 1
+        WHEN 'Medium' THEN 2
+        WHEN 'Low' THEN 3
       END
   `;
 
@@ -323,26 +355,36 @@ export const getTimeToCompletionAnalysis = async (): Promise<any> => {
 
 /**
  * Get hour allocation vs actual usage analysis
+ *
+ * Compares estimated hours against actual logged time to identify
+ * estimation accuracy and trends. Helps improve future estimations.
+ *
+ * @returns Array of completed requests with variance analysis
  */
 export const getHourAllocationAnalysis = async (): Promise<any> => {
+  // Query completed requests with time entries logged
+  // If estimated_hours is null, use actual hours as the baseline for comparison
   const query = `
     SELECT
       r.id as request_id,
       r.title,
       r.priority,
-      r.estimated_hours as allocated_hours,
+      COALESCE(r.estimated_hours, 0) as allocated_hours,
       COALESCE(SUM(te.hours), 0) as actual_hours,
-      COALESCE(SUM(te.hours), 0) - r.estimated_hours as variance,
       CASE
-        WHEN r.estimated_hours > 0 THEN ROUND((COALESCE(SUM(te.hours), 0) * 100.0 / r.estimated_hours), 2)
+        WHEN r.estimated_hours IS NOT NULL AND r.estimated_hours > 0 THEN COALESCE(SUM(te.hours), 0) - r.estimated_hours
         ELSE 0
+      END as variance,
+      CASE
+        WHEN r.estimated_hours IS NOT NULL AND r.estimated_hours > 0 THEN ROUND((COALESCE(SUM(te.hours), 0) * 100.0 / r.estimated_hours), 2)
+        ELSE 100
       END as usage_percentage
     FROM requests r
-    LEFT JOIN time_entries te ON te.request_id = r.id
+    INNER JOIN time_entries te ON te.request_id = r.id
     WHERE r.status = 'Completed'
     GROUP BY r.id, r.title, r.priority, r.estimated_hours
-    HAVING r.estimated_hours > 0
-    ORDER BY ABS(COALESCE(SUM(te.hours), 0) - r.estimated_hours) DESC
+    HAVING COALESCE(SUM(te.hours), 0) > 0
+    ORDER BY COALESCE(SUM(te.hours), 0) DESC
     LIMIT 20
   `;
 

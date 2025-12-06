@@ -1,6 +1,24 @@
+/**
+ * @fileoverview Authentication Controller
+ *
+ * Handles user authentication including local login, SSO via Microsoft Entra ID,
+ * session management, and logout operations.
+ *
+ * Authentication Methods:
+ * 1. Local: Email/password with bcrypt hashing
+ * 2. SSO: Microsoft Entra ID with PKCE flow
+ *
+ * Session Management:
+ * - Sessions stored in database with user agent and IP tracking
+ * - HTTP-only cookies for session tokens
+ * - Support for multi-device session management
+ * - Session revocation (single, all, or other devices)
+ *
+ * @module controllers/authController
+ */
+
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
@@ -12,10 +30,23 @@ import {
 } from '../services/msalService';
 import { getUserPhoto } from '../services/graphService';
 import { logAudit, AuditAction, EntityType, getIpFromRequest, getUserAgentFromRequest } from '../services/auditService';
-
-// JWT secret - in production, this should be in environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'sim-flow-secret-key-change-in-production';
-const JWT_EXPIRATION = '24h';
+import {
+  ValidationError,
+  AuthenticationError,
+  ErrorCode,
+} from '../utils/errors';
+import { asyncHandler } from '../middleware/errorHandler';
+import { SESSION_COOKIE_NAME, COOKIE_OPTIONS } from '../config/session';
+import {
+  generateSessionId,
+  storeSession,
+  revokeSession,
+  revokeAllUserSessions,
+  revokeOtherUserSessions,
+  getUserSessions,
+  revokeSessionById as revokeSessionByDbId,
+  validateSession,
+} from '../services/sessionService';
 
 interface User {
   id: string;
@@ -26,118 +57,254 @@ interface User {
   avatarUrl: string;
 }
 
-export const login = async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
+/**
+ * Set session cookie on response
+ */
+function setSessionCookie(res: Response, sessionId: string): void {
+  res.cookie(SESSION_COOKIE_NAME, sessionId, COOKIE_OPTIONS);
+}
 
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
+/**
+ * Clear session cookie from response
+ */
+function clearSessionCookie(res: Response): void {
+  res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+}
 
-    // Find user by email
-    const result = await query(
-      'SELECT id, name, email, password_hash, role, avatar_url FROM users WHERE email = $1',
-      [email.toLowerCase().trim()]
-    );
+/**
+ * Authenticate user with email and password
+ *
+ * Creates a new session and sets HTTP-only session cookie.
+ * Uses constant-time password comparison via bcrypt.
+ *
+ * @param req.body.email - User email address
+ * @param req.body.password - User password
+ * @returns user - User info (id, name, email, role, avatarUrl)
+ * @throws ValidationError if credentials are missing
+ * @throws AuthenticationError if credentials are invalid
+ */
+export const login = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
 
-    if (result.rows.length === 0) {
-      // Generic error message to prevent user enumeration
-      logger.warn(`Failed login attempt for email: ${email}`);
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
+  // Validation
+  if (!email || !password) {
+    throw new ValidationError('Email and password are required', {
+      fields: { email: !email, password: !password },
+    });
+  }
 
-    const user = toCamelCase<User>(result.rows[0]);
+  // Find user by email
+  const result = await query(
+    'SELECT id, name, email, password_hash, role, avatar_url FROM users WHERE email = $1',
+    [email.toLowerCase().trim()]
+  );
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+  if (result.rows.length === 0) {
+    // Generic error message to prevent user enumeration
+    logger.warn(`Failed login attempt for email: ${email}`);
+    throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
+  }
 
-    if (!isPasswordValid) {
-      logger.warn(`Failed login attempt for user: ${user.id} (${email})`);
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
+  const user = toCamelCase<User>(result.rows[0]);
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-      },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRATION }
-    );
+  // Verify password
+  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
-    // Return user info and token (exclude password hash)
-    const userResponse = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-    };
+  if (!isPasswordValid) {
+    logger.warn(`Failed login attempt for user: ${user.id} (${email})`);
+    throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
+  }
 
-    logger.info(`User logged in: ${user.id} (${email}) - Role: ${user.role}`);
+  // Generate and store session
+  const sessionId = generateSessionId();
+  await storeSession(
+    user.id,
+    sessionId,
+    getUserAgentFromRequest(req),
+    getIpFromRequest(req)
+  );
 
-    // Log audit trail
+  // Set session cookie
+  setSessionCookie(res, sessionId);
+
+  // Return user info (no tokens in response body)
+  const userResponse = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+  };
+
+  logger.info(`User logged in: ${user.id} (${email}) - Role: ${user.role}`);
+
+  // Log audit trail
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    userName: user.name,
+    action: AuditAction.LOGIN,
+    entityType: EntityType.AUTH,
+    ipAddress: getIpFromRequest(req),
+    userAgent: getUserAgentFromRequest(req),
+    details: { role: user.role },
+  });
+
+  res.json({ user: userResponse });
+});
+
+/**
+ * Verify session and return user info
+ * Used by frontend to check if session is still valid on page load
+ */
+export const verifySession = asyncHandler(async (req: Request, res: Response) => {
+  const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
+
+  if (!sessionId) {
+    throw new AuthenticationError('No session', ErrorCode.AUTH_REQUIRED);
+  }
+
+  const user = await validateSession(sessionId);
+
+  if (!user) {
+    clearSessionCookie(res);
+    throw new AuthenticationError('Invalid session', ErrorCode.AUTH_INVALID_TOKEN);
+  }
+
+  // Fetch full user data including avatar
+  const result = await query(
+    'SELECT id, name, email, role, avatar_url FROM users WHERE id = $1',
+    [user.id]
+  );
+
+  if (result.rows.length === 0) {
+    clearSessionCookie(res);
+    throw new AuthenticationError('User not found', ErrorCode.AUTH_INVALID_TOKEN);
+  }
+
+  const fullUser = toCamelCase(result.rows[0]);
+
+  res.json({ user: fullUser, valid: true });
+});
+
+/**
+ * Logout - revoke session and clear cookie
+ */
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
+
+  if (sessionId) {
+    await revokeSession(sessionId, 'logout');
+    logger.info('User logged out, session revoked');
+  }
+
+  // Clear the cookie
+  clearSessionCookie(res);
+
+  // Log audit trail if user is authenticated
+  if (req.user) {
     await logAudit({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: AuditAction.LOGIN,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      userName: req.user.name,
+      action: AuditAction.LOGOUT,
       entityType: EntityType.AUTH,
       ipAddress: getIpFromRequest(req),
       userAgent: getUserAgentFromRequest(req),
-      details: { role: user.role },
     });
-
-    res.json({
-      user: userResponse,
-      token,
-    });
-  } catch (error) {
-    logger.error('Error during login:', error);
-    res.status(500).json({ error: 'Login failed' });
   }
-};
 
-export const verifyToken = async (req: Request, res: Response) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+  res.json({ success: true });
+});
 
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-      userId: string;
-      email: string;
-      role: string;
-      name: string;
-    };
-
-    // Optionally verify user still exists in database
-    const result = await query(
-      'SELECT id, name, email, role, avatar_url FROM users WHERE id = $1',
-      [decoded.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    const user = toCamelCase(result.rows[0]);
-
-    res.json({ user, valid: true });
-  } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: 'Invalid token', valid: false });
-    }
-    logger.error('Error verifying token:', error);
-    res.status(500).json({ error: 'Token verification failed' });
+/**
+ * Logout from all devices - revoke all sessions
+ */
+export const logoutAll = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AuthenticationError('Authentication required', ErrorCode.AUTH_REQUIRED);
   }
-};
+
+  const revokedCount = await revokeAllUserSessions(req.user.id, 'logout_all');
+
+  // Clear the current cookie
+  clearSessionCookie(res);
+
+  await logAudit({
+    userId: req.user.id,
+    userEmail: req.user.email,
+    userName: req.user.name,
+    action: AuditAction.LOGOUT,
+    entityType: EntityType.AUTH,
+    ipAddress: getIpFromRequest(req),
+    userAgent: getUserAgentFromRequest(req),
+    details: { allDevices: true, revokedCount },
+  });
+
+  logger.info(`User ${req.user.id} logged out from all devices (${revokedCount} sessions)`);
+
+  res.json({ success: true, revokedCount });
+});
+
+/**
+ * Logout from all other devices - revoke other sessions, keep current
+ */
+export const logoutOthers = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !req.sessionId) {
+    throw new AuthenticationError('Authentication required', ErrorCode.AUTH_REQUIRED);
+  }
+
+  const revokedCount = await revokeOtherUserSessions(req.user.id, req.sessionId, 'logout_others');
+
+  await logAudit({
+    userId: req.user.id,
+    userEmail: req.user.email,
+    userName: req.user.name,
+    action: AuditAction.LOGOUT,
+    entityType: EntityType.AUTH,
+    ipAddress: getIpFromRequest(req),
+    userAgent: getUserAgentFromRequest(req),
+    details: { otherDevices: true, revokedCount },
+  });
+
+  logger.info(`User ${req.user.id} logged out from other devices (${revokedCount} sessions)`);
+
+  res.json({ success: true, revokedCount });
+});
+
+/**
+ * Get active sessions for current user
+ */
+export const getSessions = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AuthenticationError('Authentication required', ErrorCode.AUTH_REQUIRED);
+  }
+
+  const sessions = await getUserSessions(req.user.id);
+
+  res.json({ sessions });
+});
+
+/**
+ * Revoke a specific session by ID
+ */
+export const revokeSessionById = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AuthenticationError('Authentication required', ErrorCode.AUTH_REQUIRED);
+  }
+
+  const { sessionId } = req.params;
+
+  const revoked = await revokeSessionByDbId(sessionId, req.user.id);
+
+  if (!revoked) {
+    throw new ValidationError('Session not found or already revoked');
+  }
+
+  logger.info(`User ${req.user.id} revoked session ${sessionId}`);
+
+  res.json({ success: true });
+});
 
 /**
  * Check if SSO is enabled
@@ -254,19 +421,19 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
       logger.info(`Existing user logged in via SSO: ${user.email}`);
     }
 
-    // Generate JWT token (exclude password hash from response)
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-      },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRATION }
+    // Generate and store session
+    const sessionId = generateSessionId();
+    await storeSession(
+      user.id,
+      sessionId,
+      getUserAgentFromRequest(req),
+      getIpFromRequest(req)
     );
 
-    // Return user info and token (create response without password hash)
+    // Set session cookie
+    setSessionCookie(res, sessionId);
+
+    // Return user info (no tokens in response body)
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -289,7 +456,6 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
 
     res.json({
       user: userResponse,
-      token,
       method: 'sso',
     });
   } catch (error) {
