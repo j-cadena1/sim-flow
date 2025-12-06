@@ -100,6 +100,22 @@ INSERT INTO users (name, email, password_hash, role, avatar_url) VALUES
     ('Bob Manager', 'bob@simflow.local', '$2b$10$tNgQPQGmKIVU6E467EKbIed/1Kqbh.D99q/izl2yZ6DSZoqfqmmUS', 'Manager', 'https://api.dicebear.com/7.x/avataaars/svg?seed=bob'),
     ('Charlie Engineer', 'charlie@simflow.local', '$2b$10$ZqaYJK.tKOidGRV0OsSGtu9lUCt7J4.sWRKe2Zq8K9JnHv9y04ghy', 'Engineer', 'https://api.dicebear.com/7.x/avataaars/svg?seed=charlie');
 
+-- Apply migrations
+\i /docker-entrypoint-initdb.d/migrations/001_add_projects_and_revisions.sql
+\i /docker-entrypoint-initdb.d/migrations/002_add_time_tracking.sql
+\i /docker-entrypoint-initdb.d/migrations/003_add_title_change_requests.sql
+\i /docker-entrypoint-initdb.d/migrations/004_add_discussion_requests.sql
+\i /docker-entrypoint-initdb.d/migrations/005_add_user_passwords.sql
+\i /docker-entrypoint-initdb.d/migrations/006_add_sso_configuration.sql
+\i /docker-entrypoint-initdb.d/migrations/007_add_user_sso_tracking.sql
+\i /docker-entrypoint-initdb.d/migrations/008_extend_avatar_url.sql
+\i /docker-entrypoint-initdb.d/migrations/009_add_performance_indexes.sql
+\i /docker-entrypoint-initdb.d/migrations/010_add_audit_logs.sql
+\i /docker-entrypoint-initdb.d/migrations/011_add_refresh_tokens.sql
+\i /docker-entrypoint-initdb.d/migrations/012_add_on_behalf_of_fields.sql
+\i /docker-entrypoint-initdb.d/migrations/013_enhance_project_lifecycle.sql
+\i /docker-entrypoint-initdb.d/migrations/014_user_soft_delete.sql
+
 -- Grant permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO simflow_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO simflow_user;

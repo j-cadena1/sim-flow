@@ -32,6 +32,7 @@ import { useRequest, useProject, useUpdateProjectHours, useDeleteRequest, useTim
 import { RequestStatus, UserRole, TitleChangeRequest, DiscussionRequest } from '../types';
 import { validateComment } from '../utils/validation';
 import { CheckCircle, XCircle, Clock, UserPlus, ArrowLeft, MessageSquare, AlertTriangle, User as UserIcon, FolderOpen, Trash2, Timer, MoreVertical, Edit2, Check, X, UserCog } from 'lucide-react';
+import { DeletedUserTooltip } from './DeletedUserTooltip';
 
 /**
  * Request Detail page component
@@ -925,13 +926,23 @@ export const RequestDetail: React.FC = () => {
             ) : (
               <span className="flex items-center">
                 <UserIcon size={14} className="mr-1" />
-                {request.createdByName}
+                <DeletedUserTooltip
+                  userId={request.createdBy}
+                  displayName={request.createdByName}
+                  showIcon={false}
+                />
                 {request.createdByAdminName && (
                   <span className="ml-2 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800">
-                    Created by {request.createdByAdminName} (Admin)
+                    Created by{' '}
+                    <DeletedUserTooltip
+                      userId={request.createdByAdminId}
+                      displayName={request.createdByAdminName}
+                      showIcon={false}
+                    />
+                    {' '}(Admin)
                   </span>
                 )}
-                {currentUser.role === UserRole.ADMIN && (
+                {currentUser.role === UserRole.ADMIN && request.createdBy && (
                   <button
                     onClick={handleStartChangingRequester}
                     className="ml-2 p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
@@ -1237,12 +1248,18 @@ export const RequestDetail: React.FC = () => {
 
           {request.assignedToName && (
              <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800 mb-4">
-               <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+               <div className={`w-8 h-8 rounded-full ${request.assignedTo ? 'bg-blue-100 dark:bg-blue-900/50' : 'bg-gray-200 dark:bg-slate-700'} flex items-center justify-center ${request.assignedTo ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-slate-400'} font-bold`}>
                  {request.assignedToName[0]}
                </div>
                <div>
                  <p className="text-xs text-gray-500 dark:text-slate-500">Assigned Engineer</p>
-                 <p className="text-sm font-medium text-gray-900 dark:text-white">{request.assignedToName}</p>
+                 <p className="text-sm font-medium text-gray-900 dark:text-white">
+                   <DeletedUserTooltip
+                     userId={request.assignedTo}
+                     displayName={request.assignedToName}
+                     showIcon={true}
+                   />
+                 </p>
                </div>
              </div>
           )}

@@ -31,7 +31,8 @@ pool.on('connect', () => {
   logger.info('Database connected');
 });
 
-export const query = (text: string, params?: (string | number | boolean | null)[]) => {
+type QueryParam = string | number | boolean | null | string[] | number[];
+export const query = (text: string, params?: QueryParam[]) => {
   return pool.query(text, params);
 };
 

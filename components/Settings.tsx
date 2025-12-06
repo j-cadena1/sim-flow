@@ -29,6 +29,7 @@ interface ManagedUser {
   entraId: string | null;
   lastSyncAt: string | null;
   createdAt: string;
+  deletedAt: string | null;
 }
 
 interface DirectoryUser {
@@ -72,6 +73,10 @@ export const Settings: React.FC = () => {
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState('');
+  const [showDeactivated, setShowDeactivated] = useState(false);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<ManagedUser | null>(null);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
 
   useEffect(() => {
     // Only load SSO config if user is qAdmin
@@ -147,7 +152,7 @@ export const Settings: React.FC = () => {
   const loadUsers = async () => {
     try {
       setIsLoadingUsers(true);
-      const response = await apiClient.get('/users/management');
+      const response = await apiClient.get(`/users/management?includeDeactivated=${showDeactivated}`);
       setUsers(response.data.users);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -156,6 +161,13 @@ export const Settings: React.FC = () => {
       setIsLoadingUsers(false);
     }
   };
+
+  // Reload users when showDeactivated changes
+  useEffect(() => {
+    if (activeTab === 'users') {
+      loadUsers();
+    }
+  }, [showDeactivated]);
 
   const loadDirectoryUsers = async () => {
     try {
@@ -226,17 +238,45 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) {
-      return;
-    }
-
+  const handleDeactivateUser = async (userId: string) => {
     try {
-      await apiClient.delete(`/users/management/${userId}`);
-      showToast('User deleted successfully', 'success');
+      await apiClient.post(`/users/management/${userId}/deactivate`);
+      showToast('User deactivated successfully', 'success');
       loadUsers();
     } catch (error: any) {
-      console.error('Error deleting user:', error);
+      console.error('Error deactivating user:', error);
+      showToast(error.response?.data?.error || 'Failed to deactivate user', 'error');
+    }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+    try {
+      await apiClient.post(`/users/management/${userId}/restore`);
+      showToast('User restored successfully', 'success');
+      loadUsers();
+    } catch (error: any) {
+      console.error('Error restoring user:', error);
+      showToast(error.response?.data?.error || 'Failed to restore user', 'error');
+    }
+  };
+
+  const handlePermanentlyDeleteUser = async () => {
+    if (!deleteConfirmUser) return;
+
+    try {
+      await apiClient.delete(`/users/management/${deleteConfirmUser.id}`, {
+        data: {
+          confirmEmail: deleteConfirmEmail,
+          reason: deleteReason,
+        },
+      });
+      showToast('User permanently deleted', 'success');
+      setDeleteConfirmUser(null);
+      setDeleteConfirmEmail('');
+      setDeleteReason('');
+      loadUsers();
+    } catch (error: any) {
+      console.error('Error permanently deleting user:', error);
       showToast(error.response?.data?.error || 'Failed to delete user', 'error');
     }
   };
@@ -511,23 +551,34 @@ export const Settings: React.FC = () => {
                 <p className="text-sm text-gray-500 dark:text-slate-400">Manage users and import from Entra ID directory</p>
               </div>
             </div>
-            <button
-              onClick={loadDirectoryUsers}
-              disabled={isLoadingDirectory}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-            >
-              {isLoadingDirectory ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  Import from Entra ID
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={showDeactivated}
+                  onChange={(e) => setShowDeactivated(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-blue-600 focus:ring-blue-500"
+                />
+                Show deactivated users
+              </label>
+              <button
+                onClick={loadDirectoryUsers}
+                disabled={isLoadingDirectory}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                {isLoadingDirectory ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Import from Entra ID
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Users Table */}
@@ -554,14 +605,14 @@ export const Settings: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Auth Source</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Last Sync</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
                     {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-950/50">
+                      <tr key={user.id} className={`hover:bg-gray-50 dark:hover:bg-slate-950/50 ${user.deletedAt ? 'opacity-60' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
                         </td>
@@ -569,7 +620,7 @@ export const Settings: React.FC = () => {
                           <div className="text-sm text-gray-500 dark:text-slate-400">{user.email}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {editingUserId === user.id ? (
+                          {editingUserId === user.id && !user.deletedAt ? (
                             <div className="flex items-center gap-2">
                               <select
                                 value={editingRole}
@@ -604,16 +655,29 @@ export const Settings: React.FC = () => {
                               }`}>
                                 {user.role}
                               </span>
-                              <button
-                                onClick={() => {
-                                  setEditingUserId(user.id);
-                                  setEditingRole(user.role);
-                                }}
-                                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </button>
+                              {!user.deletedAt && (
+                                <button
+                                  onClick={() => {
+                                    setEditingUserId(user.id);
+                                    setEditingRole(user.role);
+                                  }}
+                                  className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {user.deletedAt ? (
+                            <span className="px-2 py-1 text-xs rounded-full bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400">
+                              Deactivated
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
+                              Active
+                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -625,27 +689,49 @@ export const Settings: React.FC = () => {
                             {user.authSource === 'entra_id' ? 'Entra ID' : 'Local'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
-                          {user.lastSyncAt ? new Date(user.lastSyncAt).toLocaleDateString() : 'Never'}
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                           <div className="flex items-center justify-end gap-2">
-                            {user.authSource === 'entra_id' && (
-                              <button
-                                onClick={() => handleSyncUser(user.id)}
-                                className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
-                                title="Sync from Entra ID"
-                              >
-                                <RefreshCw className="w-4 h-4" />
-                              </button>
+                            {user.deletedAt ? (
+                              <>
+                                {/* Restore button for deactivated users */}
+                                <button
+                                  onClick={() => handleRestoreUser(user.id)}
+                                  className="text-green-600 dark:text-green-400 hover:text-green-500 dark:hover:text-green-300"
+                                  title="Restore user"
+                                >
+                                  <RefreshCw className="w-4 h-4" />
+                                </button>
+                                {/* Permanently delete button */}
+                                <button
+                                  onClick={() => setDeleteConfirmUser(user)}
+                                  className="text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300"
+                                  title="Permanently delete user"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* Sync button for Entra ID users */}
+                                {user.authSource === 'entra_id' && (
+                                  <button
+                                    onClick={() => handleSyncUser(user.id)}
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
+                                    title="Sync from Entra ID"
+                                  >
+                                    <RefreshCw className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {/* Deactivate button for active users */}
+                                <button
+                                  onClick={() => handleDeactivateUser(user.id)}
+                                  className="text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300"
+                                  title="Deactivate user"
+                                >
+                                  <Shield className="w-4 h-4" />
+                                </button>
+                              </>
                             )}
-                            <button
-                              onClick={() => handleDeleteUser(user.id, user.email)}
-                              className="text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300"
-                              title="Delete user"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -754,6 +840,78 @@ export const Settings: React.FC = () => {
                   Import Selected Users
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Confirmation Modal */}
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 dark:bg-red-600/20 p-2 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Permanently Delete User</h3>
+            </div>
+
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
+              <p className="text-sm text-red-700 dark:text-red-300">
+                <strong>Warning:</strong> This action cannot be undone. The user <strong>{deleteConfirmUser.name}</strong> ({deleteConfirmUser.email}) will be permanently removed from the system.
+              </p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                Their identity will be archived for historical reference, but their account and login access will be permanently deleted.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                  Type the user's email to confirm: <strong>{deleteConfirmUser.email}</strong>
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmEmail}
+                  onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                  placeholder="Enter email to confirm"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                  Reason for deletion (optional)
+                </label>
+                <input
+                  type="text"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="e.g., Employee left the company"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setDeleteConfirmUser(null);
+                  setDeleteConfirmEmail('');
+                  setDeleteReason('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePermanentlyDeleteUser}
+                disabled={deleteConfirmEmail.toLowerCase() !== deleteConfirmUser.email.toLowerCase()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Permanently
+              </button>
             </div>
           </div>
         </div>

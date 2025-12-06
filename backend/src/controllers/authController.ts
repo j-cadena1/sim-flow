@@ -93,9 +93,9 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
-  // Find user by email
+  // Find user by email (exclude soft-deleted users)
   const result = await query(
-    'SELECT id, name, email, password_hash, role, avatar_url FROM users WHERE email = $1',
+    'SELECT id, name, email, password_hash, role, avatar_url, deleted_at FROM users WHERE email = $1',
     [email.toLowerCase().trim()]
   );
 
@@ -105,7 +105,13 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
   }
 
-  const user = toCamelCase<User>(result.rows[0]);
+  const user = toCamelCase<User & { deletedAt: string | null }>(result.rows[0]);
+
+  // Check if user is deactivated
+  if (user.deletedAt) {
+    logger.warn(`Login attempt for deactivated user: ${user.id} (${email})`);
+    throw new AuthenticationError('This account has been deactivated. Please contact an administrator.', ErrorCode.AUTH_INVALID_CREDENTIALS);
+  }
 
   // Verify password
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -378,7 +384,7 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
 
     // Find or create user
     let userResult = await query(
-      'SELECT id, name, email, role, avatar_url FROM users WHERE email = $1',
+      'SELECT id, name, email, role, avatar_url, deleted_at FROM users WHERE email = $1',
       [userInfo.email.toLowerCase()]
     );
 
@@ -405,6 +411,14 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
       user = toCamelCase<User>(insertResult.rows[0]);
       logger.info(`Created new user from SSO: ${user.email}`);
     } else {
+      // Check if user is deactivated
+      if (userResult.rows[0].deleted_at) {
+        logger.warn(`SSO login attempt for deactivated user: ${userInfo.email}`);
+        return res.status(403).json({
+          error: 'This account has been deactivated. Please contact an administrator.',
+        });
+      }
+
       // Update existing user's name and avatar if changed
       await query(
         'UPDATE users SET name = $1, avatar_url = $2, auth_source = $3, entra_id = $4 WHERE email = $5',

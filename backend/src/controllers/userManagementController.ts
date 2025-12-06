@@ -15,23 +15,39 @@ interface User {
   entraId: string | null;
   lastSyncAt: string | null;
   createdAt: string;
+  deletedAt: string | null;
+}
+
+interface DeletedUserInfo {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  deletedAt: string;
 }
 
 /**
  * Get all users with their auth source
- * Admin only
+ * Admin only - includes both active and deactivated users
  */
 export const getAllUsersManagement = async (req: Request, res: Response) => {
   try {
-    const result = await query(
-      `SELECT id, name, email, role, avatar_url, auth_source, entra_id, last_sync_at, created_at
-       FROM users
-       ORDER BY created_at DESC`
-    );
+    const includeDeactivated = req.query.includeDeactivated === 'true';
+
+    let sql = `SELECT id, name, email, role, avatar_url, auth_source, entra_id, last_sync_at, created_at, deleted_at
+       FROM users`;
+
+    if (!includeDeactivated) {
+      sql += ` WHERE deleted_at IS NULL`;
+    }
+
+    sql += ` ORDER BY deleted_at NULLS FIRST, created_at DESC`;
+
+    const result = await query(sql);
 
     const users = toCamelCase<User[]>(result.rows);
 
-    logger.info(`Retrieved ${users.length} users for management`);
+    logger.info(`Retrieved ${users.length} users for management (includeDeactivated: ${includeDeactivated})`);
     res.json({ users });
   } catch (error) {
     logger.error('Error fetching users for management:', error);
@@ -273,12 +289,130 @@ export const bulkImportUsers = async (req: Request, res: Response) => {
 };
 
 /**
- * Delete a user
- * Admin only - cannot delete yourself
+ * Deactivate a user (soft delete)
+ * User cannot login but all their data is preserved
+ * Admin only - cannot deactivate yourself
  */
-export const deleteUser = async (req: Request, res: Response) => {
+export const deactivateUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const admin = req.user;
+
+    // Prevent deactivating yourself
+    if (admin?.userId === id) {
+      return res.status(400).json({
+        error: 'Cannot deactivate your own account',
+      });
+    }
+
+    // Check if user exists and is not already deactivated
+    const checkResult = await query(
+      'SELECT id, email, name, deleted_at FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (checkResult.rows[0].deleted_at) {
+      return res.status(400).json({ error: 'User is already deactivated' });
+    }
+
+    const result = await query(
+      'UPDATE users SET deleted_at = NOW() WHERE id = $1 RETURNING id, email, name',
+      [id]
+    );
+
+    logger.info(`User ${id} (${result.rows[0].email}) deactivated by admin ${admin?.userId}`);
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.DELETE_USER,
+      EntityType.USER,
+      id,
+      {
+        action: 'deactivate',
+        deactivatedUserEmail: result.rows[0].email,
+        deactivatedUserName: result.rows[0].name
+      }
+    );
+
+    res.json({
+      message: 'User deactivated successfully. They can no longer login but their data is preserved.',
+      id: result.rows[0].id
+    });
+  } catch (error) {
+    logger.error('Error deactivating user:', error);
+    res.status(500).json({ error: 'Failed to deactivate user' });
+  }
+};
+
+/**
+ * Restore a deactivated user
+ * Admin only
+ */
+export const restoreUser = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const admin = req.user;
+
+    // Check if user exists and is deactivated
+    const checkResult = await query(
+      'SELECT id, email, name, deleted_at FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!checkResult.rows[0].deleted_at) {
+      return res.status(400).json({ error: 'User is not deactivated' });
+    }
+
+    const result = await query(
+      'UPDATE users SET deleted_at = NULL WHERE id = $1 RETURNING id, email, name',
+      [id]
+    );
+
+    logger.info(`User ${id} (${result.rows[0].email}) restored by admin ${admin?.userId}`);
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.UPDATE_USER_ROLE, // Reusing this action type for restore
+      EntityType.USER,
+      id,
+      {
+        action: 'restore',
+        restoredUserEmail: result.rows[0].email,
+        restoredUserName: result.rows[0].name
+      }
+    );
+
+    res.json({
+      message: 'User restored successfully. They can now login again.',
+      id: result.rows[0].id
+    });
+  } catch (error) {
+    logger.error('Error restoring user:', error);
+    res.status(500).json({ error: 'Failed to restore user' });
+  }
+};
+
+/**
+ * Permanently delete a user (hard delete)
+ * Archives user info to deleted_users table for historical reference
+ * Then removes user from users table
+ * Admin only - cannot delete yourself
+ * Requires confirmation (user email must match)
+ */
+export const permanentlyDeleteUser = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { confirmEmail, reason } = req.body;
     const admin = req.user;
 
     // Prevent deleting yourself
@@ -288,16 +422,41 @@ export const deleteUser = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await query(
-      'DELETE FROM users WHERE id = $1 RETURNING id, email',
+    // Get user details
+    const userResult = await query(
+      'SELECT id, email, name, role, created_at, entra_id FROM users WHERE id = $1',
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    logger.info(`User ${id} (${result.rows[0].email}) deleted by admin ${admin?.userId}`);
+    const user = userResult.rows[0];
+
+    // Require confirmation by typing email
+    if (!confirmEmail || confirmEmail.toLowerCase() !== user.email.toLowerCase()) {
+      return res.status(400).json({
+        error: 'Please confirm by typing the user\'s email address',
+        requiredEmail: user.email
+      });
+    }
+
+    // Archive user info to deleted_users table
+    await query(
+      `INSERT INTO deleted_users (id, email, name, role, deleted_by, deletion_reason, original_created_at, sso_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (id) DO UPDATE SET
+         deleted_at = NOW(),
+         deleted_by = $5,
+         deletion_reason = $6`,
+      [user.id, user.email, user.name, user.role, admin?.userId, reason || null, user.created_at, user.entra_id]
+    );
+
+    // Delete the user (foreign key SET NULL constraints will preserve related data)
+    await query('DELETE FROM users WHERE id = $1', [id]);
+
+    logger.info(`User ${id} (${user.email}) permanently deleted by admin ${admin?.userId}. Reason: ${reason || 'Not specified'}`);
 
     // Log audit trail
     await logRequestAudit(
@@ -305,12 +464,109 @@ export const deleteUser = async (req: Request, res: Response) => {
       AuditAction.DELETE_USER,
       EntityType.USER,
       id,
-      { deletedUserEmail: result.rows[0].email }
+      {
+        action: 'permanent_delete',
+        deletedUserEmail: user.email,
+        deletedUserName: user.name,
+        reason: reason || 'Not specified'
+      }
     );
 
-    res.json({ message: 'User deleted successfully', id: result.rows[0].id });
+    res.json({
+      message: 'User permanently deleted. Their identity is archived for historical reference.',
+      id: user.id
+    });
   } catch (error) {
-    logger.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Failed to delete user' });
+    logger.error('Error permanently deleting user:', error);
+    res.status(500).json({ error: 'Failed to permanently delete user' });
+  }
+};
+
+/**
+ * Get deleted user info by ID
+ * Used for tooltips showing original user info on anonymized records
+ */
+export const getDeletedUserInfo = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      'SELECT id, email, name, role, deleted_at FROM deleted_users WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Deleted user not found' });
+    }
+
+    const deletedUser = toCamelCase<DeletedUserInfo>(result.rows[0]);
+    res.json({ deletedUser });
+  } catch (error) {
+    logger.error('Error fetching deleted user info:', error);
+    res.status(500).json({ error: 'Failed to fetch deleted user info' });
+  }
+};
+
+/**
+ * Batch lookup deleted users by IDs or names
+ * More efficient for loading multiple deleted user references at once
+ * Supports both ID lookup (when available) and name lookup (for historical records)
+ */
+export const batchGetDeletedUsers = async (req: Request, res: Response) => {
+  try {
+    const { ids, names } = req.body;
+
+    // Must provide either ids or names array
+    if ((!Array.isArray(ids) || ids.length === 0) && (!Array.isArray(names) || names.length === 0)) {
+      return res.status(400).json({ error: 'ids or names array is required' });
+    }
+
+    const usersMap: Record<string, DeletedUserInfo> = {};
+
+    // Lookup by IDs if provided
+    if (Array.isArray(ids) && ids.length > 0) {
+      const limitedIds = ids.slice(0, 100);
+      const result = await query(
+        `SELECT id, email, name, role, deleted_at, deleted_by, deletion_reason, original_created_at
+         FROM deleted_users WHERE id = ANY($1)`,
+        [limitedIds]
+      );
+
+      const deletedUsers = toCamelCase<DeletedUserInfo[]>(result.rows);
+      deletedUsers.forEach(user => {
+        usersMap[user.id] = user;
+      });
+    }
+
+    // Lookup by names if provided (for historical records where we only have the name)
+    if (Array.isArray(names) && names.length > 0) {
+      const limitedNames = names.slice(0, 100);
+      const result = await query(
+        `SELECT du.id, du.email, du.name, du.role, du.deleted_at, du.deleted_by, du.deletion_reason, du.original_created_at,
+                u.name as deleted_by_name
+         FROM deleted_users du
+         LEFT JOIN users u ON du.deleted_by = u.id
+         WHERE du.name = ANY($1)`,
+        [limitedNames]
+      );
+
+      interface ExtendedDeletedUserInfo extends DeletedUserInfo {
+        deletedBy?: string;
+        deletedByName?: string;
+        deletionReason?: string;
+        originalCreatedAt?: string;
+      }
+
+      const deletedUsers = toCamelCase<ExtendedDeletedUserInfo[]>(result.rows);
+      deletedUsers.forEach(user => {
+        // Key by name for name lookups (since that's what the frontend will use)
+        usersMap[user.name] = user;
+      });
+    }
+
+    res.json({ users: usersMap });
+  } catch (error) {
+    logger.error('Error batch fetching deleted users:', error);
+    res.status(500).json({ error: 'Failed to fetch deleted users' });
   }
 };

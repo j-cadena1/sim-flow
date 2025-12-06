@@ -6,7 +6,11 @@ import {
   syncUserFromEntraID,
   getEntraIDDirectoryUsers,
   bulkImportUsers,
-  deleteUser,
+  deactivateUser,
+  restoreUser,
+  permanentlyDeleteUser,
+  getDeletedUserInfo,
+  batchGetDeletedUsers,
 } from '../controllers/userManagementController';
 
 const router = Router();
@@ -14,6 +18,7 @@ const router = Router();
 /**
  * GET /api/users/management
  * Get all users with their auth source and sync status
+ * Query params: ?includeDeactivated=true to include soft-deleted users
  * Admin only
  */
 router.get('/', requireRole(['Admin']), getAllUsersManagement);
@@ -24,6 +29,22 @@ router.get('/', requireRole(['Admin']), getAllUsersManagement);
  * Admin only
  */
 router.get('/directory', requireRole(['Admin']), getEntraIDDirectoryUsers);
+
+/**
+ * GET /api/users/management/deleted/:id
+ * Get archived info for a permanently deleted user
+ * Used for tooltips on anonymized records
+ * Admin only
+ */
+router.get('/deleted/:id', requireRole(['Admin']), getDeletedUserInfo);
+
+/**
+ * POST /api/users/management/deleted/batch
+ * Batch lookup archived info for multiple deleted users
+ * Body: { ids: string[] }
+ * Admin only
+ */
+router.post('/deleted/batch', requireRole(['Admin']), batchGetDeletedUsers);
 
 /**
  * PATCH /api/users/management/:id/role
@@ -47,10 +68,26 @@ router.post('/:id/sync', requireRole(['Admin']), syncUserFromEntraID);
 router.post('/import', requireRole(['Admin']), bulkImportUsers);
 
 /**
- * DELETE /api/users/management/:id
- * Delete a user
+ * POST /api/users/management/:id/deactivate
+ * Soft delete - user cannot login but data is preserved
  * Admin only
  */
-router.delete('/:id', requireRole(['Admin']), deleteUser);
+router.post('/:id/deactivate', requireRole(['Admin']), deactivateUser);
+
+/**
+ * POST /api/users/management/:id/restore
+ * Restore a deactivated user
+ * Admin only
+ */
+router.post('/:id/restore', requireRole(['Admin']), restoreUser);
+
+/**
+ * DELETE /api/users/management/:id
+ * Permanently delete a user (hard delete)
+ * Requires body: { confirmEmail: string, reason?: string }
+ * Archives user info before deletion for historical reference
+ * Admin only
+ */
+router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
 
 export default router;
