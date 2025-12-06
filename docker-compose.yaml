@@ -9,6 +9,11 @@
 # Or directly:
 #   docker compose up -d
 #
+# Reverse Proxy Integration:
+#   Only port 8080 is exposed - point your reverse proxy here.
+#   Works with: cloudflared, Nginx Proxy Manager, Traefik, Caddy, etc.
+#   See REVERSE-PROXY.md for detailed configuration examples.
+#
 # Version configuration via environment variables:
 # - NODE_VERSION: Node.js version (default: 20, supports 18-22)
 # - POSTGRES_VERSION: PostgreSQL version (default: 16, supports 14-17)
@@ -58,8 +63,9 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       PORT: 3001
       LOG_LEVEL: info
-    ports:
-      - "3001:3001"
+    # Backend only accessible within Docker network - frontend proxies API requests
+    expose:
+      - "3001"
     depends_on:
       postgres:
         condition: service_healthy

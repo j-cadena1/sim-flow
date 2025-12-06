@@ -16,7 +16,7 @@ const isProduction = process.env.NODE_ENV === 'production';
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 10 : 100, // 10 attempts in production, 100 in development
+  max: isProduction ? 30 : 100, // 30 attempts in production, 100 in development
   message: {
     error: 'Too many login attempts. Please try again after 15 minutes.',
     code: 'RATE_LIMIT_EXCEEDED',

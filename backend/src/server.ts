@@ -31,6 +31,11 @@ enforceSecureConfig();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy - required for correct client IP and protocol detection behind reverse proxies
+// Set to 1 to trust first proxy (Docker's internal nginx or external proxy)
+// This enables: req.ip, req.protocol, req.secure, req.hostname to work correctly
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors({

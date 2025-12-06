@@ -292,31 +292,30 @@ To add new migrations:
 git clone https://github.com/j-cadena1/sim-flow.git
 cd sim-flow
 cp .env.example .env
-nano .env  # Set JWT_SECRET and DB_PASSWORD
+nano .env  # Set DB_PASSWORD and CORS_ORIGIN
 make prod
 ```
 
-### Option 2: Behind Reverse Proxy (Production)
+### Option 2: Behind Reverse Proxy
 
-Example nginx configuration:
+Sim-Flow exposes a **single port (8080)** for easy reverse proxy integration. Works with cloudflared, Nginx Proxy Manager, Traefik, Caddy, and any other reverse proxy.
 
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name simflow.yourdomain.com;
+**Quick setup:**
 
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
+1. Start Sim-Flow: `make prod`
+2. Point your reverse proxy to `http://localhost:8080`
+3. Set `CORS_ORIGIN=https://your-domain.com` in `.env`
+4. Restart: `make prod-down && make prod`
 
-    location / {
-        proxy_pass http://localhost:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+**Supported reverse proxies:**
+
+- Cloudflare Tunnel (cloudflared)
+- Nginx Proxy Manager
+- Traefik
+- Caddy
+- Standard Nginx/Apache
+
+See [REVERSE-PROXY.md](REVERSE-PROXY.md) for detailed configuration examples.
 
 ### Option 3: Kubernetes (Advanced)
 
@@ -369,8 +368,8 @@ make prod
 ## 📚 Documentation
 
 - [Quick Start Guide](QUICKSTART.md) - Fast deployment walkthrough
-- [Backend Architecture](BACKEND-STATUS.md) - API documentation and architecture
-- [Project Structure](STRUCTURE.md) - Codebase organization
+- [Reverse Proxy Guide](REVERSE-PROXY.md) - Cloudflared, NPM, Traefik, Caddy setup
+- [Backend Architecture](BACKEND-ARCHITECTURE.md) - API documentation and architecture
 
 ## 🤝 Contributing
 

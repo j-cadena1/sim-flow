@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSimFlow } from '../contexts/SimFlowContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { RequestStatus } from '../types';
 import { CHART_COLORS, STATUS_INDICATOR_COLORS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -8,6 +9,7 @@ import { Activity, Clock, CheckCircle, AlertOctagon } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { requests } = useSimFlow();
+  const { theme } = useTheme();
 
   // Memoize stats calculations
   const stats = useMemo(() => {
@@ -78,9 +80,15 @@ export const Dashboard: React.FC = () => {
               />
               <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff' }}
-                itemStyle={{ color: '#fff' }}
-                cursor={{ fill: '#1e293b' }}
+                contentStyle={{
+                  backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
+                  borderColor: theme === 'dark' ? '#1e293b' : '#e5e7eb',
+                  color: theme === 'dark' ? '#fff' : '#111827',
+                  borderRadius: '8px',
+                  boxShadow: theme === 'dark' ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                }}
+                itemStyle={{ color: theme === 'dark' ? '#fff' : '#111827' }}
+                cursor={{ fill: theme === 'dark' ? '#1e293b' : '#f3f4f6' }}
               />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                 {statusData.map((entry, index) => (
