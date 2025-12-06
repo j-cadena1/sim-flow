@@ -36,13 +36,13 @@ export const Dashboard: React.FC = () => {
   }
 
   const StatCard: React.FC<StatCardProps> = React.memo(({ label, value, icon: Icon, color }) => (
-    <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 relative overflow-hidden group">
+    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 relative overflow-hidden group shadow-sm">
       <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
         <Icon size={64} />
       </div>
       <div className="relative z-10">
-        <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-3xl font-bold text-white mt-1">{value}</p>
+        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</p>
+        <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
       </div>
     </div>
   ));
@@ -50,8 +50,8 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-white">Dashboard</h2>
-        <p className="text-slate-400">Real-time overview of simulation throughput.</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h2>
+        <p className="text-gray-500 dark:text-slate-400">Real-time overview of simulation throughput.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -62,8 +62,8 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-[400px]">
-          <h3 className="text-lg font-semibold text-white mb-6">Request Status Distribution</h3>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 h-[400px] shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Request Status Distribution</h3>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={statusData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <XAxis
@@ -91,8 +91,8 @@ export const Dashboard: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-           <h3 className="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
            <div className="space-y-4">
              {requests.slice(0, 5).map(req => {
                const statusColor = STATUS_INDICATOR_COLORS[req.status] || STATUS_INDICATOR_COLORS.DEFAULT;
@@ -100,20 +100,20 @@ export const Dashboard: React.FC = () => {
                  <Link
                    key={req.id}
                    to={`/requests/${req.id}`}
-                   className="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-800/50 hover:border-blue-500/50 hover:bg-slate-900 transition-all group"
+                   className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800/50 hover:border-blue-500/50 hover:bg-gray-100 dark:hover:bg-slate-900 transition-all group"
                  >
                    <div className="flex items-center space-x-3">
                      <div className={`w-2 h-2 rounded-full ${statusColor}`} />
                      <div>
-                       <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{req.title}</p>
-                       <p className="text-xs text-slate-500">{new Date(req.createdAt).toLocaleDateString()}</p>
+                       <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{req.title}</p>
+                       <p className="text-xs text-gray-500 dark:text-slate-500">{new Date(req.createdAt).toLocaleDateString()}</p>
                      </div>
                    </div>
-                   <span className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300">{req.status}</span>
+                   <span className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300">{req.status}</span>
                  </Link>
                );
              })}
-             {requests.length === 0 && <p className="text-slate-500 text-sm">No recent activity.</p>}
+             {requests.length === 0 && <p className="text-gray-500 dark:text-slate-500 text-sm">No recent activity.</p>}
            </div>
         </div>
       </div>

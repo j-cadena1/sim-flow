@@ -20,14 +20,44 @@ export enum RequestStatus {
 }
 
 export enum ProjectStatus {
-  PENDING = 'Pending', // Awaiting management approval
-  APPROVED = 'Approved', // Active project
-  ARCHIVED = 'Archived' // Closed project
+  PENDING = 'Pending',       // Awaiting management approval
+  APPROVED = 'Approved',     // Legacy - use ACTIVE instead
+  ACTIVE = 'Active',         // Approved and actively being worked on
+  ON_HOLD = 'On Hold',       // Temporarily paused, can be resumed
+  SUSPENDED = 'Suspended',   // Administratively halted, requires approval to resume
+  COMPLETED = 'Completed',   // All work finished successfully
+  CANCELLED = 'Cancelled',   // Cancelled before completion
+  EXPIRED = 'Expired',       // Past deadline without completion
+  ARCHIVED = 'Archived'      // Historical record, no longer active
+}
+
+export enum ProjectPriority {
+  LOW = 'Low',
+  MEDIUM = 'Medium',
+  HIGH = 'High',
+  CRITICAL = 'Critical'
+}
+
+export enum HourTransactionType {
+  ALLOCATION = 'allocation',
+  DEALLOCATION = 'deallocation',
+  ADJUSTMENT = 'adjustment',
+  COMPLETION = 'completion',
+  ROLLOVER = 'rollover',
+  EXTENSION = 'extension'
+}
+
+export enum MilestoneStatus {
+  PENDING = 'Pending',
+  IN_PROGRESS = 'In Progress',
+  COMPLETED = 'Completed',
+  SKIPPED = 'Skipped'
 }
 
 export interface User {
   id: string;
   name: string;
+  email?: string;
   role: UserRole;
   avatar?: string; // Legacy - use avatarUrl instead
   avatarUrl?: string; // Profile picture URL or data URL
@@ -35,10 +65,11 @@ export interface User {
 
 export interface Comment {
   id: string;
+  authorId?: string;
   authorName: string;
   authorRole: UserRole;
   content: string;
-  timestamp: string;
+  timestamp?: string;
   createdAt?: string; // Backend uses createdAt
 }
 
@@ -46,13 +77,95 @@ export interface Project {
   id: string;
   name: string;
   code: string; // Unique project code
+  description?: string;
   totalHours: number;
   usedHours: number;
+  availableHours?: number; // Computed: totalHours - usedHours
   status: ProjectStatus;
+  priority?: ProjectPriority; // Optional - defaults to Medium if not set
+  category?: string;
+
+  // Dates
+  startDate?: string;
+  endDate?: string;
+  deadline?: string;
+
+  // Completion tracking
+  completedAt?: string;
+  completionNotes?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+
+  // Owner (project sponsor, different from creator)
+  ownerId?: string;
+  ownerName?: string;
+
+  // Creator info
   createdBy: string;
   createdByName: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface ProjectStatusHistory {
+  id: string;
+  projectId: string;
+  fromStatus?: ProjectStatus;
+  toStatus: ProjectStatus;
+  changedBy?: string;
+  changedByName: string;
+  reason?: string;
+  createdAt: string;
+}
+
+export interface ProjectHourTransaction {
+  id: string;
+  projectId: string;
+  requestId?: string;
+  transactionType: HourTransactionType;
+  hours: number; // Positive for additions, negative for deductions
+  balanceBefore: number;
+  balanceAfter: number;
+  performedBy?: string;
+  performedByName: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface ProjectMilestone {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  targetDate?: string;
+  completedAt?: string;
+  status: MilestoneStatus;
+  sortOrder: number;
+  createdBy?: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ProjectHealthMetrics {
+  id: string;
+  name: string;
+  code: string;
+  status: ProjectStatus;
+  priority?: ProjectPriority;
+  totalHours: number;
+  usedHours: number;
+  availableHours: number;
+  utilizationPercentage: number;
+  deadline?: string;
+  deadlineStatus?: 'Overdue' | 'Due Soon' | 'On Track';
+  startDate?: string;
+  endDate?: string;
+  totalRequests: number;
+  completedRequests: number;
+  activeRequests: number;
+  totalMilestones: number;
+  completedMilestones: number;
 }
 
 export interface TimeEntry {
@@ -69,13 +182,13 @@ export interface TimeEntry {
 export interface TitleChangeRequest {
   id: string;
   requestId: string;
-  requestedBy: string;
+  requestedBy?: string | null;
   requestedByName: string;
   currentTitle: string;
   proposedTitle: string;
   status: 'Pending' | 'Approved' | 'Denied';
-  reviewedBy?: string;
-  reviewedByName?: string;
+  reviewedBy?: string | null;
+  reviewedByName?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -104,57 +217,23 @@ export interface SimRequest {
   status: RequestStatus;
   priority: 'Low' | 'Medium' | 'High';
 
-  createdBy: string; // User ID
+  createdBy?: string | null; // User ID
   createdByName: string;
   createdAt: string;
 
-  assignedTo?: string; // Engineer User ID
-  assignedToName?: string;
+  // Fields for when admin creates request on behalf of user
+  createdByAdminId?: string | null;
+  createdByAdminName?: string | null;
 
-  estimatedHours?: number;
-  allocatedHours?: number; // Hours allocated from project bucket
+  assignedTo?: string | null; // Engineer User ID
+  assignedToName?: string | null;
 
-  projectId?: string; // Associated project
-  projectName?: string;
-  projectCode?: string;
+  estimatedHours?: number | null;
+  allocatedHours?: number | null; // Hours allocated from project bucket
+
+  projectId?: string | null; // Associated project
+  projectName?: string | null;
+  projectCode?: string | null;
 
   comments: Comment[];
 }
-
-// Mock Data for Initial Load
-export const MOCK_USERS: User[] = [
-  { id: 'u1', name: 'Alice User', role: UserRole.USER, avatar: 'https://picsum.photos/seed/u1/200' },
-  { id: 'm1', name: 'Bob Manager', role: UserRole.MANAGER, avatar: 'https://picsum.photos/seed/m1/200' },
-  { id: 'e1', name: 'Charlie Engineer', role: UserRole.ENGINEER, avatar: 'https://picsum.photos/seed/e1/200' },
-  { id: 'a1', name: 'Dave Admin', role: UserRole.ADMIN, avatar: 'https://picsum.photos/seed/a1/200' },
-];
-
-export const MOCK_REQUESTS: SimRequest[] = [
-  {
-    id: 'req1',
-    title: 'Analyze new gripper design',
-    description: 'We have a new gripper design and need to analyze its performance.',
-    vendor: 'FANUC',
-    status: RequestStatus.SUBMITTED,
-    priority: 'High',
-    createdBy: 'u1',
-    createdByName: 'Alice User',
-    createdAt: new Date().toISOString(),
-    comments: [],
-  },
-  {
-    id: 'req2',
-    title: 'Cycle time validation for cell 12',
-    description: 'Validate the cycle time for the new layout in cell 12.',
-    vendor: 'Siemens',
-    status: RequestStatus.IN_PROGRESS,
-    priority: 'Medium',
-    createdBy: 'u1',
-    createdByName: 'Alice User',
-    createdAt: new Date().toISOString(),
-    assignedTo: 'e1',
-    assignedToName: 'Charlie Engineer',
-    estimatedHours: 16,
-    comments: [],
-  },
-];

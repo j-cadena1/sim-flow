@@ -1,8 +1,10 @@
 import { RequestStatus } from './types';
 
 // Storage keys
+// Note: Auth tokens are now handled via HttpOnly cookies (not accessible to JS)
 export const STORAGE_KEYS = {
   REQUESTS: 'sim-flow-requests',
+  THEME: 'theme-mode',
 } as const;
 
 // Status colors for consistent styling

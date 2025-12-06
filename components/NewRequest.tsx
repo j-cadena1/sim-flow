@@ -4,23 +4,45 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from './Toast';
 import { useProjects } from '../lib/api/hooks';
 import { validateNewRequest } from '../utils/validation';
-import { Send, AlertCircle, FolderOpen } from 'lucide-react';
+import { Send, AlertCircle, FolderOpen, UserCircle } from 'lucide-react';
 import { ProjectStatus } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { apiClient } from '../lib/api/client';
 
 export const NewRequest: React.FC = () => {
   const { addRequest } = useSimFlow();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { data: allProjects = [], isLoading: projectsLoading } = useProjects();
 
   const approvedProjects = allProjects.filter(p => p.status === ProjectStatus.APPROVED && p.totalHours > p.usedHours);
+  const isAdmin = user?.role === 'Admin';
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [vendor, setVendor] = useState('FANUC');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [projectId, setProjectId] = useState('');
+  const [onBehalfOfUserId, setOnBehalfOfUserId] = useState('');
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch users when component mounts (only for admins)
+  React.useEffect(() => {
+    if (isAdmin) {
+      setUsersLoading(true);
+      apiClient.get('/users')
+        .then(response => {
+          setUsers(response.data.users || []);
+        })
+        .catch(() => {
+          // Failed to fetch users for dropdown
+        })
+        .finally(() => setUsersLoading(false));
+    }
+  }, [isAdmin]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +60,7 @@ export const NewRequest: React.FC = () => {
       return;
     }
 
-    addRequest(title, description, vendor, priority, projectId);
+    addRequest(title, description, vendor, priority, projectId, onBehalfOfUserId || undefined);
     showToast('Request submitted successfully', 'success');
     navigate('/requests');
   };
@@ -46,17 +68,45 @@ export const NewRequest: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white">New Simulation Request</h2>
-        <p className="text-slate-400">Submit a new job for the engineering team.</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">New Simulation Request</h2>
+        <p className="text-gray-500 dark:text-slate-400">Submit a new job for the engineering team.</p>
       </div>
 
-      <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 shadow-xl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 shadow-xl">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {isAdmin && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <UserCircle size={16} />
+                Create on Behalf of User (Optional)
+              </label>
+              <select
+                className="w-full bg-white dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={onBehalfOfUserId}
+                onChange={(e) => setOnBehalfOfUserId(e.target.value)}
+                disabled={usersLoading}
+              >
+                <option value="">Create as myself</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email}) - {u.role}
+                  </option>
+                ))}
+              </select>
+              {onBehalfOfUserId && (
+                <p className="mt-2 text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                  <AlertCircle size={14} />
+                  This request will be created on behalf of the selected user
+                </p>
+              )}
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Project Title</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Project Title</label>
             <input
               type="text"
-              className={`w-full bg-slate-950 border ${errors.title ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+              className={`w-full bg-gray-50 dark:bg-slate-950 border ${errors.title ? 'border-red-500' : 'border-gray-300 dark:border-slate-700'} rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
               placeholder="e.g. Robot Cell Cycle Time Analysis"
               value={title}
               onChange={(e) => {
@@ -65,7 +115,7 @@ export const NewRequest: React.FC = () => {
               }}
             />
             {errors.title && (
-              <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                 <AlertCircle size={14} />
                 {errors.title}
               </p>
@@ -73,12 +123,12 @@ export const NewRequest: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
               <FolderOpen size={16} />
               Project (Hour Budget)
             </label>
             <select
-              className={`w-full bg-slate-950 border ${errors.project ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className={`w-full bg-gray-50 dark:bg-slate-950 border ${errors.project ? 'border-red-500' : 'border-gray-300 dark:border-slate-700'} rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
               value={projectId}
               onChange={(e) => {
                 setProjectId(e.target.value);
@@ -94,13 +144,13 @@ export const NewRequest: React.FC = () => {
               ))}
             </select>
             {errors.project && (
-              <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                 <AlertCircle size={14} />
                 {errors.project}
               </p>
             )}
             {approvedProjects.length === 0 && !projectsLoading && (
-              <p className="mt-1 text-sm text-yellow-400 flex items-center gap-1">
+              <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
                 <AlertCircle size={14} />
                 No projects with available hours. Please create or request a project first.
               </p>
@@ -109,9 +159,9 @@ export const NewRequest: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Vendor / Equipment</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Vendor / Equipment</label>
               <select
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={vendor}
                 onChange={(e) => setVendor(e.target.value)}
               >
@@ -125,9 +175,9 @@ export const NewRequest: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Priority Level</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Priority Level</label>
               <select
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={priority}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -144,9 +194,9 @@ export const NewRequest: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Detailed Description</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Detailed Description</label>
             <textarea
-              className={`w-full bg-slate-950 border ${errors.description ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none`}
+              className={`w-full bg-gray-50 dark:bg-slate-950 border ${errors.description ? 'border-red-500' : 'border-gray-300 dark:border-slate-700'} rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none`}
               placeholder="Describe the simulation requirements, inputs, and desired outputs..."
               value={description}
               onChange={(e) => {
@@ -155,19 +205,19 @@ export const NewRequest: React.FC = () => {
               }}
             />
             {errors.description ? (
-              <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                 <AlertCircle size={14} />
                 {errors.description}
               </p>
             ) : (
-              <div className="mt-2 flex items-start space-x-2 text-xs text-slate-500">
+              <div className="mt-2 flex items-start space-x-2 text-xs text-gray-500 dark:text-slate-500">
                 <AlertCircle size={14} className="mt-0.5" />
                 <span>Please include details about part weight, reach requirements, and cycle time targets for accurate feasibility analysis.</span>
               </div>
             )}
           </div>
 
-          <div className="pt-4 border-t border-slate-800 flex justify-end">
+          <div className="pt-4 border-t border-gray-200 dark:border-slate-800 flex justify-end">
             <button
               type="submit"
               className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"

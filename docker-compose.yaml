@@ -1,15 +1,31 @@
+# Production Docker Compose Configuration
+# Optimized builds, no source mounts, production-ready settings
+#
+# Quick Start:
+#   make prod        # Start production environment
+#   make prod-logs   # View logs
+#   make prod-down   # Stop production environment
+#
+# Or directly:
+#   docker compose up -d
+#
+# Version configuration via environment variables:
+# - NODE_VERSION: Node.js version (default: 20, supports 18-22)
+# - POSTGRES_VERSION: PostgreSQL version (default: 16, supports 14-17)
+# - NGINX_VERSION: Nginx version (default: alpine)
+
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
     container_name: sim-flow-db
     environment:
       POSTGRES_DB: simflow
       POSTGRES_USER: simflow_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:-SimFlow2025!Secure}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
-    ports:
-      - "5432:5432"
+    # Database port not exposed to host in production - only accessible within Docker network
+    # Use docker-compose.dev.yaml for development with exposed ports
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -28,15 +44,18 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20}
     image: sim-flow-backend:latest
     container_name: sim-flow-api
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: simflow
       DB_USER: simflow_user
       DB_PASSWORD: ${DB_PASSWORD:-SimFlow2025!Secure}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       PORT: 3001
       LOG_LEVEL: info
     ports:
@@ -45,11 +64,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
-      interval: 30s
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001/ready"]
+      interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 15s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
     networks:
       - simflow-network
@@ -64,6 +83,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20}
+        NGINX_VERSION: ${NGINX_VERSION:-alpine}
     image: sim-flow-frontend:latest
     container_name: sim-flow-frontend
     ports:

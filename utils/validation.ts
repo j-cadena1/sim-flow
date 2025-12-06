@@ -113,13 +113,6 @@ export function validateNewRequest(
 }
 
 /**
- * Validates estimated hours
- */
-export function validateEstimatedHours(hours: number): ValidationResult {
-  return validateNumber(hours, 'Estimated hours', 1, 1000);
-}
-
-/**
  * Validates comment content
  */
 export function validateComment(content: string): ValidationResult {

@@ -1,12 +1,42 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { SimFlowProvider, useSimFlow } from './SimFlowContext';
-import { UserRole, MOCK_USERS } from '../types';
+import { UserRole, type User } from '../types';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// Test mock data
+const MOCK_USERS: User[] = [
+  { id: 'user-1', name: 'Test User', email: 'test@example.com', role: UserRole.USER },
+  { id: 'eng-1', name: 'Test Engineer', email: 'engineer@example.com', role: UserRole.ENGINEER },
+  { id: 'mgr-1', name: 'Test Manager', email: 'manager@example.com', role: UserRole.MANAGER },
+];
+
+// Mock the auth context
+const mockUser = {
+  id: 'test-user-id',
+  name: 'Test User',
+  email: 'test@example.com',
+  role: UserRole.USER,
+};
+
+vi.mock('./AuthContext', async () => {
+  const actual = await vi.importActual('./AuthContext');
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: mockUser,
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      register: vi.fn(),
+    }),
+  };
+});
+
 // Mock the API hooks
-vi.mock('../api/hooks', () => ({
+vi.mock('../lib/api/hooks', () => ({
   useRequests: () => ({
     data: [],
     isLoading: false,
@@ -54,20 +84,11 @@ describe('SimFlowContext', () => {
     });
   });
 
-  describe('currentUser and switchUser', () => {
-    it('should start with first user', () => {
+  describe('currentUser', () => {
+    it('should use authenticated user from AuthContext', () => {
       const { result } = renderHook(() => useSimFlow(), { wrapper });
       expect(result.current.currentUser.role).toBe(UserRole.USER);
-    });
-
-    it('should switch user by role', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
-
-      act(() => {
-        result.current.switchUser(UserRole.MANAGER);
-      });
-
-      expect(result.current.currentUser.role).toBe(UserRole.MANAGER);
+      expect(result.current.currentUser.id).toBe('test-user-id');
     });
   });
 

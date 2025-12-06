@@ -18,6 +18,7 @@ export const createRequestSchema = z.object({
   vendor: z.string().min(1).max(100).transform(sanitize),
   priority: z.enum(['Low', 'Medium', 'High']),
   projectId: z.string().uuid().optional(),
+  onBehalfOfUserId: z.string().uuid().optional(),
 });
 
 export const updateStatusSchema = z.object({

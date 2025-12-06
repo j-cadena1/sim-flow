@@ -116,22 +116,38 @@ interface ConfirmModalProps {
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({ title, message, onConfirm, onCancel }) => {
+  // Handle Escape key to close modal
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl border border-slate-800 max-w-md w-full shadow-2xl animate-scale-in">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
+      aria-describedby="confirm-modal-description"
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 max-w-md w-full shadow-2xl animate-scale-in">
         <div className="p-6">
           <div className="flex items-start gap-4 mb-4">
-            <div className="bg-yellow-500/10 p-3 rounded-full">
+            <div className="bg-yellow-500/10 p-3 rounded-full" aria-hidden="true">
               <AlertTriangle className="text-yellow-500" size={24} />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-              <p className="text-slate-400 text-sm">{message}</p>
+              <h2 id="confirm-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{title}</h2>
+              <p id="confirm-modal-description" className="text-gray-600 dark:text-slate-400 text-sm">{message}</p>
             </div>
             <button
               onClick={onCancel}
-              className="text-slate-400 hover:text-white transition-colors"
-              aria-label="Close"
+              className="text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              aria-label="Close dialog"
             >
               <X size={20} />
             </button>
@@ -140,12 +156,13 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ title, message, onConfirm, 
         <div className="flex gap-3 p-6 pt-0">
           <button
             onClick={onCancel}
-            className="flex-1 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
+            className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
+            autoFocus
             className="flex-1 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
           >
             Confirm
@@ -174,6 +191,15 @@ const PromptModal: React.FC<PromptModalProps> = ({
 }) => {
   const [value, setValue] = useState(defaultValue);
 
+  // Handle Escape key to close modal
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (value.trim()) {
@@ -182,26 +208,35 @@ const PromptModal: React.FC<PromptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl border border-slate-800 max-w-md w-full shadow-2xl animate-scale-in">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="prompt-modal-title"
+      aria-describedby="prompt-modal-description"
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 max-w-md w-full shadow-2xl animate-scale-in">
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-                <p className="text-slate-400 text-sm">{message}</p>
+                <h2 id="prompt-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{title}</h2>
+                <p id="prompt-modal-description" className="text-gray-600 dark:text-slate-400 text-sm">{message}</p>
               </div>
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-slate-400 hover:text-white transition-colors"
-                aria-label="Close"
+                className="text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                aria-label="Close dialog"
               >
                 <X size={20} />
               </button>
             </div>
+            <label htmlFor="prompt-input" className="sr-only">{title}</label>
             <textarea
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              id="prompt-input"
+              className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               rows={3}
               value={value}
               onChange={e => setValue(e.target.value)}
@@ -213,7 +248,7 @@ const PromptModal: React.FC<PromptModalProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
+              className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
             >
               Cancel
             </button>
@@ -246,6 +281,15 @@ const DiscussionRequestModal: React.FC<DiscussionRequestModalProps> = ({
   const [suggestedHours, setSuggestedHours] = useState('');
   const [error, setError] = useState('');
 
+  // Handle Escape key to close modal
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -265,20 +309,27 @@ const DiscussionRequestModal: React.FC<DiscussionRequestModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl border border-slate-800 max-w-lg w-full shadow-2xl animate-scale-in">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="discussion-modal-title"
+      aria-describedby="discussion-modal-description"
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 max-w-lg w-full shadow-2xl animate-scale-in">
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Request Discussion</h3>
-                <p className="text-slate-400 text-sm">Explain what you need to discuss with the manager</p>
+                <h2 id="discussion-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Request Discussion</h2>
+                <p id="discussion-modal-description" className="text-gray-600 dark:text-slate-400 text-sm">Explain what you need to discuss with the manager</p>
               </div>
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-slate-400 hover:text-white transition-colors"
-                aria-label="Close"
+                className="text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                aria-label="Close dialog"
               >
                 <X size={20} />
               </button>
@@ -287,11 +338,13 @@ const DiscussionRequestModal: React.FC<DiscussionRequestModalProps> = ({
             <div className="space-y-4">
               {/* Reason */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Reason for Discussion <span className="text-red-400">*</span>
+                <label htmlFor="discussion-reason" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                  Reason for Discussion <span className="text-red-400" aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
                 </label>
                 <textarea
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  id="discussion-reason"
+                  className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   rows={4}
                   value={reason}
                   onChange={e => {
@@ -299,45 +352,49 @@ const DiscussionRequestModal: React.FC<DiscussionRequestModalProps> = ({
                     setError('');
                   }}
                   autoFocus
+                  required
+                  aria-describedby="reason-hint"
                   placeholder="I don't think this is enough time because..."
                 />
-                <p className="text-xs text-slate-500 mt-1">Minimum 5 characters</p>
+                <p id="reason-hint" className="text-xs text-gray-500 dark:text-slate-500 mt-1">Minimum 5 characters</p>
               </div>
 
               {/* Current Hours Display */}
-              <div className="bg-slate-950 border border-slate-700 rounded-lg p-4">
+              <div className="bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-400">Current Allocation:</span>
-                  <span className="text-lg font-bold text-white font-mono">{currentHours}h</span>
+                  <span className="text-sm text-gray-600 dark:text-slate-400">Current Allocation:</span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-white font-mono" aria-label={`${currentHours} hours`}>{currentHours}h</span>
                 </div>
               </div>
 
               {/* Suggested Hours */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label htmlFor="suggested-hours" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                   Suggested Hours (Optional)
                 </label>
                 <input
+                  id="suggested-hours"
                   type="number"
                   min="1"
                   step="1"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={suggestedHours}
                   onChange={e => {
                     setSuggestedHours(e.target.value);
                     setError('');
                   }}
+                  aria-describedby="hours-hint"
                   placeholder="Leave empty to discuss without suggesting new hours"
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p id="hours-hint" className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                   Enter a number if you want to propose different hours
                 </p>
               </div>
 
               {error && (
-                <div className="bg-red-900/20 border border-red-700 rounded-lg p-3">
+                <div className="bg-red-900/20 border border-red-700 rounded-lg p-3" role="alert">
                   <p className="text-sm text-red-400 flex items-center gap-2">
-                    <AlertTriangle size={16} />
+                    <AlertTriangle size={16} aria-hidden="true" />
                     {error}
                   </p>
                 </div>
@@ -349,7 +406,7 @@ const DiscussionRequestModal: React.FC<DiscussionRequestModalProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
+              className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
             >
               Cancel
             </button>

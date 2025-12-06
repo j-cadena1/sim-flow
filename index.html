@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
@@ -34,6 +35,34 @@
         }
       }
     </script>
+    <style>
+      /* Light mode date inputs */
+      input[type="date"] {
+        color-scheme: light;
+      }
+
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+      }
+
+      /* Dark mode date inputs */
+      .dark input[type="date"] {
+        color-scheme: dark;
+      }
+
+      .dark input[type="date"]::-webkit-datetime-edit,
+      .dark input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+      .dark input[type="date"]::-webkit-datetime-edit-text,
+      .dark input[type="date"]::-webkit-datetime-edit-month-field,
+      .dark input[type="date"]::-webkit-datetime-edit-day-field,
+      .dark input[type="date"]::-webkit-datetime-edit-year-field {
+        color: rgb(226, 232, 240); /* slate-200 */
+      }
+
+      .dark input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
@@ -47,7 +76,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+  <body class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

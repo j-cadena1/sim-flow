@@ -2,6 +2,7 @@ import { ConfidentialClientApplication, CryptoProvider } from '@azure/msal-node'
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
+import { decrypt } from './encryptionService';
 
 interface SSOConfig {
   id: string;
@@ -40,7 +41,14 @@ export const getSSOConfigFromDB = async (): Promise<SSOConfig | null> => {
       return null;
     }
 
-    return toCamelCase<SSOConfig>(result.rows[0]);
+    const config = toCamelCase<SSOConfig>(result.rows[0]);
+
+    // Decrypt the client secret if present
+    if (config.clientSecret) {
+      config.clientSecret = decrypt(config.clientSecret);
+    }
+
+    return config;
   } catch (error) {
     logger.error('Error fetching SSO config from DB:', error);
     return null;

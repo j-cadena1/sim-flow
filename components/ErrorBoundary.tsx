@@ -49,31 +49,31 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8">
-          <div className="max-w-2xl w-full bg-slate-900 rounded-2xl border border-slate-800 p-8">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-8">
+          <div className="max-w-2xl w-full bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-lg">
             <div className="flex items-center space-x-4 mb-6">
-              <div className="bg-red-500/10 p-4 rounded-full">
+              <div className="bg-red-100 dark:bg-red-500/10 p-4 rounded-full">
                 <AlertTriangle className="text-red-500" size={32} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Something went wrong</h1>
-                <p className="text-slate-400">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Something went wrong</h1>
+                <p className="text-gray-500 dark:text-slate-400">
                   An unexpected error occurred in the application
                 </p>
               </div>
             </div>
 
             {this.state.error && (
-              <div className="bg-slate-950 rounded-lg p-4 mb-6 border border-slate-800">
-                <p className="text-sm font-mono text-red-400 mb-2">
+              <div className="bg-gray-50 dark:bg-slate-950 rounded-lg p-4 mb-6 border border-gray-200 dark:border-slate-800">
+                <p className="text-sm font-mono text-red-600 dark:text-red-400 mb-2">
                   {this.state.error.toString()}
                 </p>
                 {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
                   <details className="mt-4">
-                    <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-300">
+                    <summary className="text-sm text-gray-500 dark:text-slate-400 cursor-pointer hover:text-gray-700 dark:hover:text-slate-300">
                       Stack trace
                     </summary>
-                    <pre className="text-xs text-slate-500 mt-2 overflow-auto max-h-64">
+                    <pre className="text-xs text-gray-500 dark:text-slate-500 mt-2 overflow-auto max-h-64">
                       {this.state.errorInfo.componentStack}
                     </pre>
                   </details>
@@ -91,13 +91,13 @@ export class ErrorBoundary extends Component<Props, State> {
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-900 dark:text-white px-6 py-3 rounded-lg font-medium transition-colors"
               >
                 Reload Page
               </button>
             </div>
 
-            <p className="text-sm text-slate-500 mt-6">
+            <p className="text-sm text-gray-500 dark:text-slate-500 mt-6">
               If this problem persists, please contact support.
             </p>
           </div>

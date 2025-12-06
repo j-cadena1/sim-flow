@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { getSSOConfig, updateSSOConfig, testSSOConfig } from '../controllers/ssoController';
-import { requireRole } from '../middleware/authorization';
+import { requireQAdmin } from '../middleware/authorization';
 
 const router = Router();
 
-// All SSO configuration endpoints are Admin-only
-router.get('/config', requireRole(['Admin']), getSSOConfig);
-router.put('/config', requireRole(['Admin']), updateSSOConfig);
-router.post('/test', requireRole(['Admin']), testSSOConfig);
+// All SSO configuration endpoints are restricted to qAdmin only
+// This ensures SSO configuration can only be managed by the local admin account
+router.get('/config', requireQAdmin(), getSSOConfig);
+router.put('/config', requireQAdmin(), updateSSOConfig);
+router.post('/test', requireQAdmin(), testSSOConfig);
 
 export default router;

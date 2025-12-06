@@ -1,91 +1,67 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { logger } from './logger';
+import { SESSION_COOKIE_NAME } from '../config/session';
+import { validateSession, SessionUser } from '../services/sessionService';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sim-flow-secret-key-change-in-production';
-
-interface JWTPayload {
-  userId: string;
-  email: string;
-  role: string;
-  name: string;
-}
-
-// Extend Express Request to include user info
+// Extend Express Request to include user info and session ID
 declare global {
   namespace Express {
     interface Request {
-      user?: JWTPayload;
+      user?: SessionUser;
+      sessionId?: string;
     }
   }
 }
 
 /**
- * Middleware to authenticate requests using JWT tokens
- * Extracts token from Authorization header and verifies it
+ * Middleware to authenticate requests using session cookies
+ * Extracts session ID from cookie and validates against database
  */
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authHeader = req.headers.authorization;
+    const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
 
-    if (!authHeader) {
-      // For backwards compatibility during development, check for legacy headers
-      const userId = req.headers['x-user-id'] as string;
-      const userRole = req.headers['x-user-role'] as string;
-      const userName = req.headers['x-user-name'] as string;
-
-      if (userId && userRole) {
-        // Legacy header authentication (will be removed after migration)
-        req.user = {
-          userId,
-          email: '', // Not available in legacy format
-          role: userRole,
-          name: userName || 'Unknown',
-        };
-        return next();
-      }
-
-      logger.warn('Authentication failed: No token provided');
+    if (!sessionId) {
+      logger.warn('Authentication failed: No session cookie');
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const user = await validateSession(sessionId);
 
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    if (!user) {
+      logger.warn('Authentication failed: Invalid or expired session');
+      return res.status(401).json({ error: 'Invalid session' });
+    }
 
-    // Attach user info to request
-    req.user = decoded;
+    // Attach user info and session ID to request
+    req.user = user;
+    req.sessionId = sessionId;
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      logger.warn('Authentication failed: Invalid token');
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    if (error instanceof jwt.TokenExpiredError) {
-      logger.warn('Authentication failed: Token expired');
-      return res.status(401).json({ error: 'Token expired' });
-    }
     logger.error('Authentication error:', error);
     res.status(500).json({ error: 'Authentication failed' });
   }
 };
 
 /**
- * Optional authentication - doesn't fail if no token provided
+ * Optional authentication - doesn't fail if no session cookie provided
  * Useful for endpoints that work both authenticated and unauthenticated
  */
-export const optionalAuthenticate = (req: Request, res: Response, next: NextFunction) => {
+export const optionalAuthenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authHeader = req.headers.authorization;
+    const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
 
-    if (!authHeader) {
+    if (!sessionId) {
       return next();
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    req.user = decoded;
+    const user = await validateSession(sessionId);
+
+    if (user) {
+      req.user = user;
+      req.sessionId = sessionId;
+    }
 
     next();
   } catch (error) {

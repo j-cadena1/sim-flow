@@ -4,6 +4,9 @@ import { authenticate } from './authentication';
 
 export type UserRole = 'Admin' | 'Manager' | 'Engineer' | 'End-User';
 
+// Only the local qAdmin account can configure SSO
+const QADMIN_EMAIL = 'qadmin@simflow.local';
+
 /**
  * Middleware to require specific user roles for accessing endpoints
  * @param allowedRoles - Array of roles that are allowed to access the endpoint
@@ -68,6 +71,34 @@ export const requireOwnershipOrRole = (ownershipCheck: (req: Request) => Promise
         logger.error('Ownership check failed:', error);
         return res.status(500).json({ error: 'Authorization check failed' });
       }
+    }
+  ];
+};
+
+/**
+ * Middleware to require the local qAdmin account
+ * Used for SSO configuration which should only be managed by qAdmin
+ */
+export const requireQAdmin = () => {
+  return [
+    authenticate,
+    (req: Request, res: Response, next: NextFunction) => {
+      const user = req.user;
+
+      if (!user) {
+        logger.warn('Unauthorized access attempt - missing user');
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      if (user.email !== QADMIN_EMAIL) {
+        logger.warn(`SSO config access denied for ${user.email} - only qAdmin can configure SSO`);
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'Only the local qAdmin account can configure SSO settings'
+        });
+      }
+
+      next();
     }
   ];
 };

@@ -4,7 +4,6 @@ import {
   validateLength,
   validateNumber,
   validateNewRequest,
-  validateEstimatedHours,
   validateComment,
 } from './validation';
 
@@ -98,23 +97,6 @@ describe('validation utilities', () => {
     it('should return errors for short description', () => {
       const errors = validateNewRequest('Valid Title', 'short');
       expect(errors.description).toBeTruthy();
-    });
-  });
-
-  describe('validateEstimatedHours', () => {
-    it('should pass for valid hours', () => {
-      const result = validateEstimatedHours(40);
-      expect(result.isValid).toBe(true);
-    });
-
-    it('should fail for hours less than 1', () => {
-      const result = validateEstimatedHours(0);
-      expect(result.isValid).toBe(false);
-    });
-
-    it('should fail for hours greater than 1000', () => {
-      const result = validateEstimatedHours(1001);
-      expect(result.isValid).toBe(false);
     });
   });
 
