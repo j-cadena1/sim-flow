@@ -9,6 +9,7 @@ This guide shows you how to deploy and develop Sim-Flow using only Docker and Do
 ## ✅ Prerequisites
 
 **Required:**
+
 - Docker 20.10+
 - Docker Compose V2 (built into modern Docker)
 
@@ -22,7 +23,8 @@ docker compose version
 ```
 
 Expected output:
-```
+
+```text
 Docker version 24.0.0 or higher
 Docker Compose version v2.0.0 or higher
 ```
@@ -42,7 +44,7 @@ cd sim-flow
 
 # 2. (Optional) Configure environment
 cp .env.example .env
-# Edit .env and set JWT_SECRET and DB_PASSWORD
+# Edit .env and set DB_PASSWORD
 
 # 3. Start everything
 make prod
@@ -62,7 +64,7 @@ Docker built and started three containers:
 
 ### Access Your Application
 
-```
+```text
 🌐 Application:  http://localhost:8080
 📚 API Docs:     http://localhost:3001/api-docs
 📊 Metrics:      http://localhost:3001/metrics
@@ -70,7 +72,7 @@ Docker built and started three containers:
 
 ### Default Login
 
-```
+```text
 Email:    qadmin@simflow.local
 Password: admin123
 ```
@@ -90,6 +92,7 @@ make dev
 ```
 
 This starts:
+
 - **Frontend dev server** (Vite with HMR) on port 5173
 - **Backend dev server** (tsx watch) on port 3001
 - **PostgreSQL** on port 5432
@@ -97,7 +100,7 @@ This starts:
 
 ### Access Development Environment
 
-```
+```text
 🔥 Frontend (Hot Reload):  http://localhost:5173
 🔌 Backend API:            http://localhost:3001
 🗄️  Database:              localhost:5432
@@ -107,6 +110,7 @@ This starts:
 ### How Hot Reload Works
 
 Source code is mounted as volumes:
+
 - Edit files in `src/`, `components/`, `contexts/`, etc.
 - Vite automatically reloads frontend changes
 - tsx watch automatically restarts backend on changes
@@ -177,6 +181,7 @@ make test
 ```
 
 This runs tests in Docker containers:
+
 - Frontend tests: React Testing Library + Vitest
 - Backend tests: Vitest
 
@@ -203,6 +208,7 @@ make db-shell
 ```
 
 Now you can run SQL queries:
+
 ```sql
 SELECT * FROM users;
 SELECT * FROM requests;
@@ -231,6 +237,7 @@ Restores from `backup.sql`. **Warning:** This overwrites current data!
 Connect to `localhost:5432` with your favorite database tool:
 
 **Connection details:**
+
 - Host: `localhost`
 - Port: `5432`
 - Database: `simflow`
@@ -238,6 +245,7 @@ Connect to `localhost:5432` with your favorite database tool:
 - Password: (from your `.env` or default `SimFlow2025!Secure`)
 
 Popular tools:
+
 - pgAdmin
 - DBeaver
 - TablePlus
@@ -255,8 +263,8 @@ Create `.env` file (optional - defaults provided):
 # Database Password
 DB_PASSWORD=YourStrongPasswordHere123!@#
 
-# JWT Secret (REQUIRED for production)
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+# SSO Encryption Key (for storing SSO client secrets)
+SSO_ENCRYPTION_KEY=your-encryption-key-min-32-chars
 
 # CORS Origin (restrict in production)
 CORS_ORIGIN=https://your-domain.com
@@ -270,8 +278,9 @@ POSTGRES_VERSION=16
 ```
 
 Generate secure secrets:
+
 ```bash
-# Generate JWT secret
+# Generate SSO encryption key
 openssl rand -base64 32
 
 # Generate database password
@@ -295,6 +304,7 @@ frontend:
 ```
 
 Then restart:
+
 ```bash
 make prod-down && make prod
 # or
@@ -372,6 +382,7 @@ Create `.vscode/launch.json`:
 ```
 
 Then:
+
 1. Start dev environment: `make dev`
 2. Set breakpoints in VS Code
 3. Press F5 or click "Run > Start Debugging"
@@ -379,7 +390,8 @@ Then:
 ### Frontend Debugging
 
 Use browser DevTools:
-1. Open http://localhost:5173
+
+1. Open <http://localhost:5173>
 2. Open DevTools (F12)
 3. Source maps are enabled automatically
 4. Debug original TypeScript code
@@ -442,7 +454,7 @@ newgrp docker
 git clone https://github.com/j-cadena1/sim-flow.git
 cd sim-flow
 cp .env.example .env
-nano .env  # Set JWT_SECRET and DB_PASSWORD
+nano .env  # Set DB_PASSWORD
 
 # 3. Start
 make prod
@@ -455,11 +467,13 @@ sudo ufw enable
 ### Behind Nginx Reverse Proxy
 
 Install nginx on host:
+
 ```bash
 sudo apt install nginx
 ```
 
 Create `/etc/nginx/sites-available/simflow`:
+
 ```nginx
 server {
     listen 80;
@@ -476,6 +490,7 @@ server {
 ```
 
 Enable and add SSL:
+
 ```bash
 sudo ln -s /etc/nginx/sites-available/simflow /etc/nginx/sites-enabled/
 sudo certbot --nginx -d simflow.yourdomain.com
@@ -566,6 +581,7 @@ docker compose ps
 ### Regular Backups
 
 Add to crontab:
+
 ```bash
 # Edit crontab
 crontab -e
@@ -640,6 +656,7 @@ make test-e2e
 ## 🆘 Getting Help
 
 1. **Check logs:**
+
    ```bash
    make prod-logs
    # or
@@ -647,12 +664,14 @@ make test-e2e
    ```
 
 2. **Check container status:**
+
    ```bash
    make status
    docker compose ps
    ```
 
 3. **Check health endpoints:**
+
    ```bash
    curl http://localhost:8080/health
    curl http://localhost:3001/health
@@ -665,7 +684,7 @@ make test-e2e
    - docker-compose.dev.yaml - Dev config
 
 5. **GitHub Issues:**
-   - https://github.com/j-cadena1/sim-flow/issues
+   - <https://github.com/j-cadena1/sim-flow/issues>
 
 ---
 

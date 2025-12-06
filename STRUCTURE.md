@@ -4,7 +4,7 @@ This document describes the organization of the Sim-Flow codebase.
 
 ## Root Directory
 
-```
+```text
 sim-flow/
 ├── backend/              # Backend API server
 ├── components/           # React UI components
@@ -23,7 +23,7 @@ sim-flow/
 
 Node.js/Express API server with TypeScript.
 
-```
+```text
 backend/
 ├── src/
 │   ├── controllers/      # Request handlers
@@ -51,14 +51,14 @@ backend/
   - `msalService.ts`: Microsoft Entra ID OAuth/PKCE
   - `graphService.ts`: Microsoft Graph API (users, photos)
 - **middleware/**: Request processing
-  - `authentication.ts`: JWT token verification
+  - `authentication.ts`: Session cookie validation
   - `authorization.ts`: Role-based access control
 
 ## Frontend
 
 React application with TypeScript and Vite.
 
-```
+```text
 root/
 ├── components/           # React components
 │   ├── Dashboard.tsx     # Main dashboard view
@@ -97,7 +97,7 @@ root/
 
 PostgreSQL schema and migrations.
 
-```
+```text
 database/
 ├── init.sql              # Initial schema (users, requests, comments)
 ├── migrations/           # Sequential database migrations
@@ -132,7 +132,7 @@ Production deployment configuration:
 
 ### Nginx (`nginx/`)
 
-```
+```text
 nginx/
 ├── nginx.conf            # Production configuration
 │   ├── HTTP → HTTPS redirect
@@ -157,9 +157,9 @@ nginx/
 - **.env**: Actual secrets (gitignored)
 
 Required variables:
+
 - Database: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- JWT: `JWT_SECRET`, `JWT_EXPIRATION`
-- SSO: `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID`
+- SSO Encryption: `SSO_ENCRYPTION_KEY` (for storing SSO client secrets)
 - API: `CORS_ORIGIN`, `RATE_LIMIT_MAX_REQUESTS`
 
 ### Build Configuration
@@ -173,22 +173,26 @@ Required variables:
 ## Development Workflow
 
 1. **Install Dependencies**
+
    ```bash
    npm install
    cd backend && npm install
    ```
 
 2. **Start Development Environment**
+
    ```bash
    docker compose up -d
    ```
 
 3. **Run Tests**
+
    ```bash
    npm test
    ```
 
 4. **Build for Production**
+
    ```bash
    npm run build
    cd backend && npm run build
@@ -197,23 +201,27 @@ Required variables:
 ## Production Deployment
 
 1. **Configure Environment**
+
    ```bash
    cp .env.example .env
    # Edit .env with production values
    ```
 
 2. **Obtain SSL Certificates**
+
    ```bash
    # Using Let's Encrypt
    sudo certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
    ```
 
 3. **Deploy**
+
    ```bash
    docker compose -f docker-compose.prod.yaml up -d
    ```
 
 4. **Set Up Backups**
+
    ```bash
    crontab -e
    # Add: 0 2 * * * /path/to/scripts/backup-database.sh
@@ -223,9 +231,9 @@ Required variables:
 
 ### Authentication & Authorization
 
-- JWT tokens for session management
+- Session-based authentication with HTTP-only cookies
 - Microsoft Entra ID SSO with PKCE
-- Role-based access control (Admin, Engineer, Business)
+- Role-based access control (Admin, Manager, Engineer, User)
 
 ### Database Security
 
@@ -261,6 +269,7 @@ Run with: `npm test`
 ### Git Ignore
 
 Build artifacts, dependencies, and secrets are excluded:
+
 - `node_modules/`, `dist/`, `backend/dist/`
 - `.env`, `.DS_Store`
 - `nginx/ssl/*.pem`, `database/backups/`
