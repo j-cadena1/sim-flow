@@ -12,160 +12,372 @@ A role-based engineering simulation request management system with comprehensive
 - **Analytics Dashboard**: Real-time insights into team productivity and resource utilization
 - **Discussion Workflow**: Engineers can request hour adjustments with manager approval
 - **Title Change Approval**: Controlled request title modifications
+- **Security**: JWT with refresh tokens, rate limiting, structured logging
+- **Monitoring**: Prometheus metrics, health checks, API documentation
 
-## Quick Start
+## 🚀 Quick Start (Docker-First)
 
-See [QUICKSTART.md](QUICKSTART.md) for deployment instructions.
+**Prerequisites:** Docker and Docker Compose only!
 
-## Run Locally (Development)
-
-**Prerequisites:** Node.js 20+
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Run the app:
-   ```bash
-   npm run dev
-   ```
-
-## Production Deployment
-
-### Using Docker Compose (Recommended)
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/j-cadena1/sim-flow.git
-   cd sim-flow
-   ```
-
-2. **Create environment file**:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Configure environment variables** (see Security Considerations below)
-
-4. **Start the application**:
-   ```bash
-   docker compose up -d
-   ```
-
-5. **Access the application**:
-   - Frontend: `http://your-server:8080`
-   - Backend API: `http://your-server:3001`
-
-For detailed deployment instructions, see [SIMPLE-DEPLOYMENT.md](SIMPLE-DEPLOYMENT.md).
-
-## 🔒 Security Considerations
-
-**IMPORTANT**: Before deploying to production, you MUST configure the following:
-
-### 1. Database Password
-
-The default database password in `docker-compose.yaml` is for development only:
+### Production Deployment
 
 ```bash
-# In your .env file, set a strong password:
-DB_PASSWORD=YourStrongPasswordHere123!@#
+# 1. Clone the repository
+git clone https://github.com/j-cadena1/sim-flow.git
+cd sim-flow
+
+# 2. Create environment file (optional - has secure defaults)
+cp .env.example .env
+
+# 3. Start the application
+make prod
+
+# That's it! ✨
+# Application: http://localhost:8080
+# API Docs:    http://localhost:3001/api-docs
 ```
 
-Generate a secure password:
+### Development with Hot Reload
 
 ```bash
-openssl rand -base64 24
+# Start development environment (hot reload enabled)
+make dev
+
+# Frontend: http://localhost:5173 (Vite dev server)
+# Backend:  http://localhost:3001
+# Database: localhost:5432
 ```
 
-### 2. JWT Secret
+## 📖 Available Commands
 
-The JWT secret is critical for authentication security:
+Run `make help` to see all available commands:
 
 ```bash
-# In your .env file:
-JWT_SECRET=$(openssl rand -base64 32)
+make help         # Show all commands
+
+# Development
+make dev          # Start dev environment with hot reload
+make dev-logs     # View development logs
+make dev-down     # Stop dev environment
+
+# Production
+make prod         # Start production environment
+make prod-logs    # View production logs
+make prod-down    # Stop production environment
+
+# Testing
+make test         # Run unit tests
+make test-e2e     # Run E2E tests with Playwright
+
+# Database
+make db-shell     # Open PostgreSQL shell
+make db-backup    # Backup database to backup.sql
+make db-restore   # Restore from backup.sql
+
+# Utilities
+make status       # Show container status
+make clean        # Remove all containers and volumes
 ```
 
-### 3. Change Default Admin Password
-
-On first deployment, immediately change the default admin password:
-
-- **Default credentials**: `admin@simflow.local` / `SimFlow2024!Admin`
-- Login and navigate to Settings → Users to change the password
-
-### 4. CORS Configuration
-
-Restrict CORS to your production domain:
-
-```bash
-# In your .env file:
-CORS_ORIGIN=https://your-production-domain.com
-```
-
-### 5. HTTPS/TLS
-
-- Use a reverse proxy (nginx, Traefik, Caddy) with TLS certificates
-- Never expose the application over HTTP in production
-- Consider using Let's Encrypt for free SSL certificates
-
-### 6. Firewall Configuration
-
-- Restrict database port (5432) to localhost only
-- Only expose ports 80/443 to the internet
-- Use UFW, firewalld, or your cloud provider's security groups
-
-### 7. SSO Configuration (Optional)
-
-If using Microsoft Entra ID SSO:
-
-- Store SSO secrets securely (consider Azure Key Vault)
-- Use environment variables, never commit secrets to Git
-- Rotate secrets regularly
-
-### 8. Regular Updates
-
-- Keep Docker images updated
-- Monitor security advisories for Node.js and PostgreSQL
-- Review audit logs regularly for suspicious activity
-
-## Architecture
+## 🏗️ Architecture
 
 - **Frontend**: React + TypeScript + Vite + TailwindCSS
 - **Backend**: Node.js + Express + TypeScript
 - **Database**: PostgreSQL 16
 - **Authentication**: JWT + Microsoft Entra ID PKCE flow
 - **Deployment**: Docker + Docker Compose
+- **Monitoring**: Prometheus metrics, structured logging
+- **Documentation**: OpenAPI/Swagger
 
-## Default Users
+## 🔒 Security Configuration
 
-The system comes with pre-configured users for testing:
+### Default Credentials
 
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | `admin@simflow.local` | `SimFlow2024!Admin` |
-| Manager | `manager@simflow.local` | `SimFlow2024!Manager` |
-| Engineer | `engineer@simflow.local` | `SimFlow2024!Engineer` |
-| End-User | `user@simflow.local` | `SimFlow2024!User` |
+**Admin User:**
+- Email: `qadmin@simflow.local`
+- Password: `admin123`
 
-**⚠️ Change these passwords immediately in production!**
+**⚠️ Change the admin password immediately in production!**
 
-## Documentation
+### Environment Variables
+
+Create a `.env` file for production (optional - defaults are provided):
+
+```bash
+# Database
+DB_PASSWORD=YourStrongPasswordHere123!@#
+
+# JWT Secret (REQUIRED for production)
+JWT_SECRET=$(openssl rand -base64 32)
+
+# CORS (restrict to your domain in production)
+CORS_ORIGIN=https://your-domain.com
+
+# Node Environment
+NODE_ENV=production
+```
+
+### Production Security Checklist
+
+- [ ] Change default admin password
+- [ ] Set a strong `JWT_SECRET` in `.env`
+- [ ] Set a strong `DB_PASSWORD` in `.env`
+- [ ] Configure `CORS_ORIGIN` to your domain
+- [ ] Use HTTPS with a reverse proxy (nginx/Traefik/Caddy)
+- [ ] Restrict database port (5432) to localhost only
+- [ ] Set up regular database backups (`make db-backup`)
+- [ ] Monitor logs for suspicious activity
+- [ ] Keep Docker images updated
+
+## 🛠️ Development
+
+### Prerequisites (for local development only)
+
+If you want to develop outside of Docker, you'll need:
+- Node.js 20+
+- PostgreSQL 16+
+
+But we recommend using the Docker development environment instead:
+
+```bash
+make dev          # Everything runs in Docker with hot reload
+make dev-logs     # View logs
+```
+
+### Project Structure
+
+```
+sim-flow/
+├── backend/              # Express API server
+│   ├── src/
+│   │   ├── controllers/  # Request handlers
+│   │   ├── middleware/   # Auth, logging, rate limiting
+│   │   ├── routes/       # API routes
+│   │   ├── services/     # Business logic
+│   │   └── utils/        # Helpers
+│   ├── Dockerfile        # Production build
+│   └── Dockerfile.dev    # Development with hot reload
+├── components/           # React components
+├── contexts/             # React contexts (Auth, Theme, etc)
+├── lib/                  # API client, utilities
+├── database/             # SQL migrations and init scripts
+├── tests/                # E2E tests (Playwright)
+├── Dockerfile            # Frontend production build
+├── Dockerfile.dev        # Frontend dev server
+├── docker-compose.yaml   # Production configuration
+├── docker-compose.dev.yaml  # Development configuration
+└── Makefile             # Easy Docker commands
+```
+
+## 🧪 Testing
+
+### Unit Tests
+
+```bash
+# Run in Docker (recommended)
+make test
+
+# Or locally
+npm test                  # Frontend tests
+cd backend && npm test    # Backend tests
+```
+
+### E2E Tests
+
+```bash
+# Start production environment
+make prod
+
+# Run E2E tests
+make test-e2e
+
+# Or manually
+npx playwright test
+npx playwright test --ui    # Interactive mode
+```
+
+## 📊 Monitoring
+
+### Health Checks
+
+- Frontend health: `http://localhost:8080/health`
+- Backend health: `http://localhost:3001/health`
+- Backend ready: `http://localhost:3001/ready`
+
+### Metrics
+
+Prometheus metrics available at: `http://localhost:3001/metrics`
+
+Includes:
+- HTTP request counts and durations
+- Database connection pool stats
+- Active users
+- Request status distributions
+- Process uptime and memory usage
+
+### API Documentation
+
+Interactive Swagger documentation: `http://localhost:3001/api-docs`
+
+### Logs
+
+```bash
+# Production logs
+make prod-logs
+
+# Development logs
+make dev-logs
+
+# Or directly with Docker
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f postgres
+```
+
+## 🗄️ Database Management
+
+### Backup
+
+```bash
+# Create backup
+make db-backup
+
+# Creates backup.sql in current directory
+```
+
+### Restore
+
+```bash
+# Restore from backup.sql
+make db-restore
+```
+
+### Direct Access
+
+```bash
+# Open PostgreSQL shell
+make db-shell
+
+# Or manually
+docker compose exec postgres psql -U simflow_user -d simflow
+```
+
+### Migrations
+
+Database migrations are automatically applied on container startup from `database/init.sql`.
+
+To add new migrations:
+1. Create SQL file in `database/migrations/`
+2. Add to `database/init.sql`
+3. Rebuild containers: `make prod-build`
+
+## 🚢 Deployment Options
+
+### Option 1: Docker Compose (Recommended)
+
+```bash
+# On your server
+git clone https://github.com/j-cadena1/sim-flow.git
+cd sim-flow
+cp .env.example .env
+nano .env  # Set JWT_SECRET and DB_PASSWORD
+make prod
+```
+
+### Option 2: Behind Reverse Proxy (Production)
+
+Example nginx configuration:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name simflow.yourdomain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Option 3: Kubernetes (Advanced)
+
+Kubernetes manifests coming soon. For now, use Docker Compose.
+
+## 🔧 Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Check what's using the port
+sudo lsof -i :8080
+
+# Change port in docker-compose.yaml or use environment variable
+FRONTEND_PORT=9000 make prod
+```
+
+### Container Won't Start
+
+```bash
+# Check logs
+make prod-logs
+
+# Rebuild from scratch
+make clean
+make prod-build
+```
+
+### Database Connection Errors
+
+```bash
+# Check database health
+docker compose ps postgres
+
+# Restart database
+docker compose restart postgres
+
+# Check logs
+docker compose logs postgres
+```
+
+### Permission Errors
+
+```bash
+# Reset permissions on volumes
+make clean
+make prod
+```
+
+## 📚 Documentation
 
 - [Quick Start Guide](QUICKSTART.md) - Fast deployment walkthrough
-- [Simple Deployment](SIMPLE-DEPLOYMENT.md) - Detailed deployment with troubleshooting
-- [Backend Status](BACKEND-STATUS.md) - API documentation and architecture
-- [Compatibility Check](COMPATIBILITY-CHECK.md) - System requirements verification
+- [Backend Architecture](BACKEND-STATUS.md) - API documentation and architecture
 - [Project Structure](STRUCTURE.md) - Codebase organization
 
-## License
+## 🤝 Contributing
 
-MIT License - See LICENSE file for details
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`make test && make test-e2e`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
-## Contributing
+## 📝 License
 
-Contributions welcome! Please open an issue or submit a pull request.
+MIT License - See LICENSE file for details.
 
-## Support
+## 💬 Support
 
-For issues or questions, please open an issue on GitHub.
+For issues or questions:
+- Open an issue on GitHub
+- Check existing documentation
+- Review logs with `make prod-logs` or `make dev-logs`

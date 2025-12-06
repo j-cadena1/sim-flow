@@ -1,5 +1,9 @@
+# Global build arguments (declared before any FROM)
+ARG NODE_VERSION=20
+ARG NGINX_VERSION=alpine
+
 # Stage 1: Build the React application
-FROM node:20-alpine AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve with Nginx
-FROM nginx:alpine
+FROM nginx:${NGINX_VERSION}
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
