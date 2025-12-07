@@ -13,11 +13,42 @@ interface SSOConfig {
   redirectUri: string | null;
   authority: string | null;
   scopes: string | null;
+  source?: 'database' | 'environment';
 }
 
 // In-memory store for PKCE code verifiers (maps state -> code_verifier)
 // In production, consider using Redis or a database with TTL
 const pkceStore = new Map<string, string>();
+
+/**
+ * Get SSO configuration from environment variables
+ * This serves as a fallback when database config is not available
+ */
+const getSSOConfigFromEnv = (): SSOConfig | null => {
+  const tenantId = process.env.SSO_TENANT_ID;
+  const clientId = process.env.SSO_CLIENT_ID;
+  const clientSecret = process.env.SSO_CLIENT_SECRET;
+  const redirectUri = process.env.SSO_REDIRECT_URI;
+
+  // All required fields must be present
+  if (!tenantId || !clientId || !clientSecret || !redirectUri) {
+    return null;
+  }
+
+  logger.info('Using SSO configuration from environment variables');
+
+  return {
+    id: 'env-config',
+    enabled: true,
+    tenantId,
+    clientId,
+    clientSecret,
+    redirectUri,
+    authority: process.env.SSO_AUTHORITY || `https://login.microsoftonline.com/${tenantId}`,
+    scopes: process.env.SSO_SCOPES || 'openid,profile,email',
+    source: 'environment',
+  };
+};
 
 // Clean up old PKCE codes after 10 minutes
 setInterval(() => {
@@ -31,7 +62,7 @@ setInterval(() => {
 }, 60000); // Run every minute
 
 /**
- * Get SSO configuration from database
+ * Get SSO configuration from database only
  */
 export const getSSOConfigFromDB = async (): Promise<SSOConfig | null> => {
   try {
@@ -48,6 +79,7 @@ export const getSSOConfigFromDB = async (): Promise<SSOConfig | null> => {
       config.clientSecret = decrypt(config.clientSecret);
     }
 
+    config.source = 'database';
     return config;
   } catch (error) {
     logger.error('Error fetching SSO config from DB:', error);
@@ -56,10 +88,30 @@ export const getSSOConfigFromDB = async (): Promise<SSOConfig | null> => {
 };
 
 /**
- * Check if SSO is enabled and configured
+ * Get SSO configuration - checks database first, then falls back to environment variables
+ * Priority: Database config (if enabled) > Environment variables
+ */
+export const getSSOConfig = async (): Promise<SSOConfig | null> => {
+  // First try database config
+  const dbConfig = await getSSOConfigFromDB();
+  if (dbConfig && dbConfig.enabled && dbConfig.tenantId && dbConfig.clientId && dbConfig.clientSecret) {
+    return dbConfig;
+  }
+
+  // Fall back to environment variables
+  const envConfig = getSSOConfigFromEnv();
+  if (envConfig) {
+    return envConfig;
+  }
+
+  return null;
+};
+
+/**
+ * Check if SSO is enabled and configured (from either source)
  */
 export const isSSOEnabled = async (): Promise<boolean> => {
-  const config = await getSSOConfigFromDB();
+  const config = await getSSOConfig();
   return !!(config && config.enabled && config.tenantId && config.clientId && config.clientSecret);
 };
 
@@ -69,7 +121,7 @@ export const isSSOEnabled = async (): Promise<boolean> => {
  */
 export const getMSALClient = async (): Promise<ConfidentialClientApplication | null> => {
   try {
-    const config = await getSSOConfigFromDB();
+    const config = await getSSOConfig();
 
     if (!config || !config.enabled || !config.tenantId || !config.clientId || !config.clientSecret) {
       logger.warn('SSO is not enabled or not fully configured');
@@ -119,7 +171,7 @@ export const getMSALClient = async (): Promise<ConfidentialClientApplication | n
  */
 export const getAuthorizationUrl = async (): Promise<string | null> => {
   try {
-    const config = await getSSOConfigFromDB();
+    const config = await getSSOConfig();
     const msalClient = await getMSALClient();
 
     if (!msalClient || !config || !config.redirectUri) {
@@ -164,7 +216,7 @@ export const getAuthorizationUrl = async (): Promise<string | null> => {
  */
 export const exchangeCodeForTokens = async (code: string, state: string): Promise<any> => {
   try {
-    const config = await getSSOConfigFromDB();
+    const config = await getSSOConfig();
     const msalClient = await getMSALClient();
 
     if (!msalClient || !config || !config.redirectUri) {

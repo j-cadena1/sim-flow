@@ -2,18 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Simulation Requests', () => {
   test.beforeEach(async ({ page }) => {
-    // Login before each test
+    // Tests automatically start with authenticated session from global setup
+    // Just navigate to home page to begin
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-
-    // Wait for login form to be visible
-    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
-
-    await page.locator('#email').fill('qadmin@simflow.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 
     // Wait for dashboard to load
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
@@ -52,8 +43,8 @@ test.describe('Simulation Requests', () => {
     // Wait for page to load
     await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
 
-    // Should see Active Requests section
-    await expect(page.getByText(/Active Requests/i)).toBeVisible();
+    // Should see Active Requests section heading (use specific selector to avoid matching "No active requests")
+    await expect(page.getByRole('heading', { name: /^Active Requests \(\d+\)$/ })).toBeVisible();
   });
 
   test('should see request status badges', async ({ page }) => {
@@ -63,10 +54,26 @@ test.describe('Simulation Requests', () => {
     // Wait for page to load
     await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
 
-    // Look for the Active Requests section which confirms data has loaded
-    await expect(page.getByText(/Active Requests/i)).toBeVisible();
+    // Look for the Active Requests section heading (use specific selector)
+    const activeRequestsHeading = page.getByRole('heading', { name: /^Active Requests \(\d+\)$/ });
+    await expect(activeRequestsHeading).toBeVisible();
 
-    // Page should contain request cards/items
-    await expect(page.locator('article, [role="article"], .request-card, .cursor-pointer').first()).toBeVisible({ timeout: 5000 });
+    // Extract the count from the heading to determine if we should have requests
+    const headingText = await activeRequestsHeading.textContent();
+    const count = parseInt(headingText?.match(/\((\d+)\)/)?.[1] || '0');
+
+    if (count > 0) {
+      // If there are requests, verify we can see status badges
+      // Look for status badge spans (they have specific styling and contain status text)
+      const statusBadge = page.locator('span.px-2\\.5.py-0\\.5.rounded-full').first();
+      await expect(statusBadge).toBeVisible({ timeout: 5000 });
+
+      // Also verify the badge contains valid status text
+      const badgeText = await statusBadge.textContent();
+      expect(badgeText).toMatch(/Feasibility Review|Resource Allocation|Engineering Review|In Progress|Completed|Submitted|Accepted|Discussion/);
+    } else {
+      // If no requests, verify the empty state message is shown
+      await expect(page.getByText(/No active requests/i)).toBeVisible();
+    }
   });
 });

@@ -7,7 +7,13 @@ import { Sessions } from './Sessions';
 import { useAuth } from '../contexts/AuthContext';
 
 // Only the local qAdmin account can configure SSO
+// qAdmin is also a protected system account that cannot be modified or deleted
 const QADMIN_EMAIL = 'qadmin@simflow.local';
+
+// Check if a user is the protected system administrator
+const isProtectedUser = (email: string): boolean => {
+  return email.toLowerCase() === QADMIN_EMAIL.toLowerCase();
+};
 
 interface SSOConfig {
   id: string;
@@ -47,8 +53,8 @@ export const Settings: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
   const isQAdmin = user?.email === QADMIN_EMAIL;
-  // Default to 'users' tab if not qAdmin (can't see SSO tab)
-  const [activeTab, setActiveTab] = useState<ActiveTab>(isQAdmin ? 'sso' : 'users');
+  // Default to 'users' tab - will be updated if qAdmin and SSO tab is visible
+  const [activeTab, setActiveTab] = useState<ActiveTab>('users');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -62,6 +68,9 @@ export const Settings: React.FC = () => {
     authority: null,
     scopes: 'openid,profile,email',
   });
+
+  // SSO configuration source - if 'environment', hide SSO config tab
+  const [ssoSource, setSsoSource] = useState<'database' | 'environment' | null>(null);
 
   // User management state
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -78,9 +87,31 @@ export const Settings: React.FC = () => {
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
 
+  // SSO config tab is only visible to qAdmin AND only when NOT configured via environment
+  const showSsoTab = isQAdmin && ssoSource !== 'environment';
+
+  // Check SSO source on mount to determine if SSO tab should be visible
   useEffect(() => {
-    // Only load SSO config if user is qAdmin
-    if (isQAdmin) {
+    const checkSsoSource = async () => {
+      try {
+        const response = await apiClient.get('/auth/sso/status');
+        const source = response.data.source as 'database' | 'environment' | null;
+        setSsoSource(source);
+
+        // qAdmin gets SSO tab as default ONLY if SSO is not env-configured
+        if (isQAdmin && source !== 'environment') {
+          setActiveTab('sso');
+        }
+      } catch (error) {
+        console.error('Error checking SSO source:', error);
+      }
+    };
+    checkSsoSource();
+  }, [isQAdmin]);
+
+  useEffect(() => {
+    // Only load SSO config if user is qAdmin and SSO tab is visible
+    if (isQAdmin && showSsoTab) {
       loadConfig();
     } else {
       setIsLoading(false);
@@ -88,7 +119,7 @@ export const Settings: React.FC = () => {
     if (activeTab === 'users') {
       loadUsers();
     }
-  }, [activeTab, isQAdmin]);
+  }, [activeTab, isQAdmin, showSsoTab]);
 
   const loadConfig = async () => {
     try {
@@ -311,8 +342,8 @@ export const Settings: React.FC = () => {
 
       {/* Tab Navigation */}
       <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-slate-800">
-        {/* SSO Configuration tab - only visible to qAdmin */}
-        {isQAdmin && (
+        {/* SSO Configuration tab - only visible to qAdmin when NOT configured via environment variables */}
+        {showSsoTab && (
           <button
             onClick={() => setActiveTab('sso')}
             className={`px-6 py-3 font-medium transition-colors relative ${
@@ -372,8 +403,8 @@ export const Settings: React.FC = () => {
         </button>
       </div>
 
-      {/* SSO Configuration Tab - only accessible to qAdmin */}
-      {activeTab === 'sso' && isQAdmin && (
+      {/* SSO Configuration Tab - only accessible to qAdmin when NOT configured via environment variables */}
+      {activeTab === 'sso' && showSsoTab && (
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 mb-6 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-blue-100 dark:bg-blue-600/20 p-2 rounded-lg">
@@ -655,13 +686,14 @@ export const Settings: React.FC = () => {
                               }`}>
                                 {user.role}
                               </span>
-                              {!user.deletedAt && (
+                              {!user.deletedAt && !isProtectedUser(user.email) && (
                                 <button
                                   onClick={() => {
                                     setEditingUserId(user.id);
                                     setEditingRole(user.role);
                                   }}
                                   className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                                  title="Edit role"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </button>
@@ -722,14 +754,16 @@ export const Settings: React.FC = () => {
                                     <RefreshCw className="w-4 h-4" />
                                   </button>
                                 )}
-                                {/* Deactivate button for active users */}
-                                <button
-                                  onClick={() => handleDeactivateUser(user.id)}
-                                  className="text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300"
-                                  title="Deactivate user"
-                                >
-                                  <Shield className="w-4 h-4" />
-                                </button>
+                                {/* Deactivate button for active users (not for protected accounts) */}
+                                {!isProtectedUser(user.email) && (
+                                  <button
+                                    onClick={() => handleDeactivateUser(user.id)}
+                                    className="text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300"
+                                    title="Deactivate user"
+                                  >
+                                    <Shield className="w-4 h-4" />
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -1155,69 +1189,70 @@ const AuditLogTab: React.FC = () => {
           </div>
         ) : (
           <>
+            {/* Table Header */}
+            <div className="hidden md:grid md:grid-cols-[180px_1fr_180px_32px] gap-4 px-4 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+              <div>Action</div>
+              <div>Details</div>
+              <div className="text-right">Timestamp</div>
+              <div></div>
+            </div>
             <div className="divide-y divide-gray-200 dark:divide-slate-800">
               {auditData.logs.map((log: any) => (
                 <div key={log.id}>
                   {/* Clickable Row */}
                   <button
                     onClick={() => toggleExpand(log.id)}
-                    className="w-full px-4 py-4 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors text-left"
+                    className="w-full px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors text-left"
                   >
-                    <div className="flex items-center gap-4">
-                      {/* Action Icon & Badge */}
-                      <div className="flex-shrink-0">
+                    <div className="grid md:grid-cols-[180px_1fr_180px_32px] gap-4 items-center">
+                      {/* Action Badge - Fixed Width Column */}
+                      <div className="flex items-center">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getActionColor(
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border whitespace-nowrap ${getActionColor(
                             log.action
                           )}`}
                         >
-                          <span>{getActionIcon(log.action)}</span>
-                          {formatActionName(log.action)}
+                          <span className="text-sm">{getActionIcon(log.action)}</span>
+                          <span className="hidden sm:inline">{formatActionName(log.action)}</span>
                         </span>
                       </div>
 
-                      {/* Main Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 dark:text-white">{log.user_name}</span>
-                          <span className="text-gray-400 dark:text-slate-500">•</span>
-                          <span className="text-sm text-gray-500 dark:text-slate-400 capitalize">{log.entity_type}</span>
+                      {/* Main Content - Flexible Width */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-gray-900 dark:text-white text-sm">{log.user_name}</span>
+                          <span className="text-gray-400 dark:text-slate-600">→</span>
+                          <span className="text-sm text-gray-600 dark:text-slate-400 capitalize">{log.entity_type}</span>
                           {log.entity_id && (
-                            <>
-                              <span className="text-gray-400 dark:text-slate-500">•</span>
-                              <span className="text-xs font-mono text-gray-400 dark:text-slate-500">
-                                #{String(log.entity_id).slice(0, 8)}
-                              </span>
-                            </>
+                            <span className="text-xs font-mono text-gray-400 dark:text-slate-500 bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                              {String(log.entity_id).slice(0, 8)}
+                            </span>
                           )}
                         </div>
                         {/* Quick Preview of Key Details */}
                         {log.details && Object.keys(log.details).length > 0 && (
-                          <div className="mt-1 text-sm text-gray-500 dark:text-slate-400 truncate">
+                          <div className="mt-1 text-xs text-gray-500 dark:text-slate-400 truncate">
                             {Object.entries(log.details).slice(0, 2).map(([key, value], idx) => (
                               <span key={key}>
-                                {idx > 0 && ' • '}
+                                {idx > 0 && <span className="mx-1.5 text-gray-300 dark:text-slate-600">•</span>}
                                 <span className="text-gray-400 dark:text-slate-500">{formatDetailKey(key)}:</span>{' '}
                                 <span className="text-gray-600 dark:text-slate-300">{formatDetailValue(key, value)}</span>
                               </span>
                             ))}
-                            {Object.keys(log.details).length > 2 && (
-                              <span className="text-gray-400 dark:text-slate-500"> +{Object.keys(log.details).length - 2} more</span>
-                            )}
                           </div>
                         )}
                       </div>
 
-                      {/* Timestamp & IP */}
-                      <div className="flex-shrink-0 text-right">
+                      {/* Timestamp & IP - Fixed Width Column */}
+                      <div className="text-right hidden md:block">
                         <div className="text-sm text-gray-700 dark:text-slate-300">{formatTimestamp(log.timestamp)}</div>
                         <div className="text-xs font-mono text-gray-400 dark:text-slate-500">{log.ip_address || '-'}</div>
                       </div>
 
                       {/* Expand Indicator */}
-                      <div className="flex-shrink-0">
+                      <div className="hidden md:flex justify-center">
                         <svg
-                          className={`w-5 h-5 text-gray-400 transition-transform ${expandedLogId === log.id ? 'rotate-180' : ''}`}
+                          className={`w-4 h-4 text-gray-400 transition-transform ${expandedLogId === log.id ? 'rotate-180' : ''}`}
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -1226,12 +1261,33 @@ const AuditLogTab: React.FC = () => {
                         </svg>
                       </div>
                     </div>
+                    {/* Mobile timestamp */}
+                    <div className="md:hidden mt-2 text-xs text-gray-400 dark:text-slate-500">
+                      {formatTimestamp(log.timestamp)} • {log.ip_address || '-'}
+                    </div>
                   </button>
 
                   {/* Expanded Details Panel */}
                   {expandedLogId === log.id && (
                     <div className="px-4 pb-4 bg-gray-50 dark:bg-slate-800/30 border-t border-gray-100 dark:border-slate-800">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                      {/* Event Details Card - Full Width at Top */}
+                      {log.details && Object.keys(log.details).length > 0 && (
+                        <div className="mt-4 bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                          <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Event Details</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+                            {Object.entries(log.details).map(([key, value]) => (
+                              <div key={key} className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800 last:border-0">
+                                <span className="text-sm text-gray-500 dark:text-slate-400">{formatDetailKey(key)}</span>
+                                <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 text-right">
+                                  {formatDetailValue(key, value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                         {/* User Info Card */}
                         <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
                           <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">User Information</h4>
@@ -1295,23 +1351,6 @@ const AuditLogTab: React.FC = () => {
                           </div>
                         </div>
                       </div>
-
-                      {/* Details Card - Full Width */}
-                      {log.details && Object.keys(log.details).length > 0 && (
-                        <div className="mt-4 bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
-                          <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Event Details</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-                            {Object.entries(log.details).map(([key, value]) => (
-                              <div key={key} className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800 last:border-0">
-                                <span className="text-sm text-gray-500 dark:text-slate-400">{formatDetailKey(key)}</span>
-                                <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 text-right">
-                                  {formatDetailValue(key, value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

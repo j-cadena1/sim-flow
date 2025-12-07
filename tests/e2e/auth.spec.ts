@@ -1,12 +1,17 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdmin } from '../helpers/auth';
 
 test.describe('Authentication', () => {
+  // Auth tests need to clear the global auth state to test login flows
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test.beforeEach(async ({ page }) => {
-    // Clear any existing auth state
+    // Clear any existing auth state for auth tests
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.clear();
     });
+    await page.context().clearCookies();
     await page.reload();
     // Wait for page to fully load
     await page.waitForLoadState('networkidle');
@@ -38,17 +43,9 @@ test.describe('Authentication', () => {
     await expect(page.getByText('Invalid email or password')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should login successfully with valid credentials', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Wait for form to appear
-    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
-
-    // Fill in valid credentials
-    await page.locator('#email').fill('qadmin@simflow.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  test('should login successfully with valid credentials', async ({ page, baseURL }) => {
+    // Use the auth helper to login (bypasses rate limiting)
+    await loginAsAdmin(page, baseURL);
 
     // Should redirect to dashboard - look for the dashboard heading
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
@@ -57,15 +54,9 @@ test.describe('Authentication', () => {
     await expect(page.getByText('qAdmin')).toBeVisible();
   });
 
-  test('should logout successfully', async ({ page }) => {
-    // Login first
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
-
-    await page.locator('#email').fill('qadmin@simflow.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  test('should logout successfully', async ({ page, baseURL }) => {
+    // Login using auth helper
+    await loginAsAdmin(page, baseURL);
 
     // Wait for dashboard
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });

@@ -64,6 +64,12 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       PORT: 3001
       LOG_LEVEL: info
+      # SSO Configuration (optional - from .env file)
+      SSO_ENCRYPTION_KEY: ${SSO_ENCRYPTION_KEY:-}
+      SSO_TENANT_ID: ${SSO_TENANT_ID:-}
+      SSO_CLIENT_ID: ${SSO_CLIENT_ID:-}
+      SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
+      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-}
     # Backend only accessible within Docker network - frontend proxies API requests
     expose:
       - "3001"

@@ -2,18 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {
-    // Login before each test
+    // Tests automatically start with authenticated session from global setup
+    // Just navigate to home page to begin
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-
-    // Wait for login form to be visible
-    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
-
-    await page.locator('#email').fill('qadmin@simflow.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 
     // Wait for dashboard to load
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });

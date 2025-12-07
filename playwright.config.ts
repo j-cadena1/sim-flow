@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Playwright E2E Test Configuration for Sim-Flow
@@ -6,11 +10,13 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  // Run serially to avoid rate limiting on login endpoint
-  fullyParallel: false,
+  // Global setup runs once before all tests to authenticate and save session state
+  globalSetup: path.resolve(__dirname, 'tests/global-setup.ts'),
+  // Can now run tests in parallel since we're not hitting the login endpoint repeatedly
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 1,
+  workers: process.env.CI ? 1 : 2,
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
@@ -24,11 +30,26 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  // Only test with Chromium for now to keep tests fast
+  // Separate projects for authenticated and unauthenticated tests
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'authenticated',
+      testMatch: /.*\/(navigation|requests|health|analytics|dashboard|forms)\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        // These tests use the saved auth state from global setup
+        storageState: 'tests/.auth/admin.json',
+      },
+    },
+    {
+      name: 'auth-tests',
+      testMatch: /.*\/(auth|roles|lifecycle|lifecycle-enforcement)\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        // Auth, role, and lifecycle tests need to start without authentication
+        // to switch between different user contexts
+        storageState: { cookies: [], origins: [] },
+      },
     },
   ],
 

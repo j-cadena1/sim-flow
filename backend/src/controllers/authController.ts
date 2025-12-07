@@ -24,6 +24,7 @@ import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
 import {
   isSSOEnabled,
+  getSSOConfig,
   getAuthorizationUrl,
   exchangeCodeForTokens,
   extractUserInfo,
@@ -315,11 +316,18 @@ export const revokeSessionById = asyncHandler(async (req: Request, res: Response
 /**
  * Check if SSO is enabled
  * Public endpoint - used by login page to show/hide SSO button
+ * Also returns the configuration source so UI can hide config when using env vars
  */
 export const getSSOStatus = async (req: Request, res: Response) => {
   try {
-    const enabled = await isSSOEnabled();
-    res.json({ enabled });
+    const config = await getSSOConfig();
+    const enabled = !!(config && config.enabled && config.tenantId && config.clientId && config.clientSecret);
+
+    res.json({
+      enabled,
+      // Only include source if SSO is configured - helps UI decide whether to show config tab
+      source: config?.source || null,
+    });
   } catch (error) {
     logger.error('Error checking SSO status:', error);
     res.status(500).json({ error: 'Failed to check SSO status' });
@@ -447,15 +455,6 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
     // Set session cookie
     setSessionCookie(res, sessionId);
 
-    // Return user info (no tokens in response body)
-    const userResponse = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-    };
-
     // Log audit trail for SSO login
     await logAudit({
       userId: user.id,
@@ -468,12 +467,14 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
       details: { role: user.role, entraId: userInfo.oid },
     });
 
-    res.json({
-      user: userResponse,
-      method: 'sso',
-    });
+    // Redirect to frontend - the session cookie is already set
+    // The frontend will detect the session and load the user
+    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:8080';
+    res.redirect(frontendUrl);
   } catch (error) {
     logger.error('Error handling SSO callback:', error);
-    res.status(500).json({ error: 'SSO login failed' });
+    // Redirect to frontend with error
+    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:8080';
+    res.redirect(`${frontendUrl}/#/login?error=sso_failed`);
   }
 };

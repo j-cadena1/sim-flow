@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { logger } from '../middleware/logger';
-import { getSSOConfigFromDB } from './msalService';
+import { getSSOConfig } from './msalService';
 
 interface EntraUser {
   id: string;
@@ -17,7 +17,7 @@ interface EntraUser {
  */
 const getGraphAccessToken = async (): Promise<string | null> => {
   try {
-    const config = await getSSOConfigFromDB();
+    const config = await getSSOConfig();
 
     if (!config || !config.tenantId || !config.clientId || !config.clientSecret) {
       logger.error('SSO not configured for Graph API access');

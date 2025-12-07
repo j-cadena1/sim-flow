@@ -18,6 +18,16 @@ interface User {
   deletedAt: string | null;
 }
 
+// Protected system account - cannot be modified or deleted
+const PROTECTED_EMAIL = 'qadmin@simflow.local';
+
+/**
+ * Check if a user is a protected system account
+ */
+const isProtectedUser = (email: string): boolean => {
+  return email.toLowerCase() === PROTECTED_EMAIL.toLowerCase();
+};
+
 interface DeletedUserInfo {
   id: string;
   email: string;
@@ -77,6 +87,14 @@ export const updateUserRole = async (req: Request, res: Response) => {
     if (admin?.userId === id) {
       return res.status(400).json({
         error: 'Cannot change your own role',
+      });
+    }
+
+    // Check if target user is protected
+    const targetUserResult = await query('SELECT email FROM users WHERE id = $1', [id]);
+    if (targetUserResult.rows.length > 0 && isProtectedUser(targetUserResult.rows[0].email)) {
+      return res.status(403).json({
+        error: 'Cannot modify the system administrator account',
       });
     }
 
@@ -315,6 +333,13 @@ export const deactivateUser = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Check if target user is protected
+    if (isProtectedUser(checkResult.rows[0].email)) {
+      return res.status(403).json({
+        error: 'Cannot deactivate the system administrator account',
+      });
+    }
+
     if (checkResult.rows[0].deleted_at) {
       return res.status(400).json({ error: 'User is already deactivated' });
     }
@@ -433,6 +458,13 @@ export const permanentlyDeleteUser = async (req: Request, res: Response) => {
     }
 
     const user = userResult.rows[0];
+
+    // Check if target user is protected
+    if (isProtectedUser(user.email)) {
+      return res.status(403).json({
+        error: 'Cannot delete the system administrator account',
+      });
+    }
 
     // Require confirmation by typing email
     if (!confirmEmail || confirmEmail.toLowerCase() !== user.email.toLowerCase()) {
