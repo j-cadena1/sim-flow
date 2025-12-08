@@ -54,7 +54,7 @@ export const ALLOWS_NEW_REQUESTS: ProjectStatus[] = ['Active', 'Approved'];
 export interface TransitionResult {
   success: boolean;
   error?: string;
-  project?: any;
+  project?: Record<string, unknown>;
   historyId?: string;
 }
 
@@ -160,7 +160,7 @@ export async function transitionProjectStatus(
 
     // Build update query based on target status
     let updateFields = ['status = $1', 'updated_at = CURRENT_TIMESTAMP'];
-    const updateParams: any[] = [params.toStatus];
+    const updateParams: (string | undefined)[] = [params.toStatus];
     let paramIndex = 2;
 
     // Handle specific status transitions

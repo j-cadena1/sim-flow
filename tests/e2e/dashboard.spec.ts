@@ -33,16 +33,21 @@ test.describe('Dashboard Display', () => {
   });
 
   test('should display navigation sidebar', async ({ page }) => {
-    // Verify sidebar with navigation links
-    await expect(page.getByRole('link', { name: /dashboard/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /requests/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /projects/i })).toBeVisible();
+    // Verify sidebar with navigation links (use first() to get sidebar link, not dashboard quick action)
+    await expect(page.getByRole('link', { name: /dashboard/i }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /requests/i }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /projects/i }).first()).toBeVisible();
   });
 
   test('should have theme toggle button', async ({ page }) => {
-    // Look for theme toggle (Light Mode, Dark Mode, or System)
-    const themeButton = page.getByRole('button', { name: /light mode|dark mode|system/i });
-    await expect(themeButton).toBeVisible({ timeout: 5000 });
+    // Look for theme slider buttons
+    const lightButton = page.getByRole('button', { name: 'Light mode' });
+    const darkButton = page.getByRole('button', { name: 'Dark mode' });
+    const systemButton = page.getByRole('button', { name: 'System preference' });
+
+    await expect(lightButton).toBeVisible({ timeout: 5000 });
+    await expect(darkButton).toBeVisible({ timeout: 5000 });
+    await expect(systemButton).toBeVisible({ timeout: 5000 });
   });
 
   test('should have sign out button', async ({ page }) => {
@@ -78,17 +83,20 @@ test.describe('Dashboard Navigation', () => {
   });
 
   test('should navigate to requests from sidebar', async ({ page }) => {
-    await page.getByRole('link', { name: /requests/i }).click();
+    // Use .first() to get sidebar link, not dashboard quick action
+    await page.getByRole('link', { name: /requests/i }).first().click();
     await expect(page).toHaveURL(/\/#\/requests/);
   });
 
   test('should navigate to projects from sidebar', async ({ page }) => {
-    await page.getByRole('link', { name: /projects/i }).click();
+    // Click the sidebar link (first one), not the dashboard quick action
+    await page.getByRole('link', { name: /projects/i }).first().click();
     await expect(page).toHaveURL(/\/#\/projects/);
   });
 
   test('should navigate to analytics from sidebar', async ({ page }) => {
-    await page.getByRole('link', { name: /analytics/i }).click();
+    // Click the sidebar link (first one), not the dashboard quick action
+    await page.getByRole('link', { name: /analytics/i }).first().click();
     await expect(page).toHaveURL(/\/#\/analytics/);
   });
 
@@ -143,8 +151,8 @@ test.describe('Dashboard Responsiveness', () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
-    // Sidebar should be visible
-    await expect(page.getByRole('link', { name: /requests/i })).toBeVisible();
+    // Sidebar should be visible (use .first() to get sidebar link)
+    await expect(page.getByRole('link', { name: /requests/i }).first()).toBeVisible();
   });
 
   test('should display correctly on tablet (768x1024)', async ({ page }) => {
@@ -176,39 +184,43 @@ test.describe('Dashboard Dark/Light Mode', () => {
   });
 
   test('should toggle between dark and light modes', async ({ page }) => {
-    const themeButton = page.getByRole('button', { name: /light mode|dark mode|system/i });
+    const lightButton = page.getByRole('button', { name: 'Light mode' });
+    const darkButton = page.getByRole('button', { name: 'Dark mode' });
 
-    // Get initial text
-    const initialText = await themeButton.textContent();
+    // Click dark mode
+    await darkButton.click();
+    await page.waitForTimeout(300);
 
-    // Click to toggle
-    await themeButton.click();
-    await page.waitForTimeout(300); // Wait for theme transition
+    // Verify dark mode is applied
+    const htmlClass = await page.locator('html').getAttribute('class');
+    expect(htmlClass).toContain('dark');
 
-    // Get new text
-    const newText = await themeButton.textContent();
+    // Click light mode
+    await lightButton.click();
+    await page.waitForTimeout(300);
 
-    // Text should change
-    expect(newText).not.toBe(initialText);
+    // Verify light mode is applied
+    const htmlClassAfter = await page.locator('html').getAttribute('class');
+    expect(htmlClassAfter).not.toContain('dark');
   });
 
   test('should persist theme preference', async ({ page }) => {
-    const themeButton = page.getByRole('button', { name: /light mode|dark mode|system/i });
+    const darkButton = page.getByRole('button', { name: 'Dark mode' });
 
-    // Toggle theme
-    await themeButton.click();
+    // Set to dark mode
+    await darkButton.click();
     await page.waitForTimeout(300);
 
-    const themeAfterToggle = await themeButton.textContent();
+    // Verify dark mode
+    let htmlClass = await page.locator('html').getAttribute('class');
+    expect(htmlClass).toContain('dark');
 
     // Reload page
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-    // Theme should be persisted
-    const themeAfterReload = await page.getByRole('button', { name: /light mode|dark mode|system/i }).textContent();
-
-    // Theme should match (localStorage persistence)
-    expect(themeAfterReload).toBe(themeAfterToggle);
+    // Dark mode should be persisted
+    htmlClass = await page.locator('html').getAttribute('class');
+    expect(htmlClass).toContain('dark');
   });
 });

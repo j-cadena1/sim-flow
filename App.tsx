@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SimFlowProvider } from './contexts/SimFlowContext';
@@ -9,17 +9,29 @@ import { ToastProvider } from './components/Toast';
 import { ModalProvider } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
-import { NewRequest } from './components/NewRequest';
-import { RequestList } from './components/RequestList';
-import { RequestDetail } from './components/RequestDetail';
-import { Projects } from './components/Projects';
-import { Settings } from './components/Settings';
-import Analytics from './components/Analytics';
 import Login from './components/Login';
 import { createQueryClient } from './lib/api/queryConfig';
 
+// Lazy load heavy components for better initial load time
+const NewRequest = lazy(() => import('./components/NewRequest').then(m => ({ default: m.NewRequest })));
+const RequestList = lazy(() => import('./components/RequestList').then(m => ({ default: m.RequestList })));
+const RequestDetail = lazy(() => import('./components/RequestDetail').then(m => ({ default: m.RequestDetail })));
+const Projects = lazy(() => import('./components/Projects').then(m => ({ default: m.Projects })));
+const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
+const Analytics = lazy(() => import('./components/Analytics'));
+
 // Create React Query client with optimized caching configuration
 const queryClient = createQueryClient();
+
+// Loading fallback component for code-split routes
+const PageLoader: React.FC = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="text-center">
+      <div className="w-16 h-16 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-gray-500 dark:text-slate-400">Loading...</p>
+    </div>
+  </div>
+);
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -62,16 +74,18 @@ const AuthenticatedApp: React.FC = () => {
     <SimFlowProvider>
       <Router>
         <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/requests" element={<RequestList />} />
-            <Route path="/requests/:id" element={<RequestDetail />} />
-            <Route path="/new" element={<NewRequest />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/requests" element={<RequestList />} />
+              <Route path="/requests/:id" element={<RequestDetail />} />
+              <Route path="/new" element={<NewRequest />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </Layout>
       </Router>
     </SimFlowProvider>

@@ -77,34 +77,34 @@ export interface Project {
   id: string;
   name: string;
   code: string; // Unique project code
-  description?: string;
+  description?: string | null;
   totalHours: number;
   usedHours: number;
   availableHours?: number; // Computed: totalHours - usedHours
   status: ProjectStatus;
-  priority?: ProjectPriority; // Optional - defaults to Medium if not set
-  category?: string;
+  priority?: ProjectPriority | null; // Optional - defaults to Medium if not set
+  category?: string | null;
 
   // Dates
-  startDate?: string;
-  endDate?: string;
-  deadline?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  deadline?: string | null;
 
   // Completion tracking
-  completedAt?: string;
-  completionNotes?: string;
-  cancelledAt?: string;
-  cancellationReason?: string;
+  completedAt?: string | null;
+  completionNotes?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
 
   // Owner (project sponsor, different from creator)
-  ownerId?: string;
-  ownerName?: string;
+  ownerId?: string | null;
+  ownerName?: string | null;
 
   // Creator info
   createdBy: string;
   createdByName: string;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: string | null;
 }
 
 export interface ProjectStatusHistory {
@@ -171,7 +171,7 @@ export interface ProjectHealthMetrics {
 export interface TimeEntry {
   id: string;
   requestId: string;
-  engineerId: string;
+  engineerId: string | null;
   engineerName: string;
   hours: number;
   description?: string;
@@ -196,17 +196,17 @@ export interface TitleChangeRequest {
 export interface DiscussionRequest {
   id: string;
   requestId: string;
-  engineerId: string;
-  engineerName: string;
+  engineerId: string | null;
+  engineerName?: string;
   reason: string;
-  suggestedHours?: number;
+  suggestedHours?: number | null;
   status: 'Pending' | 'Approved' | 'Denied' | 'Override';
-  reviewedBy?: string;
-  reviewedByName?: string;
-  managerResponse?: string;
-  allocatedHours?: number;
+  reviewedBy?: string | null;
+  reviewedByName?: string | null;
+  managerResponse?: string | null;
+  allocatedHours?: number | null;
   createdAt: string;
-  reviewedAt?: string;
+  reviewedAt?: string | null;
 }
 
 export interface SimRequest {

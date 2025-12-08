@@ -3,14 +3,15 @@
  * @param obj - Object with snake_case keys
  * @returns Object with camelCase keys
  */
-export const toCamelCase = <T>(obj: any): T => {
+export const toCamelCase = <T>(obj: unknown): T => {
   if (Array.isArray(obj)) {
-    return obj.map(v => toCamelCase(v)) as any;
+    return obj.map(v => toCamelCase(v)) as T;
   }
   if (obj !== null && typeof obj === 'object' && obj.constructor === Object) {
-    return Object.keys(obj).reduce((result, key) => {
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      (result as any)[camelKey] = toCamelCase((obj as any)[key]);
+    const record = obj as Record<string, unknown>;
+    return Object.keys(record).reduce((result, key) => {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+      (result as Record<string, unknown>)[camelKey] = toCamelCase(record[key]);
       return result;
     }, {} as T);
   }

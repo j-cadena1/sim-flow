@@ -16,19 +16,22 @@ test.describe('Navigation', () => {
   });
 
   test('should navigate to Requests', async ({ page }) => {
-    await page.getByRole('link', { name: /requests/i }).click();
+    // Use .first() to get sidebar link, not dashboard quick action
+    await page.getByRole('link', { name: /requests/i }).first().click();
     await expect(page).toHaveURL(/\/#\/requests/);
     // Look for the main page heading specifically
     await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
   });
 
   test('should navigate to Projects', async ({ page }) => {
-    await page.getByRole('link', { name: /projects/i }).click();
+    // Click the sidebar link (first one), not the dashboard quick action
+    await page.getByRole('link', { name: /projects/i }).first().click();
     await expect(page).toHaveURL(/\/#\/projects/);
   });
 
   test('should navigate to Analytics', async ({ page }) => {
-    await page.getByRole('link', { name: /analytics/i }).click();
+    // Click the sidebar link (first one), not the dashboard quick action
+    await page.getByRole('link', { name: /analytics/i }).first().click();
     await expect(page).toHaveURL(/\/#\/analytics/);
   });
 
@@ -39,20 +42,30 @@ test.describe('Navigation', () => {
   });
 
   test('should toggle dark/light mode', async ({ page }) => {
-    // Find the theme toggle button (text is "Light Mode", "Dark Mode", or "System")
-    const themeButton = page.getByRole('button', { name: /Light Mode|Dark Mode|System/i });
+    // Find the theme slider buttons by their titles
+    const lightButton = page.getByRole('button', { name: 'Light mode' });
+    const darkButton = page.getByRole('button', { name: 'Dark mode' });
+    const systemButton = page.getByRole('button', { name: 'System preference' });
 
-    // Get the initial button text
-    const initialText = await themeButton.textContent();
+    // All three buttons should be visible
+    await expect(lightButton).toBeVisible();
+    await expect(darkButton).toBeVisible();
+    await expect(systemButton).toBeVisible();
 
-    // Click to toggle theme
-    await themeButton.click();
+    // Click dark mode
+    await darkButton.click();
+    await page.waitForTimeout(300);
 
-    // Wait a moment for theme to apply
-    await page.waitForTimeout(500);
+    // Verify dark mode is applied (html element should have 'dark' class)
+    const htmlClass = await page.locator('html').getAttribute('class');
+    expect(htmlClass).toContain('dark');
 
-    // Get the new button text - it should have changed
-    const newText = await themeButton.textContent();
-    expect(newText).not.toBe(initialText);
+    // Click light mode
+    await lightButton.click();
+    await page.waitForTimeout(300);
+
+    // Verify light mode is applied (html should not have 'dark' class)
+    const htmlClassAfter = await page.locator('html').getAttribute('class');
+    expect(htmlClassAfter).not.toContain('dark');
   });
 });

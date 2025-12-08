@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcrypt';
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
@@ -107,7 +108,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = toCamelCase(result.rows[0]) as any;
+    const user = toCamelCase<{ email: string; name: string }>(result.rows[0]);
     logger.info(`User ${id} role updated to ${role} by admin ${admin?.userId}`);
 
     // Log audit trail
@@ -222,13 +223,25 @@ export const getEntraIDDirectoryUsers = async (req: Request, res: Response) => {
 
     logger.info(`Retrieved ${directoryUsers.length} users from Entra ID directory`);
     res.json({ users: usersWithStatus });
-  } catch (error: any) {
+  } catch (error) {
     logger.error('Error fetching Entra ID directory users:', error);
 
-    if (error.response?.data?.error?.message) {
-      return res.status(error.response.status || 500).json({
+    interface GraphApiError {
+      response?: {
+        status?: number;
+        data?: {
+          error?: {
+            message?: string;
+          };
+        };
+      };
+    }
+
+    const graphError = error as GraphApiError;
+    if (graphError.response?.data?.error?.message) {
+      return res.status(graphError.response.status || 500).json({
         error: 'Microsoft Graph API error',
-        details: error.response.data.error.message,
+        details: graphError.response.data.error.message,
       });
     }
 
@@ -354,11 +367,10 @@ export const deactivateUser = async (req: Request, res: Response) => {
     // Log audit trail
     await logRequestAudit(
       req,
-      AuditAction.DELETE_USER,
+      AuditAction.DEACTIVATE_USER,
       EntityType.USER,
       id,
       {
-        action: 'deactivate',
         deactivatedUserEmail: result.rows[0].email,
         deactivatedUserName: result.rows[0].name
       }
@@ -407,11 +419,10 @@ export const restoreUser = async (req: Request, res: Response) => {
     // Log audit trail
     await logRequestAudit(
       req,
-      AuditAction.UPDATE_USER_ROLE, // Reusing this action type for restore
+      AuditAction.RESTORE_USER,
       EntityType.USER,
       id,
       {
-        action: 'restore',
         restoredUserEmail: result.rows[0].email,
         restoredUserName: result.rows[0].name
       }
@@ -490,17 +501,17 @@ export const permanentlyDeleteUser = async (req: Request, res: Response) => {
 
     logger.info(`User ${id} (${user.email}) permanently deleted by admin ${admin?.userId}. Reason: ${reason || 'Not specified'}`);
 
-    // Log audit trail
+    // Log audit trail (permanent delete)
     await logRequestAudit(
       req,
       AuditAction.DELETE_USER,
       EntityType.USER,
       id,
       {
-        action: 'permanent_delete',
         deletedUserEmail: user.email,
         deletedUserName: user.name,
-        reason: reason || 'Not specified'
+        reason: reason || 'Not specified',
+        permanentDelete: true
       }
     );
 
@@ -600,5 +611,89 @@ export const batchGetDeletedUsers = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Error batch fetching deleted users:', error);
     res.status(500).json({ error: 'Failed to fetch deleted users' });
+  }
+};
+
+/**
+ * Change password for qAdmin local account
+ * Admin only - allows qAdmin or any Admin role user to change the qAdmin password
+ */
+export const changeQAdminPassword = async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const admin = req.user;
+
+    // Validation
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({
+        error: 'New password must be at least 8 characters long',
+      });
+    }
+
+    // Get qAdmin user
+    const userResult = await query(
+      'SELECT id, email, password_hash, auth_source FROM users WHERE email = $1',
+      [PROTECTED_EMAIL]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'System administrator account not found' });
+    }
+
+    const qAdminUser = userResult.rows[0];
+
+    // Verify this is a local account (not SSO)
+    if (qAdminUser.auth_source !== 'local') {
+      return res.status(400).json({
+        error: 'Cannot change password for SSO accounts',
+      });
+    }
+
+    // If user is qAdmin themselves, require current password verification
+    const isQAdminThemselves = admin?.email.toLowerCase() === PROTECTED_EMAIL.toLowerCase();
+    if (isQAdminThemselves) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          error: 'Current password is required',
+        });
+      }
+
+      // Verify current password
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, qAdminUser.password_hash);
+      if (!isCurrentPasswordValid) {
+        logger.warn(`Failed password change attempt for qAdmin by qAdmin (incorrect current password)`);
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+    }
+    // If user is a different Admin, they can change it without knowing current password
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await query(
+      'UPDATE users SET password_hash = $1 WHERE email = $2',
+      [hashedPassword, PROTECTED_EMAIL]
+    );
+
+    logger.info(`qAdmin password changed by ${admin?.email} (Admin role: ${admin?.role})`);
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.CHANGE_QADMIN_PASSWORD,
+      EntityType.USER,
+      qAdminUser.id,
+      {
+        changedBy: admin?.email,
+        changedByRole: admin?.role,
+        isSelfChange: isQAdminThemselves
+      }
+    );
+
+    res.json({ message: 'System administrator password updated successfully' });
+  } catch (error) {
+    logger.error('Error changing qAdmin password:', error);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 };

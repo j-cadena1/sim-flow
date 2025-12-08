@@ -11,20 +11,22 @@ test.describe('Simulation Requests', () => {
   });
 
   test('should display requests list', async ({ page }) => {
-    // Navigate to requests page
-    await page.getByRole('link', { name: /requests/i }).click();
+    // Navigate to requests page (use .first() to get sidebar link)
+    await page.getByRole('link', { name: /requests/i }).first().click();
 
     // Should see the requests page heading
     await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
   });
 
   test('should view request from dashboard', async ({ page }) => {
-    // Look for Recent Activity section and click the first request link
-    const recentActivity = page.locator('text=Recent Activity').locator('..');
-    const firstRequestLink = recentActivity.locator('a[href^="/requests/"]').first();
+    // Wait for Recent Activity heading to load
+    await page.getByRole('heading', { name: 'Recent Activity' }).waitFor({ timeout: 10000 });
 
-    // If no requests in recent activity, skip this test
-    const hasRequests = await firstRequestLink.isVisible({ timeout: 5000 }).catch(() => false);
+    // Wait for at least one request link to appear in Recent Activity (giving API time to respond)
+    const firstRequestLink = page.locator('a[href^="/requests/"]').first();
+
+    // Wait up to 10 seconds for requests to load
+    const hasRequests = await firstRequestLink.isVisible({ timeout: 10000 }).catch(() => false);
     if (!hasRequests) {
       test.skip(true, 'No requests in recent activity');
       return;
@@ -37,8 +39,8 @@ test.describe('Simulation Requests', () => {
   });
 
   test('should navigate to requests and see list', async ({ page }) => {
-    // Navigate to requests page
-    await page.getByRole('link', { name: /requests/i }).click();
+    // Navigate to requests page (use .first() to get sidebar link)
+    await page.getByRole('link', { name: /requests/i }).first().click();
 
     // Wait for page to load
     await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
@@ -48,8 +50,8 @@ test.describe('Simulation Requests', () => {
   });
 
   test('should see request status badges', async ({ page }) => {
-    // Navigate to requests page
-    await page.getByRole('link', { name: /requests/i }).click();
+    // Navigate to requests page (use .first() to get sidebar link)
+    await page.getByRole('link', { name: /requests/i }).first().click();
 
     // Wait for page to load
     await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();

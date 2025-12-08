@@ -136,7 +136,7 @@ export const getMSALClient = async (): Promise<ConfidentialClientApplication | n
       },
       system: {
         loggerOptions: {
-          loggerCallback: (level: any, message: string, containsPii: boolean) => {
+          loggerCallback: (level: number, message: string, containsPii: boolean) => {
             if (containsPii) {
               return;
             }
@@ -211,10 +211,24 @@ export const getAuthorizationUrl = async (): Promise<string | null> => {
   }
 };
 
+interface TokenResponse {
+  idTokenClaims?: {
+    email?: string;
+    preferred_username?: string;
+    upn?: string;
+    name?: string;
+    given_name?: string;
+    oid?: string;
+    sub?: string;
+  };
+  accessToken?: string;
+  idToken?: string;
+}
+
 /**
  * Exchange authorization code for tokens using PKCE
  */
-export const exchangeCodeForTokens = async (code: string, state: string): Promise<any> => {
+export const exchangeCodeForTokens = async (code: string, state: string): Promise<TokenResponse | null> => {
   try {
     const config = await getSSOConfig();
     const msalClient = await getMSALClient();
@@ -258,7 +272,7 @@ export const exchangeCodeForTokens = async (code: string, state: string): Promis
 /**
  * Extract user info from ID token
  */
-export const extractUserInfo = (tokenResponse: any): {
+export const extractUserInfo = (tokenResponse: TokenResponse | null): {
   email: string;
   name: string;
   oid: string; // Object ID from Entra ID
@@ -272,9 +286,9 @@ export const extractUserInfo = (tokenResponse: any): {
     const claims = tokenResponse.idTokenClaims;
 
     return {
-      email: claims.email || claims.preferred_username || claims.upn,
-      name: claims.name || claims.given_name || claims.email,
-      oid: claims.oid || claims.sub,
+      email: claims.email || claims.preferred_username || claims.upn || '',
+      name: claims.name || claims.given_name || claims.email || '',
+      oid: claims.oid || claims.sub || '',
     };
   } catch (error) {
     logger.error('Error extracting user info from token:', error);

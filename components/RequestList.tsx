@@ -3,15 +3,20 @@ import { useSimFlow } from '../contexts/SimFlowContext';
 import { RequestStatus, UserRole } from '../types';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../constants';
 import { Link } from 'react-router-dom';
-import { Clock, User as UserIcon, AlertTriangle, CheckCircle, Archive, Search, Filter, Plus } from 'lucide-react';
+import { Clock, User as UserIcon, AlertTriangle, CheckCircle, Archive, Search, Filter, Plus, ArrowUpDown, Bell, Target, Briefcase } from 'lucide-react';
+
+type SortOption = 'date-desc' | 'date-asc' | 'priority-desc' | 'priority-asc' | 'status' | 'title-asc' | 'title-desc';
+type QuickFilter = 'all' | 'my-requests' | 'assigned-to-me' | 'needs-attention';
 
 export const RequestList: React.FC = () => {
   const { requests, currentUser } = useSimFlow();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'Low' | 'Medium' | 'High'>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
 
-  const getStatusColor = (status: RequestStatus) => STATUS_COLORS[status] || 'bg-slate-700 text-slate-300';
+  const getStatusColor = (status: RequestStatus) => STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'bg-slate-700 text-slate-300';
 
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
@@ -27,6 +32,24 @@ export const RequestList: React.FC = () => {
         if (req.assignedTo !== currentUser.id && req.status !== RequestStatus.ENGINEERING_REVIEW) {
           return false;
         }
+      }
+
+      // Quick filter
+      if (quickFilter === 'my-requests') {
+        if (req.createdBy !== currentUser.id) return false;
+      } else if (quickFilter === 'assigned-to-me') {
+        if (req.assignedTo !== currentUser.id) return false;
+      } else if (quickFilter === 'needs-attention') {
+        // Needs attention: High priority OR in specific statuses that require action
+        const actionNeededStatuses = [
+          RequestStatus.SUBMITTED,
+          RequestStatus.FEASIBILITY_REVIEW,
+          RequestStatus.RESOURCE_ALLOCATION,
+          RequestStatus.ENGINEERING_REVIEW,
+          RequestStatus.DISCUSSION,
+        ];
+        const needsAttention = req.priority === 'High' || actionNeededStatuses.includes(req.status);
+        if (!needsAttention) return false;
       }
 
       // Search filter
@@ -52,14 +75,58 @@ export const RequestList: React.FC = () => {
 
       return true;
     });
-  }, [requests, currentUser, searchTerm, statusFilter, priorityFilter]);
+  }, [requests, currentUser, searchTerm, statusFilter, priorityFilter, quickFilter]);
+
+  // Sort requests
+  const sortedRequests = useMemo(() => {
+    const sorted = [...filteredRequests];
+
+    switch (sortBy) {
+      case 'date-desc':
+        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case 'date-asc':
+        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case 'priority-desc':
+        return sorted.sort((a, b) => {
+          const priorityOrder = { High: 3, Medium: 2, Low: 1 };
+          return priorityOrder[b.priority] - priorityOrder[a.priority];
+        });
+      case 'priority-asc':
+        return sorted.sort((a, b) => {
+          const priorityOrder = { High: 3, Medium: 2, Low: 1 };
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        });
+      case 'status':
+        // Sort by status workflow order
+        const statusOrder: Record<RequestStatus, number> = {
+          [RequestStatus.SUBMITTED]: 1,
+          [RequestStatus.FEASIBILITY_REVIEW]: 2,
+          [RequestStatus.RESOURCE_ALLOCATION]: 3,
+          [RequestStatus.ENGINEERING_REVIEW]: 4,
+          [RequestStatus.DISCUSSION]: 5,
+          [RequestStatus.IN_PROGRESS]: 6,
+          [RequestStatus.COMPLETED]: 7,
+          [RequestStatus.REVISION_REQUESTED]: 8,
+          [RequestStatus.REVISION_APPROVAL]: 9,
+          [RequestStatus.ACCEPTED]: 10,
+          [RequestStatus.DENIED]: 11,
+        };
+        return sorted.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+      case 'title-asc':
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case 'title-desc':
+        return sorted.sort((a, b) => b.title.localeCompare(a.title));
+      default:
+        return sorted;
+    }
+  }, [filteredRequests, sortBy]);
 
   // Separate active and archived requests (archived = older than 30 days)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const activeRequests = filteredRequests.filter(req => new Date(req.createdAt) >= thirtyDaysAgo);
-  const archivedRequests = filteredRequests.filter(req => new Date(req.createdAt) < thirtyDaysAgo);
+  const activeRequests = sortedRequests.filter(req => new Date(req.createdAt) >= thirtyDaysAgo);
+  const archivedRequests = sortedRequests.filter(req => new Date(req.createdAt) < thirtyDaysAgo);
 
   const renderRequestCard = (req: typeof filteredRequests[0]) => (
     <Link
@@ -122,9 +189,57 @@ export const RequestList: React.FC = () => {
         </Link>
       </div>
 
+      {/* Quick Filters */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setQuickFilter('all')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            quickFilter === 'all'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500'
+          }`}
+        >
+          <Filter size={16} />
+          <span>All Requests</span>
+        </button>
+        <button
+          onClick={() => setQuickFilter('my-requests')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            quickFilter === 'my-requests'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500'
+          }`}
+        >
+          <UserIcon size={16} />
+          <span>My Requests</span>
+        </button>
+        <button
+          onClick={() => setQuickFilter('assigned-to-me')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            quickFilter === 'assigned-to-me'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500'
+          }`}
+        >
+          <Briefcase size={16} />
+          <span>Assigned to Me</span>
+        </button>
+        <button
+          onClick={() => setQuickFilter('needs-attention')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            quickFilter === 'needs-attention'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500'
+          }`}
+        >
+          <Bell size={16} />
+          <span>Needs Attention</span>
+        </button>
+      </div>
+
       {/* Search and Filter Bar */}
       <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search Input */}
           <div className="md:col-span-1">
             <div className="relative">
@@ -175,12 +290,37 @@ export const RequestList: React.FC = () => {
               <option value="High">High Priority</option>
             </select>
           </div>
+
+          {/* Sort Dropdown */}
+          <div className="md:col-span-1">
+            <div className="relative">
+              <ArrowUpDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-400" size={18} />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer"
+              >
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+                <option value="priority-desc">High Priority First</option>
+                <option value="priority-asc">Low Priority First</option>
+                <option value="status">Sort by Status</option>
+                <option value="title-asc">Title (A-Z)</option>
+                <option value="title-desc">Title (Z-A)</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Active Filter Pills */}
-        {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all') && (
+        {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || quickFilter !== 'all') && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-slate-800">
             <span className="text-xs text-gray-500 dark:text-slate-400">Active filters:</span>
+            {quickFilter !== 'all' && (
+              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                Quick: {quickFilter === 'my-requests' ? 'My Requests' : quickFilter === 'assigned-to-me' ? 'Assigned to Me' : 'Needs Attention'}
+              </span>
+            )}
             {searchTerm && (
               <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-full border border-blue-200 dark:border-blue-800">
                 Search: "{searchTerm}"
@@ -201,6 +341,7 @@ export const RequestList: React.FC = () => {
                 setSearchTerm('');
                 setStatusFilter('all');
                 setPriorityFilter('all');
+                setQuickFilter('all');
               }}
               className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white ml-auto"
             >

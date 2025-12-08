@@ -11,6 +11,7 @@ import {
   permanentlyDeleteUser,
   getDeletedUserInfo,
   batchGetDeletedUsers,
+  changeQAdminPassword,
 } from '../controllers/userManagementController';
 
 const router = Router();
@@ -89,5 +90,15 @@ router.post('/:id/restore', requireRole(['Admin']), restoreUser);
  * Admin only
  */
 router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
+
+/**
+ * POST /api/users/management/change-qadmin-password
+ * Change password for qAdmin local account
+ * Body: { currentPassword?: string, newPassword: string }
+ * - qAdmin must provide currentPassword
+ * - Other Admins can change without currentPassword
+ * Admin only
+ */
+router.post('/change-qadmin-password', requireRole(['Admin']), changeQAdminPassword);
 
 export default router;

@@ -2,6 +2,17 @@ import { Request, Response } from 'express';
 import { getAuditLogs, getAuditLogCount } from '../services/auditService';
 import { logger } from '../middleware/logger';
 
+interface AuditLogFilters {
+  userId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: number;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  offset?: number;
+}
+
 /**
  * Get audit logs with filtering and pagination
  * Admin only
@@ -19,9 +30,9 @@ export const getAuditLogsController = async (req: Request, res: Response) => {
       offset = '0',
     } = req.query;
 
-    const filters: any = {};
+    const filters: AuditLogFilters = {};
 
-    if (userId) filters.userId = parseInt(userId as string);
+    if (userId) filters.userId = userId as string;
     if (action) filters.action = action as string;
     if (entityType) filters.entityType = entityType as string;
     if (entityId) filters.entityId = parseInt(entityId as string);
@@ -65,9 +76,9 @@ export const exportAuditLogsCSV = async (req: Request, res: Response) => {
       endDate,
     } = req.query;
 
-    const filters: any = {};
+    const filters: AuditLogFilters = {};
 
-    if (userId) filters.userId = parseInt(userId as string);
+    if (userId) filters.userId = userId as string;
     if (action) filters.action = action as string;
     if (entityType) filters.entityType = entityType as string;
     if (entityId) filters.entityId = parseInt(entityId as string);
@@ -136,7 +147,7 @@ export const getAuditStats = async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
 
-    const filters: any = {};
+    const filters: AuditLogFilters = {};
     if (startDate) filters.startDate = new Date(startDate as string);
     if (endDate) filters.endDate = new Date(endDate as string);
 

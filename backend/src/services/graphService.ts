@@ -72,9 +72,10 @@ export const getDirectoryUsers = async (): Promise<EntraUser[]> => {
 
     logger.info(`Retrieved ${response.data.value.length} users from Entra ID directory`);
     return response.data.value;
-  } catch (error: any) {
-    if (error.response) {
-      logger.error('Graph API error:', error.response.data);
+  } catch (error) {
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as { response?: { data?: unknown } };
+      logger.error('Graph API error:', axiosError.response?.data);
     } else {
       logger.error('Error fetching directory users:', error);
     }
@@ -103,9 +104,12 @@ export const getDirectoryUserByEmail = async (email: string): Promise<EntraUser 
     });
 
     return response.data;
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      return null;
+  } catch (error) {
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 404) {
+        return null;
+      }
     }
     logger.error('Error fetching directory user:', error);
     throw error;
@@ -137,10 +141,13 @@ export const getUserPhoto = async (email: string): Promise<string | null> => {
     const dataUrl = `data:${contentType};base64,${base64Image}`;
 
     return dataUrl;
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      logger.info(`No profile photo found for user ${email}`);
-      return null;
+  } catch (error) {
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 404) {
+        logger.info(`No profile photo found for user ${email}`);
+        return null;
+      }
     }
     logger.error('Error fetching user photo:', error);
     return null;

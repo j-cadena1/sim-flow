@@ -16,7 +16,7 @@ export const NewRequest: React.FC = () => {
   const { showToast } = useToast();
   const { data: allProjects = [], isLoading: projectsLoading } = useProjects();
 
-  const approvedProjects = allProjects.filter(p => p.status === ProjectStatus.APPROVED && p.totalHours > p.usedHours);
+  const approvedProjects = allProjects.filter(p => p.status === ProjectStatus.ACTIVE && p.totalHours > p.usedHours);
   const isAdmin = user?.role === 'Admin';
 
   const [title, setTitle] = useState('');
@@ -27,7 +27,7 @@ export const NewRequest: React.FC = () => {
   const [onBehalfOfUserId, setOnBehalfOfUserId] = useState('');
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
   const [usersLoading, setUsersLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   // Fetch users when component mounts (only for admins)
   React.useEffect(() => {
@@ -103,7 +103,7 @@ export const NewRequest: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Project Title</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Request Title</label>
             <input
               type="text"
               className={`w-full bg-gray-50 dark:bg-slate-950 border ${errors.title ? 'border-red-500' : 'border-gray-300 dark:border-slate-700'} rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
@@ -111,7 +111,10 @@ export const NewRequest: React.FC = () => {
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
-                if (errors.title) setErrors(prev => ({ ...prev, title: undefined }));
+                if (errors.title) {
+                  const { title, ...rest } = errors;
+                  setErrors(rest);
+                }
               }}
             />
             {errors.title && (
@@ -132,7 +135,10 @@ export const NewRequest: React.FC = () => {
               value={projectId}
               onChange={(e) => {
                 setProjectId(e.target.value);
-                if (errors.project) setErrors(prev => ({ ...prev, project: undefined }));
+                if (errors.project) {
+                  const { project, ...rest } = errors;
+                  setErrors(rest);
+                }
               }}
               disabled={projectsLoading}
             >
@@ -201,7 +207,10 @@ export const NewRequest: React.FC = () => {
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
-                if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
+                if (errors.description) {
+                  const { description, ...rest } = errors;
+                  setErrors(rest);
+                }
               }}
             />
             {errors.description ? (

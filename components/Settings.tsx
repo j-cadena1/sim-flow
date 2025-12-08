@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Save, TestTube2, Lock, AlertCircle, CheckCircle, Users, Trash2, RefreshCw, Edit2, Download, Shield, Calendar, Filter, FileDown, Globe } from 'lucide-react';
 import { useToast } from './Toast';
-import { useAuditLogs, useAuditStats, exportAuditLogsCSV } from '../lib/api/hooks';
 import apiClient from '../lib/api/client';
 import { Sessions } from './Sessions';
 import { useAuth } from '../contexts/AuthContext';
+import { SettingsTabs } from './settings/SettingsTabs';
+import { SSOConfiguration } from './settings/SSOConfiguration';
+import { UserManagement } from './settings/UserManagement';
+import { ImportUsersModal } from './settings/ImportUsersModal';
+import { DeleteUserModal } from './settings/DeleteUserModal';
+import { AuditLog } from './settings/AuditLog';
+import { ChangeQAdminPassword } from './settings/ChangeQAdminPassword';
+import { useAuditLogs, useAuditStats, exportAuditLogsCSV } from '../lib/api/hooks';
+import { Shield, FileDown, Filter, Calendar, RefreshCw } from 'lucide-react';
 
 // Only the local qAdmin account can configure SSO
 // qAdmin is also a protected system account that cannot be modified or deleted
@@ -47,14 +54,22 @@ interface DirectoryUser {
   isImported: boolean;
 }
 
-type ActiveTab = 'sso' | 'users' | 'sessions' | 'audit';
+type ActiveTab = 'sso' | 'users' | 'security' | 'sessions' | 'audit';
 
 export const Settings: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
   const isQAdmin = user?.email === QADMIN_EMAIL;
-  // Default to 'users' tab - will be updated if qAdmin and SSO tab is visible
-  const [activeTab, setActiveTab] = useState<ActiveTab>('users');
+
+  // Read initial tab from URL hash (e.g., #/settings?tab=audit)
+  const getInitialTab = (): ActiveTab => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const tabParam = params.get('tab') as ActiveTab | null;
+    const validTabs: ActiveTab[] = ['sso', 'users', 'security', 'sessions', 'audit'];
+    return tabParam && validTabs.includes(tabParam) ? tabParam : 'users';
+  };
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -90,6 +105,13 @@ export const Settings: React.FC = () => {
   // SSO config tab is only visible to qAdmin AND only when NOT configured via environment
   const showSsoTab = isQAdmin && ssoSource !== 'environment';
 
+  // Update URL hash when tab changes
+  const handleTabChange = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    const baseHash = window.location.hash.split('?')[0];
+    window.location.hash = `${baseHash}?tab=${tab}`;
+  };
+
   // Check SSO source on mount to determine if SSO tab should be visible
   useEffect(() => {
     const checkSsoSource = async () => {
@@ -98,9 +120,12 @@ export const Settings: React.FC = () => {
         const source = response.data.source as 'database' | 'environment' | null;
         setSsoSource(source);
 
-        // qAdmin gets SSO tab as default ONLY if SSO is not env-configured
-        if (isQAdmin && source !== 'environment') {
-          setActiveTab('sso');
+        // If no tab specified in URL and qAdmin, default to SSO tab if available
+        const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+        const hasTabParam = params.has('tab');
+
+        if (!hasTabParam && isQAdmin && source !== 'environment') {
+          handleTabChange('sso');
         }
       } catch (error) {
         console.error('Error checking SSO source:', error);
@@ -341,621 +366,97 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-slate-800">
-        {/* SSO Configuration tab - only visible to qAdmin when NOT configured via environment variables */}
-        {showSsoTab && (
-          <button
-            onClick={() => setActiveTab('sso')}
-            className={`px-6 py-3 font-medium transition-colors relative ${
-              activeTab === 'sso'
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
-            }`}
-          >
-            <Lock className="w-4 h-4 inline mr-2" />
-            SSO Configuration
-            {activeTab === 'sso' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
-            )}
-          </button>
-        )}
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`px-6 py-3 font-medium transition-colors relative ${
-            activeTab === 'users'
-              ? 'text-blue-600 dark:text-blue-400'
-              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Users className="w-4 h-4 inline mr-2" />
-          User Management
-          {activeTab === 'users' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('sessions')}
-          className={`px-6 py-3 font-medium transition-colors relative ${
-            activeTab === 'sessions'
-              ? 'text-blue-600 dark:text-blue-400'
-              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Globe className="w-4 h-4 inline mr-2" />
-          Sessions
-          {activeTab === 'sessions' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`px-6 py-3 font-medium transition-colors relative ${
-            activeTab === 'audit'
-              ? 'text-blue-600 dark:text-blue-400'
-              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Shield className="w-4 h-4 inline mr-2" />
-          Audit Log
-          {activeTab === 'audit' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
-          )}
-        </button>
-      </div>
+      <SettingsTabs
+        activeTab={activeTab}
+        showSsoTab={showSsoTab}
+        onTabChange={handleTabChange}
+      />
 
       {/* SSO Configuration Tab - only accessible to qAdmin when NOT configured via environment variables */}
       {activeTab === 'sso' && showSsoTab && (
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 mb-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-blue-100 dark:bg-blue-600/20 p-2 rounded-lg">
-            <Lock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Entra ID SSO Configuration</h2>
-            <p className="text-sm text-gray-500 dark:text-slate-400">Configure Microsoft Entra ID (Azure AD) single sign-on</p>
-          </div>
-        </div>
-
-        {/* Enable/Disable Toggle */}
-        <div className="mb-6 p-4 bg-gray-50 dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800">
-          <label className="flex items-center justify-between cursor-pointer">
-            <div>
-              <div className="text-gray-900 dark:text-white font-medium mb-1">Enable SSO</div>
-              <div className="text-sm text-gray-500 dark:text-slate-400">Allow users to sign in with Entra ID</div>
-            </div>
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={config.enabled}
-                onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
-                className="sr-only peer"
-              />
-              <div className="w-14 h-8 bg-gray-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:border-gray-300 dark:after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
-            </div>
-          </label>
-        </div>
-
-        {/* Configuration Fields */}
-        <div className="space-y-4">
-          {/* Tenant ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Tenant ID <span className="text-red-500 dark:text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={config.tenantId || ''}
-              onChange={(e) => setConfig({ ...config, tenantId: e.target.value })}
-              placeholder="00000000-0000-0000-0000-000000000000"
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Your Azure/Entra ID tenant (directory) ID</p>
-          </div>
-
-          {/* Client ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Client ID (Application ID) <span className="text-red-500 dark:text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={config.clientId || ''}
-              onChange={(e) => setConfig({ ...config, clientId: e.target.value })}
-              placeholder="00000000-0000-0000-0000-000000000000"
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Application (client) ID from Azure app registration</p>
-          </div>
-
-          {/* Client Secret */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Client Secret <span className="text-red-500 dark:text-red-400">*</span>
-            </label>
-            <input
-              type="password"
-              value={config.clientSecret || ''}
-              onChange={(e) => setConfig({ ...config, clientSecret: e.target.value })}
-              placeholder={config.clientSecret === '***MASKED***' ? 'Current secret is set' : 'Enter client secret'}
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Client secret value (not the secret ID)</p>
-          </div>
-
-          {/* Redirect URI */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Redirect URI <span className="text-red-500 dark:text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={config.redirectUri || ''}
-              onChange={(e) => setConfig({ ...config, redirectUri: e.target.value })}
-              placeholder="https://your-domain.com/api/auth/sso/callback"
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Must match the Redirect URI in your Azure app registration (e.g., https://simflow.company.com/api/auth/sso/callback)</p>
-          </div>
-
-          {/* Scopes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              OAuth Scopes
-            </label>
-            <input
-              type="text"
-              value={config.scopes || ''}
-              onChange={(e) => setConfig({ ...config, scopes: e.target.value })}
-              placeholder="openid,profile,email"
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Comma-separated list of OAuth scopes</p>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-          >
-            {isSaving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Save Configuration
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleTest}
-            disabled={isTesting || !config.tenantId || !config.clientId}
-            className="flex items-center gap-2 px-6 py-2 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed text-gray-900 dark:text-white rounded-lg transition-colors"
-          >
-            {isTesting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Testing...
-              </>
-            ) : (
-              <>
-                <TestTube2 className="w-4 h-4" />
-                Test Connection
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Info Box */}
-        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-700 dark:text-blue-300">
-            <p className="font-medium mb-1">Configuration Notes:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-600 dark:text-blue-400">
-              <li>Register your application in Azure/Entra ID portal first</li>
-              <li>Configure the redirect URI in your Azure app registration</li>
-              <li>Grant required API permissions (User.Read at minimum)</li>
-              <li>SSO will be available after saving and enabling</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+        <SSOConfiguration
+          config={config}
+          isSaving={isSaving}
+          isTesting={isTesting}
+          onConfigChange={setConfig}
+          onSave={handleSave}
+          onTest={handleTest}
+        />
       )}
 
       {/* User Management Tab */}
       {activeTab === 'users' && (
-        <div className="space-y-6">
-          {/* Header with Import Button */}
-          <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-100 dark:bg-blue-600/20 p-2 rounded-lg">
-                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">User Management</h2>
-                <p className="text-sm text-gray-500 dark:text-slate-400">Manage users and import from Entra ID directory</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={showDeactivated}
-                  onChange={(e) => setShowDeactivated(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-blue-600 focus:ring-blue-500"
-                />
-                Show deactivated users
-              </label>
-              <button
-                onClick={loadDirectoryUsers}
-                disabled={isLoadingDirectory}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-              >
-                {isLoadingDirectory ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Import from Entra ID
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Users Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden shadow-sm">
-            {isLoadingUsers ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-slate-400">Loading users...</p>
-                </div>
-              </div>
-            ) : users.length === 0 ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <Users className="w-12 h-12 text-gray-400 dark:text-slate-600 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-slate-400">No users found</p>
-                </div>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Auth Source</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
-                    {users.map((user) => (
-                      <tr key={user.id} className={`hover:bg-gray-50 dark:hover:bg-slate-950/50 ${user.deletedAt ? 'opacity-60' : ''}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500 dark:text-slate-400">{user.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {editingUserId === user.id && !user.deletedAt ? (
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={editingRole}
-                                onChange={(e) => setEditingRole(e.target.value)}
-                                className="px-2 py-1 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
-                              >
-                                <option value="Admin">Admin</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Engineer">Engineer</option>
-                                <option value="End-User">End-User</option>
-                              </select>
-                              <button
-                                onClick={() => handleUpdateRole(user.id, editingRole)}
-                                className="text-green-600 dark:text-green-400 hover:text-green-500 dark:hover:text-green-300"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setEditingUserId(null)}
-                                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                user.role === 'Admin' ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400' :
-                                user.role === 'Manager' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' :
-                                user.role === 'Engineer' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' :
-                                'bg-gray-100 dark:bg-slate-500/20 text-gray-600 dark:text-slate-400'
-                              }`}>
-                                {user.role}
-                              </span>
-                              {!user.deletedAt && !isProtectedUser(user.email) && (
-                                <button
-                                  onClick={() => {
-                                    setEditingUserId(user.id);
-                                    setEditingRole(user.role);
-                                  }}
-                                  className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-                                  title="Edit role"
-                                >
-                                  <Edit2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {user.deletedAt ? (
-                            <span className="px-2 py-1 text-xs rounded-full bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400">
-                              Deactivated
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
-                              Active
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            user.authSource === 'entra_id'
-                              ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                              : 'bg-gray-100 dark:bg-slate-500/20 text-gray-600 dark:text-slate-400'
-                          }`}>
-                            {user.authSource === 'entra_id' ? 'Entra ID' : 'Local'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <div className="flex items-center justify-end gap-2">
-                            {user.deletedAt ? (
-                              <>
-                                {/* Restore button for deactivated users */}
-                                <button
-                                  onClick={() => handleRestoreUser(user.id)}
-                                  className="text-green-600 dark:text-green-400 hover:text-green-500 dark:hover:text-green-300"
-                                  title="Restore user"
-                                >
-                                  <RefreshCw className="w-4 h-4" />
-                                </button>
-                                {/* Permanently delete button */}
-                                <button
-                                  onClick={() => setDeleteConfirmUser(user)}
-                                  className="text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300"
-                                  title="Permanently delete user"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                {/* Sync button for Entra ID users */}
-                                {user.authSource === 'entra_id' && (
-                                  <button
-                                    onClick={() => handleSyncUser(user.id)}
-                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
-                                    title="Sync from Entra ID"
-                                  >
-                                    <RefreshCw className="w-4 h-4" />
-                                  </button>
-                                )}
-                                {/* Deactivate button for active users (not for protected accounts) */}
-                                {!isProtectedUser(user.email) && (
-                                  <button
-                                    onClick={() => handleDeactivateUser(user.id)}
-                                    className="text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300"
-                                    title="Deactivate user"
-                                  >
-                                    <Shield className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+        <UserManagement
+          users={users}
+          isLoadingUsers={isLoadingUsers}
+          isLoadingDirectory={isLoadingDirectory}
+          showDeactivated={showDeactivated}
+          editingUserId={editingUserId}
+          editingRole={editingRole}
+          onShowDeactivatedChange={setShowDeactivated}
+          onLoadDirectoryUsers={loadDirectoryUsers}
+          onEditRole={(userId, currentRole) => {
+            setEditingUserId(userId);
+            setEditingRole(currentRole);
+          }}
+          onCancelEdit={() => setEditingUserId(null)}
+          onUpdateRole={handleUpdateRole}
+          onSyncUser={handleSyncUser}
+          onDeactivateUser={handleDeactivateUser}
+          onRestoreUser={handleRestoreUser}
+          onPermanentlyDeleteUser={(user) => setDeleteConfirmUser(user)}
+          setEditingRole={setEditingRole}
+          isProtectedUser={isProtectedUser}
+        />
       )}
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 max-w-4xl w-full mx-4 max-h-[80vh] flex flex-col shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Import Users from Entra ID</h3>
-              <button
-                onClick={() => {
-                  setShowImportModal(false);
-                  setSelectedUsers(new Set());
-                }}
-                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mb-4 p-4 bg-gray-50 dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800">
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                Default Role for Imported Users
-              </label>
-              <select
-                value={defaultRole}
-                onChange={(e) => setDefaultRole(e.target.value)}
-                className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
-              >
-                <option value="End-User">End-User</option>
-                <option value="Engineer">Engineer</option>
-                <option value="Manager">Manager</option>
-                <option value="Admin">Admin</option>
-              </select>
-            </div>
-
-            <div className="flex-1 overflow-y-auto mb-4">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 sticky top-0">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Select</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
-                  {directoryUsers.map((user) => (
-                    <tr key={user.entraId} className={user.isImported ? 'opacity-50' : ''}>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.has(user.entraId)}
-                          onChange={() => toggleUserSelection(user.entraId)}
-                          disabled={user.isImported}
-                          className="w-4 h-4 rounded border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{user.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{user.email}</td>
-                      <td className="px-4 py-3">
-                        {user.isImported ? (
-                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
-                            Already Imported
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                            Available
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-800">
-              <div className="text-sm text-gray-500 dark:text-slate-400">
-                {selectedUsers.size} user(s) selected
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setSelectedUsers(new Set());
-                  }}
-                  className="px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleImportUsers}
-                  disabled={selectedUsers.size === 0}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                >
-                  Import Selected Users
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ImportUsersModal
+          directoryUsers={directoryUsers}
+          selectedUsers={selectedUsers}
+          defaultRole={defaultRole}
+          onClose={() => {
+            setShowImportModal(false);
+            setSelectedUsers(new Set());
+          }}
+          onToggleUser={toggleUserSelection}
+          onDefaultRoleChange={setDefaultRole}
+          onImport={handleImportUsers}
+        />
       )}
 
       {/* Permanent Delete Confirmation Modal */}
       {deleteConfirmUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 max-w-md w-full mx-4 shadow-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-red-100 dark:bg-red-600/20 p-2 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Permanently Delete User</h3>
-            </div>
+        <DeleteUserModal
+          user={deleteConfirmUser}
+          confirmEmail={deleteConfirmEmail}
+          deleteReason={deleteReason}
+          onConfirmEmailChange={setDeleteConfirmEmail}
+          onDeleteReasonChange={setDeleteReason}
+          onCancel={() => {
+            setDeleteConfirmUser(null);
+            setDeleteConfirmEmail('');
+            setDeleteReason('');
+          }}
+          onConfirm={handlePermanentlyDeleteUser}
+        />
+      )}
 
-            <div className="mb-4 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
-              <p className="text-sm text-red-700 dark:text-red-300">
-                <strong>Warning:</strong> This action cannot be undone. The user <strong>{deleteConfirmUser.name}</strong> ({deleteConfirmUser.email}) will be permanently removed from the system.
-              </p>
-              <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                Their identity will be archived for historical reference, but their account and login access will be permanently deleted.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Type the user's email to confirm: <strong>{deleteConfirmUser.email}</strong>
-                </label>
-                <input
-                  type="text"
-                  value={deleteConfirmEmail}
-                  onChange={(e) => setDeleteConfirmEmail(e.target.value)}
-                  placeholder="Enter email to confirm"
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Reason for deletion (optional)
-                </label>
-                <input
-                  type="text"
-                  value={deleteReason}
-                  onChange={(e) => setDeleteReason(e.target.value)}
-                  placeholder="e.g., Employee left the company"
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setDeleteConfirmUser(null);
-                  setDeleteConfirmEmail('');
-                  setDeleteReason('');
-                }}
-                className="flex-1 px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePermanentlyDeleteUser}
-                disabled={deleteConfirmEmail.toLowerCase() !== deleteConfirmUser.email.toLowerCase()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Permanently
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Security Tab - Change qAdmin Password */}
+      {activeTab === 'security' && (
+        <ChangeQAdminPassword
+          isQAdmin={isQAdmin}
+          onSuccess={() => showToast('Password changed successfully', 'success')}
+          onError={(message) => showToast(message, 'error')}
+        />
       )}
 
       {/* Sessions Tab */}
       {activeTab === 'sessions' && <Sessions />}
 
       {/* Audit Log Tab */}
-      {activeTab === 'audit' && <AuditLogTab />}
+      {activeTab === 'audit' && <AuditLog />}
     </div>
   );
 };
@@ -1126,7 +627,9 @@ const AuditLogTab: React.FC = () => {
               <option value="ASSIGN_ENGINEER">Assign Engineer</option>
               <option value="DELETE_REQUEST">Delete Request</option>
               <option value="UPDATE_USER_ROLE">Update User Role</option>
-              <option value="DELETE_USER">Delete User</option>
+              <option value="DEACTIVATE_USER">Deactivate User</option>
+              <option value="RESTORE_USER">Restore User</option>
+              <option value="DELETE_USER">Delete User (Permanent)</option>
             </select>
           </div>
 

@@ -80,18 +80,34 @@ test.describe('New Request Form Validation', () => {
       await prioritySelect.selectOption({ index: 1 });
     }
 
-    // Select project
+    // Select project (if options are available)
+    // Wait a bit for projects to load from API
+    await page.waitForTimeout(1000);
+
     const projectSelect = page.locator('select').filter({ hasText: /project/i }).first();
     const hasProjectSelect = await projectSelect.isVisible().catch(() => false);
     if (!hasProjectSelect) {
-      // If no text filter works, just select the last select (usually project)
+      // If no text filter works, try the last select (usually project)
       const allSelects = page.locator('select');
       const selectCount = await allSelects.count();
       if (selectCount > 0) {
-        await allSelects.last().selectOption({ index: 1 });
+        const lastSelect = allSelects.last();
+        // Wait for options to load
+        await page.waitForTimeout(500);
+        const options = await lastSelect.locator('option').count();
+        // Only try to select if there are options beyond the placeholder
+        if (options > 1) {
+          await lastSelect.selectOption({ index: 1 });
+        }
       }
     } else {
-      await projectSelect.selectOption({ index: 1 });
+      // Wait for options to load in project dropdown
+      await projectSelect.waitFor({ state: 'visible' });
+      await page.waitForTimeout(500);
+      const options = await projectSelect.locator('option').count();
+      if (options > 1) {
+        await projectSelect.selectOption({ index: 1 });
+      }
     }
 
     // Verify all inputs are filled

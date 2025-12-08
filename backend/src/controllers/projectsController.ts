@@ -188,7 +188,7 @@ export const createProject = async (req: Request, res: Response) => {
       ]
     );
 
-    const project = toCamelCase(result.rows[0]) as any;
+    const project = toCamelCase<{ id: string }>(result.rows[0]);
     logger.info(`Created project ${project.id} with auto-generated code ${code}`);
 
     // Audit log

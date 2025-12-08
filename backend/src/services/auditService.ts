@@ -25,7 +25,10 @@ export enum AuditAction {
   CREATE_USER = 'CREATE_USER',
   UPDATE_USER = 'UPDATE_USER',
   DELETE_USER = 'DELETE_USER',
+  DEACTIVATE_USER = 'DEACTIVATE_USER',
+  RESTORE_USER = 'RESTORE_USER',
   UPDATE_USER_ROLE = 'UPDATE_USER_ROLE',
+  CHANGE_QADMIN_PASSWORD = 'CHANGE_QADMIN_PASSWORD',
   SYNC_USER = 'SYNC_USER',
   BULK_IMPORT_USERS = 'BULK_IMPORT_USERS',
 
@@ -69,9 +72,23 @@ interface AuditLogEntry {
   action: AuditAction;
   entityType: EntityType;
   entityId?: string | number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
+}
+
+export interface AuditLogRow {
+  id: string;
+  user_id: string | null;
+  user_email: string;
+  user_name: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  timestamp: Date;
 }
 
 /**
@@ -116,7 +133,7 @@ export const logAudit = async (entry: AuditLogEntry): Promise<void> => {
  * Extract user info from authenticated request
  */
 export const getUserFromRequest = (req: Request): { id: string; email: string; name: string } => {
-  const user = (req as any).user;
+  const user = req.user;
   if (!user) {
     throw new Error('User not found in request');
   }
@@ -153,7 +170,7 @@ export const logRequestAudit = async (
   action: AuditAction,
   entityType: EntityType,
   entityId?: string | number,
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ): Promise<void> => {
   try {
     const user = getUserFromRequest(req);
@@ -186,7 +203,7 @@ export const getAuditLogs = async (filters: {
   endDate?: Date;
   limit?: number;
   offset?: number;
-}): Promise<any[]> => {
+}): Promise<AuditLogRow[]> => {
   let query = `
     SELECT
       id, user_id, user_email, user_name, action, entity_type,
@@ -195,7 +212,7 @@ export const getAuditLogs = async (filters: {
     WHERE 1=1
   `;
 
-  const values: any[] = [];
+  const values: (string | number | Date)[] = [];
   let paramCount = 1;
 
   if (filters.userId) {
@@ -257,7 +274,7 @@ export const getAuditLogCount = async (filters: {
 }): Promise<number> => {
   let query = `SELECT COUNT(*) FROM audit_logs WHERE 1=1`;
 
-  const values: any[] = [];
+  const values: (string | number | Date)[] = [];
   let paramCount = 1;
 
   if (filters.userId) {

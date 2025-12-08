@@ -233,15 +233,23 @@ export const testSSOConfig = async (req: Request, res: Response) => {
         error: 'Connection succeeded but no token was returned. Check app permissions in Azure.',
       });
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error('SSO configuration test failed:', error);
 
     // Parse MSAL error messages for user-friendly feedback
     let errorMessage = 'Failed to connect to Microsoft Entra ID';
     let errorDetails: string | undefined;
 
-    if (error.errorCode) {
-      switch (error.errorCode) {
+    interface MSALError {
+      errorCode?: string;
+      errorMessage?: string;
+      message?: string;
+    }
+
+    const msalError = error as MSALError;
+
+    if (msalError.errorCode) {
+      switch (msalError.errorCode) {
         case 'invalid_client':
           errorMessage = 'Invalid client credentials';
           errorDetails = 'The client secret is incorrect or has expired.';
@@ -252,7 +260,7 @@ export const testSSOConfig = async (req: Request, res: Response) => {
           break;
         case 'invalid_request':
           errorMessage = 'Invalid request';
-          errorDetails = error.errorMessage || 'Check tenant ID and client ID are correct.';
+          errorDetails = msalError.errorMessage || 'Check tenant ID and client ID are correct.';
           break;
         case 'tenant_not_found':
         case 'invalid_tenant':
@@ -260,10 +268,10 @@ export const testSSOConfig = async (req: Request, res: Response) => {
           errorDetails = 'The specified tenant ID does not exist or is not accessible.';
           break;
         default:
-          errorDetails = error.errorMessage || error.message;
+          errorDetails = msalError.errorMessage || msalError.message;
       }
-    } else if (error.message) {
-      errorDetails = error.message;
+    } else if (msalError.message) {
+      errorDetails = msalError.message;
     }
 
     res.status(400).json({

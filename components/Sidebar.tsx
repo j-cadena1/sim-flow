@@ -9,7 +9,7 @@ import { UserRole } from '../types';
 export const Sidebar: React.FC = () => {
   const { currentUser } = useSimFlow();
   const { logout } = useAuth();
-  const { mode, toggleTheme } = useTheme();
+  const { mode, setMode } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const getLinks = () => {
@@ -98,21 +98,65 @@ export const Sidebar: React.FC = () => {
             </div>
           </div>
 
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-200 border border-transparent"
-            title={`Current: ${mode === 'system' ? 'System' : mode === 'dark' ? 'Dark' : 'Light'} mode`}
-          >
-            {mode === 'light' && <Sun size={20} />}
-            {mode === 'dark' && <Moon size={20} />}
-            {mode === 'system' && <Monitor size={20} />}
-            <span className="font-medium">
-              {mode === 'light' && 'Light Mode'}
-              {mode === 'dark' && 'Dark Mode'}
-              {mode === 'system' && 'System'}
-            </span>
-          </button>
+          {/* Theme Slider */}
+          <div className="bg-gray-100 dark:bg-slate-950 p-1 rounded-lg border border-gray-200 dark:border-slate-800">
+            <div className="grid grid-cols-3 gap-1 relative">
+              {/* Sliding background indicator */}
+              <div
+                className="absolute inset-y-1 bg-white dark:bg-slate-800 rounded-md shadow-sm transition-all duration-200 ease-in-out border border-gray-300 dark:border-slate-700"
+                style={{
+                  width: 'calc(33.333% - 0.25rem)',
+                  transform: `translateX(${
+                    mode === 'light' ? '0%' :
+                    mode === 'dark' ? 'calc(100% + 0.25rem)' :
+                    'calc(200% + 0.5rem)'
+                  })`
+                }}
+              />
+
+              {/* Light mode button */}
+              <button
+                onClick={() => setMode('light')}
+                className={`relative z-10 flex items-center justify-center px-3 py-2 rounded-md transition-colors ${
+                  mode === 'light'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-400'
+                }`}
+                aria-label="Light mode"
+                title="Light mode"
+              >
+                <Sun size={16} />
+              </button>
+
+              {/* Dark mode button */}
+              <button
+                onClick={() => setMode('dark')}
+                className={`relative z-10 flex items-center justify-center px-3 py-2 rounded-md transition-colors ${
+                  mode === 'dark'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-400'
+                }`}
+                aria-label="Dark mode"
+                title="Dark mode"
+              >
+                <Moon size={16} />
+              </button>
+
+              {/* System mode button */}
+              <button
+                onClick={() => setMode('system')}
+                className={`relative z-10 flex items-center justify-center px-3 py-2 rounded-md transition-colors ${
+                  mode === 'system'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-400'
+                }`}
+                aria-label="System preference"
+                title="System preference"
+              >
+                <Monitor size={16} />
+              </button>
+            </div>
+          </div>
 
           <button
             onClick={() => {

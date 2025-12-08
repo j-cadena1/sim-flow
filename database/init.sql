@@ -117,6 +117,7 @@ INSERT INTO users (name, email, password_hash, role, avatar_url) VALUES
 \i /docker-entrypoint-initdb.d/migrations/014_user_soft_delete.sql
 \i /docker-entrypoint-initdb.d/migrations/015_fix_project_codes.sql
 \i /docker-entrypoint-initdb.d/migrations/016_fix_lifecycle_consistency.sql
+\i /docker-entrypoint-initdb.d/migrations/017_add_discussion_to_lifecycle_check.sql
 
 -- Grant permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO simflow_user;

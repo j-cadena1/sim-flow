@@ -74,10 +74,10 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
   };
 
   const styles = {
-    success: 'bg-green-500/10 border-green-500/20 text-green-500',
-    error: 'bg-red-500/10 border-red-500/20 text-red-500',
-    warning: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500',
-    info: 'bg-blue-500/10 border-blue-500/20 text-blue-500',
+    success: 'bg-green-500/10 dark:bg-green-500/20 border-green-500/20 dark:border-green-500/30 text-green-700 dark:text-green-400',
+    error: 'bg-red-500/10 dark:bg-red-500/20 border-red-500/20 dark:border-red-500/30 text-red-700 dark:text-red-400',
+    warning: 'bg-yellow-500/10 dark:bg-yellow-500/20 border-yellow-500/20 dark:border-yellow-500/30 text-yellow-700 dark:text-yellow-400',
+    info: 'bg-blue-500/10 dark:bg-blue-500/20 border-blue-500/20 dark:border-blue-500/30 text-blue-700 dark:text-blue-400',
   };
 
   return (
@@ -86,10 +86,10 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
       role="alert"
     >
       <div className="flex-shrink-0">{icons[toast.type]}</div>
-      <p className="text-sm font-medium text-white flex-1">{toast.message}</p>
+      <p className="text-sm font-medium text-gray-900 dark:text-white flex-1">{toast.message}</p>
       <button
         onClick={onClose}
-        className="flex-shrink-0 text-slate-400 hover:text-white transition-colors"
+        className="flex-shrink-0 text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         aria-label="Close"
       >
         <X size={16} />

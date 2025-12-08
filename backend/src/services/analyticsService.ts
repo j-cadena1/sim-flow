@@ -322,7 +322,16 @@ export const getDashboardStats = async (
  *
  * @returns Array of completion time statistics grouped by priority
  */
-export const getTimeToCompletionAnalysis = async (): Promise<any> => {
+interface CompletionTimeStats {
+  priority: string;
+  totalRequests: number;
+  averageDays: number;
+  minDays: number;
+  maxDays: number;
+  medianDays: number;
+}
+
+export const getTimeToCompletionAnalysis = async (): Promise<CompletionTimeStats[]> => {
   const query = `
     SELECT
       priority,
@@ -361,9 +370,19 @@ export const getTimeToCompletionAnalysis = async (): Promise<any> => {
  *
  * @returns Array of completed requests with variance analysis
  */
-export const getHourAllocationAnalysis = async (): Promise<any> => {
-  // Query completed requests with time entries logged
-  // If estimated_hours is null, use actual hours as the baseline for comparison
+interface HourAllocationStats {
+  requestId: string;
+  title: string;
+  priority: string;
+  allocatedHours: number;
+  actualHours: number;
+  variance: number;
+  usagePercentage: number;
+}
+
+export const getHourAllocationAnalysis = async (): Promise<HourAllocationStats[]> => {
+  // Query completed requests, showing all completed requests regardless of time entries
+  // If estimated_hours is null, use 0 as allocated hours
   const query = `
     SELECT
       r.id as request_id,
@@ -380,10 +399,9 @@ export const getHourAllocationAnalysis = async (): Promise<any> => {
         ELSE 100
       END as usage_percentage
     FROM requests r
-    INNER JOIN time_entries te ON te.request_id = r.id
+    LEFT JOIN time_entries te ON te.request_id = r.id
     WHERE r.status = 'Completed'
     GROUP BY r.id, r.title, r.priority, r.estimated_hours
-    HAVING COALESCE(SUM(te.hours), 0) > 0
     ORDER BY COALESCE(SUM(te.hours), 0) DESC
     LIMIT 20
   `;

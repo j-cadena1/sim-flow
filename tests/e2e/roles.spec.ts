@@ -72,8 +72,8 @@ test.describe('Role-Based Access Control', () => {
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Navigate to Projects
-      await page.getByRole('link', { name: /projects/i }).click();
+      // Navigate to Projects (click sidebar link, not dashboard quick action)
+      await page.getByRole('link', { name: /projects/i }).first().click();
       await expect(page).toHaveURL(/\/#\/projects/);
     });
 
@@ -82,8 +82,8 @@ test.describe('Role-Based Access Control', () => {
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Navigate to Requests
-      await page.getByRole('link', { name: /requests/i }).click();
+      // Navigate to Requests (use .first() to get sidebar link)
+      await page.getByRole('link', { name: /requests/i }).first().click();
       await expect(page).toHaveURL(/\/#\/requests/);
       await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
     });
@@ -116,8 +116,8 @@ test.describe('Role-Based Access Control', () => {
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Navigate to Requests
-      await page.getByRole('link', { name: /requests/i }).click();
+      // Navigate to Requests (use .first() to get sidebar link)
+      await page.getByRole('link', { name: /requests/i }).first().click();
       await expect(page).toHaveURL(/\/#\/requests/);
       await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
     });
@@ -154,8 +154,8 @@ test.describe('Role-Based Access Control', () => {
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Navigate to Requests
-      await page.getByRole('link', { name: /requests/i }).click();
+      // Navigate to Requests (use .first() to get sidebar link)
+      await page.getByRole('link', { name: /requests/i }).first().click();
       await expect(page).toHaveURL(/\/#\/requests/);
       await expect(page.getByRole('heading', { name: 'Simulation Requests' })).toBeVisible();
     });
