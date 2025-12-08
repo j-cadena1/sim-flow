@@ -37,7 +37,7 @@ const router = express.Router();
  *         name: status
  *         schema:
  *           type: string
- *           enum: [Pending, Approved, Active, On Hold, Suspended, Completed, Cancelled, Archived]
+ *           enum: [Pending, Active, On Hold, Suspended, Completed, Cancelled, Expired, Archived]
  *         description: Filter by project status
  *     responses:
  *       200:
@@ -294,7 +294,7 @@ router.patch('/:id/name', requireRole(['Manager', 'Admin']), updateProjectName);
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [Pending, Approved, Active, On Hold, Suspended, Completed, Cancelled, Archived]
+ *                 enum: [Pending, Active, On Hold, Suspended, Completed, Cancelled, Expired, Archived]
  *               reason:
  *                 type: string
  *                 description: Required for certain status transitions (e.g., On Hold, Suspended)

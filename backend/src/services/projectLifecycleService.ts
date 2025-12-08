@@ -16,7 +16,6 @@ import { ProjectStatus } from '../types';
  */
 export const VALID_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
   'Pending': ['Active', 'Cancelled', 'Archived'],
-  'Approved': ['Active', 'On Hold', 'Suspended', 'Completed', 'Cancelled', 'Archived'], // Legacy
   'Active': ['On Hold', 'Suspended', 'Completed', 'Cancelled', 'Expired', 'Archived'],
   'On Hold': ['Active', 'Suspended', 'Cancelled', 'Archived'],
   'Suspended': ['Active', 'On Hold', 'Cancelled', 'Archived'],
@@ -39,7 +38,7 @@ export const REQUIRES_REASON: ProjectStatus[] = [
 /**
  * States that are considered "active" (can have hours allocated)
  */
-export const ACTIVE_STATES: ProjectStatus[] = ['Active', 'Approved'];
+export const ACTIVE_STATES: ProjectStatus[] = ['Active'];
 
 /**
  * States that are considered "terminal" (project is finished)
@@ -49,7 +48,7 @@ export const TERMINAL_STATES: ProjectStatus[] = ['Completed', 'Cancelled', 'Expi
 /**
  * States that allow new requests to be created
  */
-export const ALLOWS_NEW_REQUESTS: ProjectStatus[] = ['Active', 'Approved'];
+export const ALLOWS_NEW_REQUESTS: ProjectStatus[] = ['Active'];
 
 export interface TransitionResult {
   success: boolean;
@@ -273,7 +272,7 @@ export async function checkAndExpireProjects(): Promise<{ expired: number; proje
     const result = await query(`
       UPDATE projects
       SET status = 'Expired', updated_at = CURRENT_TIMESTAMP
-      WHERE status IN ('Active', 'Approved', 'On Hold')
+      WHERE status IN ('Active', 'On Hold')
         AND deadline IS NOT NULL
         AND deadline < CURRENT_DATE
       RETURNING id, name, code
@@ -319,7 +318,7 @@ export async function getProjectsNearDeadline(daysAhead = 7) {
         p.*,
         (deadline - CURRENT_DATE) as days_until_deadline
       FROM projects p
-      WHERE status IN ('Active', 'Approved', 'On Hold')
+      WHERE status IN ('Active', 'On Hold')
         AND deadline IS NOT NULL
         AND deadline <= CURRENT_DATE + $1::INTEGER
         AND deadline >= CURRENT_DATE

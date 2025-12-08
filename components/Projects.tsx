@@ -360,7 +360,6 @@ export const Projects: React.FC = () => {
 
   // Categorize projects for deletion modal
   const activeProjects = projects.filter(p =>
-    p.status === ProjectStatus.APPROVED ||
     p.status === ProjectStatus.ACTIVE
   );
 

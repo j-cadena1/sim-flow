@@ -29,7 +29,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   nearDeadlineProjects,
 }) => {
   const activeCount = projectMetrics.filter((p: ProjectHealthMetrics) =>
-    p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.APPROVED
+    p.status === ProjectStatus.ACTIVE
   ).length;
   const totalHours = projectMetrics.reduce((sum: number, p: ProjectHealthMetrics) => sum + (p.totalHours || 0), 0);
   const usedHours = projectMetrics.reduce((sum: number, p: ProjectHealthMetrics) => sum + (p.usedHours || 0), 0);
@@ -116,7 +116,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         </h3>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {projectMetrics
-            .filter((p: ProjectHealthMetrics) => p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.APPROVED)
+            .filter((p: ProjectHealthMetrics) => p.status === ProjectStatus.ACTIVE)
             .sort((a: ProjectHealthMetrics, b: ProjectHealthMetrics) => (Number(b.utilizationPercentage) || 0) - (Number(a.utilizationPercentage) || 0))
             .slice(0, 10)
             .map((project: ProjectHealthMetrics) => {
@@ -147,7 +147,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 </div>
               );
             })}
-          {projectMetrics.filter((p: ProjectHealthMetrics) => p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.APPROVED).length === 0 && (
+          {projectMetrics.filter((p: ProjectHealthMetrics) => p.status === ProjectStatus.ACTIVE).length === 0 && (
             <p className="text-gray-500 dark:text-slate-400 text-sm text-center py-4">No active projects</p>
           )}
         </div>

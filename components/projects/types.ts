@@ -147,7 +147,6 @@ export interface ProjectTableProps {
  */
 export const VALID_TRANSITIONS: Record<string, string[]> = {
   [ProjectStatus.PENDING]: [ProjectStatus.ACTIVE, ProjectStatus.CANCELLED, ProjectStatus.ARCHIVED],
-  [ProjectStatus.APPROVED]: [ProjectStatus.ACTIVE, ProjectStatus.ON_HOLD, ProjectStatus.SUSPENDED, ProjectStatus.COMPLETED, ProjectStatus.CANCELLED, ProjectStatus.ARCHIVED],
   [ProjectStatus.ACTIVE]: [ProjectStatus.ON_HOLD, ProjectStatus.SUSPENDED, ProjectStatus.COMPLETED, ProjectStatus.CANCELLED, ProjectStatus.EXPIRED, ProjectStatus.ARCHIVED],
   [ProjectStatus.ON_HOLD]: [ProjectStatus.ACTIVE, ProjectStatus.SUSPENDED, ProjectStatus.CANCELLED, ProjectStatus.ARCHIVED],
   [ProjectStatus.SUSPENDED]: [ProjectStatus.ACTIVE, ProjectStatus.ON_HOLD, ProjectStatus.CANCELLED, ProjectStatus.ARCHIVED],

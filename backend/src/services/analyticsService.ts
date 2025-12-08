@@ -113,7 +113,7 @@ export const getDashboardStats = async (
     const projectsQuery = `
       SELECT
         COUNT(*) as total_projects,
-        COUNT(*) FILTER (WHERE status = 'Approved') as active_projects,
+        COUNT(*) FILTER (WHERE status = 'Active') as active_projects,
         COALESCE(SUM(total_hours), 0) as total_hours_budget,
         COALESCE(SUM(used_hours), 0) as total_hours_used
       FROM projects
@@ -214,7 +214,7 @@ export const getDashboardStats = async (
           ELSE 0
         END as utilization_percentage
       FROM projects
-      WHERE status = 'Approved'
+      WHERE status = 'Active'
       ORDER BY utilization_percentage DESC
     `;
     const utilizationResult = await pool.query(utilizationQuery);

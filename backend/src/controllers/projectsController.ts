@@ -42,6 +42,7 @@ import {
   canProjectAcceptRequests,
 } from '../services/projectLifecycleService';
 import { ProjectStatus } from '../types';
+import { sendNotification } from '../services/notificationHelpers';
 
 /**
  * Get all projects with optional status filter
@@ -274,7 +275,7 @@ export const updateProjectStatus = async (req: Request, res: Response) => {
 
     // Validate status is a known value
     const validStatuses: ProjectStatus[] = [
-      'Pending', 'Approved', 'Active', 'On Hold', 'Suspended',
+      'Pending', 'Active', 'On Hold', 'Suspended',
       'Completed', 'Cancelled', 'Expired', 'Archived'
     ];
 
@@ -316,6 +317,60 @@ export const updateProjectStatus = async (req: Request, res: Response) => {
       id,
       { status, reason, historyId: result.historyId }
     );
+
+    // Notify project owner and team about significant status changes
+    const projectData = result.project;
+    if (projectData && ['Active', 'Suspended', 'Completed', 'Cancelled'].includes(status)) {
+      const notifications = [];
+      const ownerId = projectData.owner_id as string | undefined;
+      const projectName = projectData.name as string;
+
+      // Notify project owner
+      if (ownerId && ownerId !== userId) {
+        notifications.push(
+          sendNotification({
+            userId: ownerId,
+            type: 'PROJECT_UPDATED',
+            title: `Project Status Changed`,
+            message: `Project "${projectName}" status changed to ${status}`,
+            link: `/projects`,
+            entityType: 'Project',
+            entityId: id,
+            triggeredBy: userId,
+          })
+        );
+      }
+
+      // Get all engineers assigned to requests in this project and notify them
+      const engineersResult = await query(
+        `SELECT DISTINCT assigned_to
+         FROM requests
+         WHERE project_id = $1 AND assigned_to IS NOT NULL`,
+        [id]
+      );
+
+      engineersResult.rows.forEach(row => {
+        if (row.assigned_to && row.assigned_to !== userId && row.assigned_to !== ownerId) {
+          notifications.push(
+            sendNotification({
+              userId: row.assigned_to,
+              type: 'PROJECT_UPDATED',
+              title: `Project Status Changed`,
+              message: `Project "${projectName}" status changed to ${status}`,
+              link: `/projects`,
+              entityType: 'Project',
+              entityId: id,
+              triggeredBy: userId,
+            })
+          );
+        }
+      });
+
+      // Send all notifications
+      await Promise.all(notifications).catch(err =>
+        logger.error('Failed to send project status change notifications:', err)
+      );
+    }
 
     res.json({
       project,
@@ -644,7 +699,7 @@ export const reassignProjectRequests = async (req: Request, res: Response) => {
     if (targetProject.rows.length === 0) {
       return res.status(404).json({ error: 'Target project not found' });
     }
-    if (!['Active', 'Approved'].includes(targetProject.rows[0].status)) {
+    if (targetProject.rows[0].status !== 'Active') {
       return res.status(400).json({ error: 'Target project must be active to accept requests' });
     }
 

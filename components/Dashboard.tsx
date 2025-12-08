@@ -41,7 +41,7 @@ export const Dashboard: React.FC = () => {
 
   // Project stats
   const projectStats = useMemo(() => {
-    const activeProjects = projectMetrics.filter((p: any) => p.status === 'Active' || p.status === 'Approved');
+    const activeProjects = projectMetrics.filter((p: any) => p.status === 'Active');
     const totalBudget = activeProjects.reduce((sum: number, p: any) => sum + (p.totalHours || 0), 0);
     const usedBudget = activeProjects.reduce((sum: number, p: any) => sum + (p.usedHours || 0), 0);
     const avgUtilization = activeProjects.length > 0

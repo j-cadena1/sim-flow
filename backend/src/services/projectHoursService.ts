@@ -82,7 +82,7 @@ export async function recordHourTransaction(
     }
 
     // For allocations, check that project is in an active state
-    if (params.hours > 0 && !['Active', 'Approved'].includes(project.status)) {
+    if (params.hours > 0 && project.status !== 'Active') {
       if (!existingClient) await client.query('ROLLBACK');
       return {
         success: false,
@@ -388,7 +388,7 @@ export async function validateHourAvailability(
     const currentAvailable = total_hours - used_hours;
 
     return {
-      available: currentAvailable >= requestedHours && ['Active', 'Approved'].includes(status),
+      available: currentAvailable >= requestedHours && status === 'Active',
       currentAvailable,
       totalHours: total_hours,
       usedHours: used_hours

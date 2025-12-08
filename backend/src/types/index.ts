@@ -17,7 +17,6 @@ export type Priority = 'Low' | 'Medium' | 'High';
 
 export type ProjectStatus =
   | 'Pending'
-  | 'Approved'    // Legacy - use 'Active' instead
   | 'Active'
   | 'On Hold'
   | 'Suspended'

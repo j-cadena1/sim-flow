@@ -25,12 +25,6 @@ export const STATUS_CONFIG: Record<string, StatusConfig> = {
     colorClass: 'text-yellow-600 dark:text-yellow-400',
     bgClass: 'bg-yellow-100 dark:bg-yellow-900/30',
   },
-  [ProjectStatus.APPROVED]: {
-    label: 'Approved',
-    icon: <CheckCircle size={14} />,
-    colorClass: 'text-green-600 dark:text-green-400',
-    bgClass: 'bg-green-100 dark:bg-green-900/30',
-  },
   [ProjectStatus.ACTIVE]: {
     label: 'Active',
     icon: <Play size={14} />,

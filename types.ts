@@ -21,7 +21,6 @@ export enum RequestStatus {
 
 export enum ProjectStatus {
   PENDING = 'Pending',       // Awaiting management approval
-  APPROVED = 'Approved',     // Legacy - use ACTIVE instead
   ACTIVE = 'Active',         // Approved and actively being worked on
   ON_HOLD = 'On Hold',       // Temporarily paused, can be resumed
   SUSPENDED = 'Suspended',   // Administratively halted, requires approval to resume
@@ -59,7 +58,6 @@ export interface User {
   name: string;
   email?: string;
   role: UserRole;
-  avatar?: string; // Legacy - use avatarUrl instead
   avatarUrl?: string; // Profile picture URL or data URL
 }
 
@@ -236,4 +234,60 @@ export interface SimRequest {
   projectCode?: string | null;
 
   comments: Comment[];
+}
+
+// Notification Types
+export enum NotificationType {
+  REQUEST_ASSIGNED = 'REQUEST_ASSIGNED',
+  REQUEST_STATUS_CHANGED = 'REQUEST_STATUS_CHANGED',
+  REQUEST_COMMENT_ADDED = 'REQUEST_COMMENT_ADDED',
+  APPROVAL_NEEDED = 'APPROVAL_NEEDED',
+  APPROVAL_REVIEWED = 'APPROVAL_REVIEWED',
+  TIME_LOGGED = 'TIME_LOGGED',
+  PROJECT_UPDATED = 'PROJECT_UPDATED',
+  ADMIN_ACTION = 'ADMIN_ACTION',
+  TITLE_CHANGE_REQUESTED = 'TITLE_CHANGE_REQUESTED',
+  TITLE_CHANGE_REVIEWED = 'TITLE_CHANGE_REVIEWED',
+  DISCUSSION_REQUESTED = 'DISCUSSION_REQUESTED',
+  DISCUSSION_REVIEWED = 'DISCUSSION_REVIEWED'
+}
+
+export enum EmailDigestFrequency {
+  INSTANT = 'instant',
+  HOURLY = 'hourly',
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  NEVER = 'never'
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link?: string;
+  read: boolean;
+  createdAt: string;
+  entityType?: 'Request' | 'Project' | 'User' | 'TitleChange' | 'Discussion';
+  entityId?: string;
+  triggeredBy?: string;
+  triggeredByName?: string;
+}
+
+export interface NotificationPreferences {
+  userId: string;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+  emailDigestFrequency: EmailDigestFrequency;
+  requestAssigned: boolean;
+  requestStatusChanged: boolean;
+  requestCommentAdded: boolean;
+  approvalNeeded: boolean;
+  timeLogged: boolean;
+  projectUpdated: boolean;
+  adminAction: boolean;
+  retentionDays: number;
+  createdAt: string;
+  updatedAt: string;
 }

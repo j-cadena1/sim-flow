@@ -52,7 +52,6 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({
 }) => {
   // Categorize projects
   const activeProjects = projects.filter(p =>
-    p.status === ProjectStatus.APPROVED ||
     p.status === ProjectStatus.ACTIVE
   );
   const pendingProjects = projects.filter(p => p.status === ProjectStatus.PENDING);
