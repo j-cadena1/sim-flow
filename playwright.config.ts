@@ -34,7 +34,7 @@ export default defineConfig({
   projects: [
     {
       name: 'authenticated',
-      testMatch: /.*\/(navigation|requests|health|analytics|dashboard|forms)\.spec\.ts/,
+      testMatch: /.*\/(navigation|requests|health|analytics|dashboard|forms|notifications)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         // These tests use the saved auth state from global setup

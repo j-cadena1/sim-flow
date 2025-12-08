@@ -19,7 +19,7 @@ export const Dashboard: React.FC = () => {
     const total = requests.length;
     const inProgress = requests.filter(r => [RequestStatus.IN_PROGRESS, RequestStatus.ENGINEERING_REVIEW, RequestStatus.DISCUSSION].includes(r.status)).length;
     const completed = requests.filter(r => r.status === RequestStatus.COMPLETED || r.status === RequestStatus.ACCEPTED).length;
-    const pending = requests.filter(r => [RequestStatus.SUBMITTED, RequestStatus.FEASIBILITY_REVIEW, RequestStatus.RESOURCE_ALLOCATION].includes(r.status)).length;
+    const pending = requests.filter(r => [RequestStatus.SUBMITTED, RequestStatus.MANAGER_REVIEW].includes(r.status)).length;
     const denied = requests.filter(r => r.status === RequestStatus.DENIED).length;
 
     // User-specific stats
@@ -31,7 +31,7 @@ export const Dashboard: React.FC = () => {
                [RequestStatus.IN_PROGRESS, RequestStatus.ENGINEERING_REVIEW, RequestStatus.DISCUSSION].includes(r.status);
       }
       if (currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) {
-        return [RequestStatus.FEASIBILITY_REVIEW, RequestStatus.RESOURCE_ALLOCATION, RequestStatus.DISCUSSION].includes(r.status);
+        return [RequestStatus.MANAGER_REVIEW, RequestStatus.DISCUSSION].includes(r.status);
       }
       return false;
     });

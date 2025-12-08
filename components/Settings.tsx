@@ -10,6 +10,7 @@ import { ImportUsersModal } from './settings/ImportUsersModal';
 import { DeleteUserModal } from './settings/DeleteUserModal';
 import { AuditLog } from './settings/AuditLog';
 import { ChangeQAdminPassword } from './settings/ChangeQAdminPassword';
+import { NotificationPreferences } from './settings/NotificationPreferences';
 import { useAuditLogs, useAuditStats, exportAuditLogsCSV } from '../lib/api/hooks';
 import { Shield, FileDown, Filter, Calendar, RefreshCw } from 'lucide-react';
 
@@ -54,7 +55,7 @@ interface DirectoryUser {
   isImported: boolean;
 }
 
-type ActiveTab = 'sso' | 'users' | 'security' | 'sessions' | 'audit';
+type ActiveTab = 'sso' | 'users' | 'security' | 'sessions' | 'audit' | 'notifications';
 
 export const Settings: React.FC = () => {
   const { showToast } = useToast();
@@ -65,8 +66,10 @@ export const Settings: React.FC = () => {
   const getInitialTab = (): ActiveTab => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
     const tabParam = params.get('tab') as ActiveTab | null;
-    const validTabs: ActiveTab[] = ['sso', 'users', 'security', 'sessions', 'audit'];
-    return tabParam && validTabs.includes(tabParam) ? tabParam : 'users';
+    const validTabs: ActiveTab[] = ['sso', 'users', 'security', 'sessions', 'audit', 'notifications'];
+    // If tab parameter exists and is valid, use it; otherwise default to 'sessions'
+    // The actual default tab will be set by the SSO source check useEffect
+    return tabParam && validTabs.includes(tabParam) ? tabParam : 'sessions';
   };
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab());
@@ -102,8 +105,12 @@ export const Settings: React.FC = () => {
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
 
-  // SSO config tab is only visible to qAdmin AND only when NOT configured via environment
+  // Role-based tab visibility
+  const isAdmin = user?.role === 'Admin';
   const showSsoTab = isQAdmin && ssoSource !== 'environment';
+  const showUsersTab = isAdmin;
+  const showSecurityTab = isAdmin;
+  const showAuditTab = isAdmin;
 
   // Update URL hash when tab changes
   const handleTabChange = (tab: ActiveTab) => {
@@ -120,19 +127,25 @@ export const Settings: React.FC = () => {
         const source = response.data.source as 'database' | 'environment' | null;
         setSsoSource(source);
 
-        // If no tab specified in URL and qAdmin, default to SSO tab if available
+        // Determine default tab based on role and SSO availability
         const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
         const hasTabParam = params.has('tab');
 
-        if (!hasTabParam && isQAdmin && source !== 'environment') {
-          handleTabChange('sso');
+        if (!hasTabParam) {
+          // For Admins, default to SSO if available, otherwise Users
+          if (isAdmin) {
+            handleTabChange(isQAdmin && source !== 'environment' ? 'sso' : 'users');
+          } else {
+            // For End-Users, default to Sessions
+            handleTabChange('sessions');
+          }
         }
       } catch (error) {
         console.error('Error checking SSO source:', error);
       }
     };
     checkSsoSource();
-  }, [isQAdmin]);
+  }, [isQAdmin, isAdmin]);
 
   useEffect(() => {
     // Only load SSO config if user is qAdmin and SSO tab is visible
@@ -369,6 +382,9 @@ export const Settings: React.FC = () => {
       <SettingsTabs
         activeTab={activeTab}
         showSsoTab={showSsoTab}
+        showUsersTab={showUsersTab}
+        showSecurityTab={showSecurityTab}
+        showAuditTab={showAuditTab}
         onTabChange={handleTabChange}
       />
 
@@ -454,6 +470,9 @@ export const Settings: React.FC = () => {
 
       {/* Sessions Tab */}
       {activeTab === 'sessions' && <Sessions />}
+
+      {/* Notifications Tab */}
+      {activeTab === 'notifications' && <NotificationPreferences />}
 
       {/* Audit Log Tab */}
       {activeTab === 'audit' && <AuditLog />}

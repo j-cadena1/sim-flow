@@ -24,9 +24,9 @@ export const Sidebar: React.FC = () => {
       links.push({ to: '/analytics', icon: BarChart, label: 'Analytics' });
     }
 
-    if (currentUser.role === UserRole.ADMIN) {
-      links.push({ to: '/settings', icon: Settings, label: 'Settings' });
-    }
+    // Settings visible to all users (for Sessions and Notification preferences)
+    // Admin sees all tabs, End-Users see only Sessions and Notifications
+    links.push({ to: '/settings', icon: Settings, label: 'Settings' });
 
     return links;
   };
@@ -91,7 +91,7 @@ export const Sidebar: React.FC = () => {
 
         <div className="p-4 border-t border-gray-200 dark:border-slate-800 space-y-3">
           <div className="flex items-center space-x-3 bg-gray-50 dark:bg-slate-950 p-3 rounded-lg border border-gray-200 dark:border-slate-800">
-            <img src={currentUser.avatarUrl || currentUser.avatar} alt="User" className="w-8 h-8 rounded-full bg-gray-300 dark:bg-slate-700" />
+            <img src={currentUser.avatarUrl} alt="User" className="w-8 h-8 rounded-full bg-gray-300 dark:bg-slate-700" />
             <div className="overflow-hidden">
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{currentUser.name}</p>
               <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{currentUser.role}</p>

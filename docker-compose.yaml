@@ -121,6 +121,30 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Playwright E2E Tests (on-demand)
+  # Run with: make test-e2e
+  playwright:
+    build:
+      context: .
+      dockerfile: Dockerfile.playwright
+    image: sim-flow-playwright:latest
+    container_name: sim-flow-playwright
+    environment:
+      # Point to frontend container via Docker network
+      BASE_URL: http://frontend:80
+    volumes:
+      # Output results to host
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - simflow-network
+    # Don't start automatically - only run on demand
+    profiles:
+      - e2e
+
 networks:
   simflow-network:
     driver: bridge

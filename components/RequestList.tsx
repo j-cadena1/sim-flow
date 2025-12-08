@@ -43,8 +43,7 @@ export const RequestList: React.FC = () => {
         // Needs attention: High priority OR in specific statuses that require action
         const actionNeededStatuses = [
           RequestStatus.SUBMITTED,
-          RequestStatus.FEASIBILITY_REVIEW,
-          RequestStatus.RESOURCE_ALLOCATION,
+          RequestStatus.MANAGER_REVIEW,
           RequestStatus.ENGINEERING_REVIEW,
           RequestStatus.DISCUSSION,
         ];
@@ -100,16 +99,15 @@ export const RequestList: React.FC = () => {
         // Sort by status workflow order
         const statusOrder: Record<RequestStatus, number> = {
           [RequestStatus.SUBMITTED]: 1,
-          [RequestStatus.FEASIBILITY_REVIEW]: 2,
-          [RequestStatus.RESOURCE_ALLOCATION]: 3,
-          [RequestStatus.ENGINEERING_REVIEW]: 4,
-          [RequestStatus.DISCUSSION]: 5,
-          [RequestStatus.IN_PROGRESS]: 6,
-          [RequestStatus.COMPLETED]: 7,
-          [RequestStatus.REVISION_REQUESTED]: 8,
-          [RequestStatus.REVISION_APPROVAL]: 9,
-          [RequestStatus.ACCEPTED]: 10,
-          [RequestStatus.DENIED]: 11,
+          [RequestStatus.MANAGER_REVIEW]: 2,
+          [RequestStatus.ENGINEERING_REVIEW]: 3,
+          [RequestStatus.DISCUSSION]: 4,
+          [RequestStatus.IN_PROGRESS]: 5,
+          [RequestStatus.COMPLETED]: 6,
+          [RequestStatus.REVISION_REQUESTED]: 7,
+          [RequestStatus.REVISION_APPROVAL]: 8,
+          [RequestStatus.ACCEPTED]: 9,
+          [RequestStatus.DENIED]: 10,
         };
         return sorted.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
       case 'title-asc':
@@ -265,8 +263,7 @@ export const RequestList: React.FC = () => {
               >
                 <option value="all">All Statuses</option>
                 <option value={RequestStatus.SUBMITTED}>Submitted</option>
-                <option value={RequestStatus.FEASIBILITY_REVIEW}>Feasibility Review</option>
-                <option value={RequestStatus.RESOURCE_ALLOCATION}>Resource Allocation</option>
+                <option value={RequestStatus.MANAGER_REVIEW}>Manager Review</option>
                 <option value={RequestStatus.ENGINEERING_REVIEW}>Engineering Review</option>
                 <option value={RequestStatus.DISCUSSION}>Discussion</option>
                 <option value={RequestStatus.IN_PROGRESS}>In Progress</option>

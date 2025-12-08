@@ -24,13 +24,13 @@ CREATE TABLE requests (
     vendor VARCHAR(100) NOT NULL,
     status VARCHAR(50) NOT NULL CHECK (status IN (
         'Submitted',
-        'Feasibility Review',
-        'Resource Allocation',
+        'Manager Review',
         'Engineering Review',
         'Discussion',
         'In Progress',
         'Completed',
         'Revision Requested',
+        'Revision Approval',
         'Accepted',
         'Denied'
     )),

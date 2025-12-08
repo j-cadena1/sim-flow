@@ -96,8 +96,7 @@ export interface RequestActionsProps {
   /** Discussion requests */
   discussionRequests: DiscussionRequest[];
   /** Manager action handlers */
-  onStartFeasibilityReview: () => void;
-  onApproveFeasibility: () => void;
+  onStartManagerReview: () => void;
   onDeny: () => void;
   onAssign: (engineerId: string, hours: number) => void;
   onApproveRevision: () => void;

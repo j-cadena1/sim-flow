@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
 import { authenticate } from './authentication';
 
+// Re-export authenticate for convenience
+export { authenticate };
+
 export type UserRole = 'Admin' | 'Manager' | 'Engineer' | 'End-User';
 
 // Only the local qAdmin account can configure SSO

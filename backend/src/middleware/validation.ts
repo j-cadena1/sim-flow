@@ -24,9 +24,9 @@ export const createRequestSchema = z.object({
 export const updateStatusSchema = z.object({
   status: z.enum([
     'Submitted',
-    'Feasibility Review',
-    'Resource Allocation',
+    'Manager Review',
     'Engineering Review',
+    'Discussion',
     'In Progress',
     'Completed',
     'Revision Requested',

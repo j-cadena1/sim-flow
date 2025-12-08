@@ -2,8 +2,7 @@ export type UserRole = 'Admin' | 'Manager' | 'Engineer' | 'End-User';
 
 export type RequestStatus =
   | 'Submitted'
-  | 'Feasibility Review'
-  | 'Resource Allocation'
+  | 'Manager Review'
   | 'Engineering Review'
   | 'Discussion'
   | 'In Progress'

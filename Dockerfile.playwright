@@ -1,0 +1,30 @@
+# Playwright E2E Test Container
+# Uses official Playwright image with all browsers pre-installed
+#
+# Usage:
+#   make test-e2e     # Run all E2E tests in container
+
+FROM mcr.microsoft.com/playwright:v1.57.0-noble
+
+WORKDIR /app
+
+# Copy package files for dependency installation
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY playwright.config.ts ./
+
+# Install dependencies (including Playwright)
+RUN npm ci
+
+# Copy test files and helpers
+COPY tests/ ./tests/
+
+# Copy source files needed for TypeScript compilation
+COPY types.ts ./
+COPY constants.ts ./
+
+# Copy hooks directory (needed by tests)
+COPY hooks/ ./hooks/
+
+# Default command: run all tests
+CMD ["npx", "playwright", "test"]

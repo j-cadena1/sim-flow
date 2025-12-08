@@ -9,18 +9,21 @@ Sim-Flow provides interactive API documentation using Swagger UI (OpenAPI 3.0).
 ### Accessing the Documentation
 
 **Local Development:**
-```
+
+```text
 http://localhost:3001/api-docs
 ```
 
 **Production/Server:**
-```
+
+```text
 http://<your-server>:3001/api-docs
 ```
 
 ### Features
 
 The interactive documentation includes:
+
 - **All API endpoints** organized by category (Auth, Requests, Projects, etc.)
 - **Request/Response schemas** with validation rules
 - **Try it out** functionality to test endpoints directly from the browser
@@ -31,7 +34,8 @@ The interactive documentation includes:
 ## API Overview
 
 ### Base URL
-```
+
+```text
 /api
 ```
 
@@ -57,6 +61,7 @@ Sim-Flow uses **session-based authentication** with HTTP-only cookies:
 ### Role-Based Access Control
 
 The API implements four user roles:
+
 - **Admin**: Full system access
 - **Manager**: Approve requests, assign engineers, manage projects
 - **Engineer**: Work on assigned requests, track time
@@ -65,6 +70,7 @@ The API implements four user roles:
 ## API Endpoints
 
 ### Authentication (10 endpoints)
+
 - ✅ Fully documented
 - `POST /auth/login` - Login with credentials
 - `GET /auth/verify` - Verify session
@@ -78,6 +84,7 @@ The API implements four user roles:
 - `GET /auth/sso/callback` - SSO callback handler
 
 ### Requests (19 endpoints)
+
 - ✅ Fully documented
 - **CRUD Operations**: Create, read, update, delete requests
 - **Status Management**: Update request status through lifecycle
@@ -88,6 +95,7 @@ The API implements four user roles:
 - **Discussions**: Request and approve discussions with managers
 
 ### Projects (19 endpoints)
+
 - ✅ Fully documented
 - Project CRUD operations
 - Status transitions and lifecycle management
@@ -96,17 +104,20 @@ The API implements four user roles:
 - Metrics, history, and activity tracking
 
 ### Analytics (3 endpoints)
+
 - ✅ Fully documented
 - Dashboard statistics
 - Completion time analysis
 - Hour allocation analysis
 
 ### SSO Configuration (3 endpoints)
+
 - ✅ Fully documented
 - Get/update SSO settings (qAdmin only)
 - Test SSO connection
 
 ### User Management (11 endpoints)
+
 - ✅ Fully documented
 - List users with management info
 - Role management and user sync
@@ -117,12 +128,14 @@ The API implements four user roles:
 - qAdmin password management
 
 ### Audit Logs (3 endpoints)
+
 - ✅ Fully documented
 - Query audit logs with filtering
 - Export audit logs to CSV
 - Get audit statistics
 
 ### Users (2 endpoints)
+
 - ✅ Fully documented
 - Get all users
 - Get current user profile
@@ -134,16 +147,19 @@ The API implements four user roles:
 The complete OpenAPI 3.0 specification can be downloaded in JSON format:
 
 **Local:**
+
 ```bash
 curl http://localhost:3001/api-docs.json > sim-flow-api.json
 ```
 
 **Production:**
+
 ```bash
 curl http://<your-server>:3001/api-docs.json > sim-flow-api.json
 ```
 
 You can import this specification into:
+
 - **Postman**: Import > Link > Paste URL
 - **Insomnia**: Import/Export > Import from URL
 - **VS Code REST Client**: Use the JSON spec to generate requests
@@ -164,6 +180,7 @@ You can import this specification into:
 ### Using curl
 
 **Login:**
+
 ```bash
 curl -c cookies.txt -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
@@ -171,6 +188,7 @@ curl -c cookies.txt -X POST http://localhost:3001/api/auth/login \
 ```
 
 **Make authenticated request:**
+
 ```bash
 curl -b cookies.txt http://localhost:3001/api/requests
 ```
@@ -191,7 +209,8 @@ The API implements rate limiting to prevent abuse:
 - **SSO endpoints**: 10 requests per 15 minutes per IP
 
 Rate limit headers are included in responses:
-```
+
+```text
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 99
 X-RateLimit-Reset: 1234567890
@@ -213,6 +232,7 @@ All errors follow a consistent format:
 ```
 
 Common HTTP status codes:
+
 - `200` - Success
 - `201` - Created
 - `400` - Bad Request (validation error)
@@ -261,6 +281,7 @@ Edit `backend/src/config/swagger.ts` to add or update schema definitions in the 
 ## Support
 
 For API questions or issues:
+
 - Review the interactive documentation at `/api-docs`
 - Check the OpenAPI specification at `/api-docs.json`
 - Refer to the source code in `backend/src/routes/`

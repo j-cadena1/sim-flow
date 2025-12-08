@@ -111,6 +111,36 @@ services:
       - simflow-dev
     command: npm run dev -- --host 0.0.0.0
 
+  # Playwright E2E Tests (on-demand)
+  # Run with: make test-e2e
+  playwright:
+    build:
+      context: .
+      dockerfile: Dockerfile.playwright
+    image: sim-flow-playwright:dev
+    container_name: sim-flow-playwright
+    environment:
+      # Point to frontend container via Docker network
+      BASE_URL: http://frontend:5173
+    volumes:
+      # Mount test files for development
+      - ./tests:/app/tests:ro
+      - ./playwright.config.ts:/app/playwright.config.ts:ro
+      - ./types.ts:/app/types.ts:ro
+      - ./constants.ts:/app/constants.ts:ro
+      - ./hooks:/app/hooks:ro
+      # Output results to host
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    depends_on:
+      frontend:
+        condition: service_started
+    networks:
+      - simflow-dev
+    # Don't start automatically - only run on demand
+    profiles:
+      - e2e
+
 networks:
   simflow-dev:
     driver: bridge

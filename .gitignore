@@ -86,6 +86,3 @@ temp/
 /playwright/.auth/
 /tests/.auth/
 playwright-report.html
-
-# Claude Code configuration (personal preference)
-CLAUDE.md

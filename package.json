@@ -24,12 +24,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "echo '⚠️  Use \"make dev\" instead for Docker-first development' && vite",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "docker:dev": "docker compose -f docker-compose.dev.yaml up -d",
+    "docker:prod": "docker compose up -d",
+    "docker:down": "docker compose down && docker compose -f docker-compose.dev.yaml down"
   },
   "dependencies": {
     "@azure/msal-node": "^3.8.3",
@@ -41,6 +44,7 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6",
     "recharts": "^3.5.1",
+    "socket.io-client": "^4.8.1",
     "zod": "^4.1.13"
   },
   "devDependencies": {

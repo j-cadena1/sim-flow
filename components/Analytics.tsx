@@ -26,14 +26,14 @@ import {
  */
 const STATUS_COLOR_MAP: Record<string, string> = {
   Submitted: '#eab308',        // yellow
-  'Feasibility Review': '#f97316', // orange
-  'Resource Allocation': '#ec4899', // pink
+  'Manager Review': '#f97316', // orange
   'Engineering Review': '#3b82f6', // blue
   Discussion: '#06b6d4',       // cyan
   'In Progress': '#8b5cf6',    // violet
   Completed: '#22c55e',        // green
   'Revision Requested': '#f59e0b', // amber
   'Revision Approval': '#a3e635', // lime
+  Accepted: '#10b981',         // emerald
   Denied: '#ef4444',           // red
 };
 

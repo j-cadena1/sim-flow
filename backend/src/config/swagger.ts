@@ -58,8 +58,7 @@ const options: swaggerJsdoc.Options = {
               type: 'string',
               enum: [
                 'Submitted',
-                'Feasibility Review',
-                'Resource Allocation',
+                'Manager Review',
                 'Engineering Review',
                 'Discussion',
                 'In Progress',

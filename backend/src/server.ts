@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import http from 'http';
 import swaggerUi from 'swagger-ui-express';
 import { apiLimiter } from './middleware/rateLimiter';
 import { logger } from './middleware/logger';
@@ -10,6 +11,8 @@ import { addRequestId, errorHandler, notFoundHandler } from './middleware/errorH
 import { enforceSecureConfig } from './utils/configValidator';
 import { cleanupExpiredSessions } from './services/sessionService';
 import { recordHttpRequest, generatePrometheusMetrics } from './services/metricsService';
+import { initializeWebSocket } from './services/websocketService';
+import { initializeNotificationCleanup, stopNotificationCleanup } from './services/notificationCleanupService';
 import { swaggerSpec } from './config/swagger';
 import authRouter from './routes/auth';
 import requestsRouter from './routes/requests';
@@ -19,6 +22,7 @@ import ssoRouter from './routes/sso';
 import userManagementRouter from './routes/userManagement';
 import auditLogsRouter from './routes/auditLogs';
 import analyticsRouter from './routes/analytics';
+import notificationsRouter from './routes/notifications';
 import pool from './db';
 
 // Load environment variables
@@ -125,6 +129,7 @@ app.use('/api/projects', projectsRouter);
 app.use('/api/sso', ssoRouter);
 app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // 404 handler - must be before error handler
 app.use(notFoundHandler);
@@ -132,9 +137,16 @@ app.use(notFoundHandler);
 // Centralized error handler - must be last
 app.use(errorHandler);
 
+// Create HTTP server and attach Express app
+const httpServer = http.createServer(app);
+
+// Initialize WebSocket for real-time notifications
+initializeWebSocket(httpServer);
+
 // Start server
-const server = app.listen(PORT, () => {
+const server = httpServer.listen(PORT, () => {
   logger.info(`🚀 Sim-Flow API server running on port ${PORT}`);
+  logger.info(`📡 WebSocket server initialized`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Schedule periodic cleanup of expired sessions (every hour)
@@ -150,6 +162,9 @@ const server = app.listen(PORT, () => {
   cleanupExpiredSessions().catch((error) => {
     logger.error('Error during initial session cleanup:', error);
   });
+
+  // Initialize notification cleanup job
+  initializeNotificationCleanup();
 });
 
 // Graceful shutdown
@@ -157,6 +172,7 @@ process.on('SIGTERM', () => {
   logger.info('SIGTERM signal received: closing HTTP server');
   server.close(async () => {
     logger.info('HTTP server closed');
+    stopNotificationCleanup();
     await pool.end();
     logger.info('Database pool closed');
     process.exit(0);

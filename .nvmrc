@@ -1,0 +1,13 @@
+# This project is Docker-first!
+# You don't need Node.js installed locally.
+#
+# Use these commands instead:
+#   make dev          # Development with hot reload
+#   make prod         # Production
+#   make test         # Unit tests
+#   make test-e2e     # E2E tests
+#
+# If you really need to run npm commands directly (not recommended):
+# Node.js version used in Docker containers is specified in:
+# - docker-compose.yaml: NODE_VERSION (default: 20)
+# - docker-compose.dev.yaml: NODE_VERSION (default: 20)

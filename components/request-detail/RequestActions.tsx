@@ -35,8 +35,7 @@ export const RequestActions: React.FC<RequestActionsProps> = ({
   engineers,
   titleChangeRequests,
   discussionRequests,
-  onStartFeasibilityReview,
-  onApproveFeasibility,
+  onStartManagerReview,
   onDeny,
   onAssign,
   onApproveRevision,
@@ -161,47 +160,25 @@ export const RequestActions: React.FC<RequestActionsProps> = ({
           <h3 className="text-gray-900 dark:text-white font-semibold mb-3">Manager Actions</h3>
           <div className="flex gap-3">
             <button
-              onClick={onStartFeasibilityReview}
+              onClick={onStartManagerReview}
               className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm"
             >
-              Start Feasibility Review
+              Start Manager Review
             </button>
           </div>
         </div>
       );
     }
 
-    if (request.status === RequestStatus.FEASIBILITY_REVIEW) {
-      return (
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-gray-200 dark:border-slate-700 mt-6 space-y-4 shadow-sm">
-          <h3 className="text-gray-900 dark:text-white font-semibold">Feasibility Review</h3>
-          <p className="text-sm text-gray-600 dark:text-slate-400">
-            Review the request and determine if it's feasible to proceed.
-          </p>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onApproveFeasibility}
-              className="flex-1 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded flex items-center justify-center gap-2"
-            >
-              <CheckCircle size={16} /> Approve Feasibility
-            </button>
-            <button
-              onClick={onDeny}
-              className="flex-1 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded flex items-center justify-center gap-2"
-            >
-              <XCircle size={16} /> Deny Request
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (request.status === RequestStatus.RESOURCE_ALLOCATION) {
+    if (request.status === RequestStatus.MANAGER_REVIEW) {
       const availableHours = project ? project.totalHours - project.usedHours : 0;
 
       return (
         <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-gray-200 dark:border-slate-700 mt-6 shadow-sm">
-          <h3 className="text-gray-900 dark:text-white font-semibold mb-4">Resource Allocation</h3>
+          <h3 className="text-gray-900 dark:text-white font-semibold mb-4">Manager Review</h3>
+          <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+            Review the request feasibility and assign resources.
+          </p>
 
           {/* Project Information */}
           {project && (
@@ -268,13 +245,21 @@ export const RequestActions: React.FC<RequestActionsProps> = ({
                 min={1}
               />
             </div>
-            <button
-              onClick={() => onAssign(assignee, hours)}
-              disabled={!project || availableHours < 1}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Assign & Send to Engineering
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => onAssign(assignee, hours)}
+                disabled={!project || availableHours < 1}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Assign & Send to Engineering
+              </button>
+              <button
+                onClick={onDeny}
+                className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded flex items-center justify-center gap-2"
+              >
+                <XCircle size={16} /> Deny
+              </button>
+            </div>
           </div>
         </div>
       );

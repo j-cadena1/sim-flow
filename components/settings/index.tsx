@@ -10,3 +10,4 @@ export { ImportUsersModal } from './ImportUsersModal';
 export { DeleteUserModal } from './DeleteUserModal';
 export { AuditLog } from './AuditLog';
 export { SettingsTabs } from './SettingsTabs';
+export { NotificationPreferences } from './NotificationPreferences';

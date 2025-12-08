@@ -105,20 +105,9 @@ export const RequestDetail: React.FC = () => {
 
   // --- ACTIONS ---
 
-  const handleStartFeasibilityReview = () => {
-    updateRequestStatus(request.id, RequestStatus.FEASIBILITY_REVIEW);
-    showToast('Feasibility review started', 'success');
-  };
-
-  const handleApproveFeasibility = () => {
-    showConfirm(
-      'Approve Feasibility',
-      'Are you sure you want to approve this request? It will move to resource allocation.',
-      () => {
-        updateRequestStatus(request.id, RequestStatus.RESOURCE_ALLOCATION);
-        showToast('Request approved for resource allocation', 'success');
-      }
-    );
+  const handleStartManagerReview = () => {
+    updateRequestStatus(request.id, RequestStatus.MANAGER_REVIEW);
+    showToast('Manager review started', 'success');
   };
 
   const handleDeny = () => {
@@ -608,8 +597,7 @@ export const RequestDetail: React.FC = () => {
           engineers={engineers}
           titleChangeRequests={titleChangeRequests}
           discussionRequests={discussionRequests}
-          onStartFeasibilityReview={handleStartFeasibilityReview}
-          onApproveFeasibility={handleApproveFeasibility}
+          onStartManagerReview={handleStartManagerReview}
           onDeny={handleDeny}
           onAssign={handleAssign}
           onApproveRevision={handleApproveRevision}

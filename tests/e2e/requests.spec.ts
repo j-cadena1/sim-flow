@@ -72,7 +72,7 @@ test.describe('Simulation Requests', () => {
 
       // Also verify the badge contains valid status text
       const badgeText = await statusBadge.textContent();
-      expect(badgeText).toMatch(/Feasibility Review|Resource Allocation|Engineering Review|In Progress|Completed|Submitted|Accepted|Discussion/);
+      expect(badgeText).toMatch(/Manager Review|Engineering Review|In Progress|Completed|Submitted|Accepted|Discussion/);
     } else {
       // If no requests, verify the empty state message is shown
       await expect(page.getByText(/No active requests/i)).toBeVisible();

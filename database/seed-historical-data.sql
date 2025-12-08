@@ -86,7 +86,7 @@ DECLARE
         'Throughput optimization study with sensitivity analysis on key parameters.',
         'Risk assessment and mitigation strategy development through simulation.'
     ];
-    statuses TEXT[] := ARRAY['Submitted', 'Feasibility Review', 'Resource Allocation', 'Engineering Review', 'In Progress', 'Completed', 'Accepted'];
+    statuses TEXT[] := ARRAY['Submitted', 'Manager Review', 'Engineering Review', 'In Progress', 'Completed', 'Accepted'];
     priorities TEXT[] := ARRAY['Low', 'Medium', 'High'];
     time_descriptions TEXT[] := ARRAY[
         'Initial model setup and data collection',

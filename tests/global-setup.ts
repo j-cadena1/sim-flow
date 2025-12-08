@@ -13,9 +13,10 @@ import { chromium, FullConfig } from '@playwright/test';
  */
 async function globalSetup(config: FullConfig) {
   const { baseURL } = config.projects[0].use;
+  const url = baseURL || process.env.BASE_URL || 'http://localhost:8080';
   const authFile = 'tests/.auth/admin.json';
 
-  console.log('🔐 Setting up global authentication...');
+  console.log(`🔐 Setting up global authentication for ${url}...`);
 
   const browser = await chromium.launch();
   const context = await browser.newContext();
@@ -23,10 +24,10 @@ async function globalSetup(config: FullConfig) {
 
   try {
     // Navigate to the application
-    await page.goto(baseURL || 'http://localhost:8080');
+    await page.goto(url);
 
     // Call the login API directly to get session cookies
-    const response = await page.request.post(`${baseURL}/api/auth/login`, {
+    const response = await page.request.post(`${url}/api/auth/login`, {
       data: {
         email: 'qadmin@simflow.local',
         password: 'admin123',
@@ -38,7 +39,7 @@ async function globalSetup(config: FullConfig) {
     }
 
     // Navigate to home to ensure session is active
-    await page.goto(`${baseURL}/`);
+    await page.goto(`${url}/`);
     await page.waitForLoadState('networkidle');
 
     // Verify we're actually logged in by checking for the Dashboard heading

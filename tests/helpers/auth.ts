@@ -45,10 +45,13 @@ export const TEST_USERS = {
  * Authenticate a user by setting their session cookie directly
  * This bypasses the login form and rate limiting
  */
-export async function authenticateUser(page: Page, user: TestUser, baseURL: string = 'http://localhost:8080') {
+export async function authenticateUser(page: Page, user: TestUser, baseURL?: string) {
+  // Use baseURL from page context if not provided
+  const url = baseURL || page.context()._options.baseURL || process.env.BASE_URL || 'http://localhost:8080';
+
   // Create a new API request context
   const apiContext = await playwrightRequest.newContext({
-    baseURL,
+    baseURL: url,
   });
 
   try {

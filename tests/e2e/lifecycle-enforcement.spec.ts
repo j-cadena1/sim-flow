@@ -10,11 +10,10 @@ import { test, expect } from '@playwright/test';
  *
  * Expected lifecycle:
  * 1. Submitted → no engineer
- * 2. Feasibility Review → no engineer
- * 3. Resource Allocation → no engineer
- * 4. Engineering Review → engineer assigned (triggered by assignEngineer())
- * 5. In Progress → engineer assigned
- * 6. Completed/Accepted/Denied → engineer assigned (or removed)
+ * 2. Manager Review → no engineer
+ * 3. Engineering Review → engineer assigned (triggered by assignEngineer())
+ * 4. In Progress → engineer assigned
+ * 5. Completed/Accepted/Denied → engineer assigned (or removed)
  */
 
 test.describe('Lifecycle Consistency Verification', () => {
@@ -29,7 +28,7 @@ test.describe('Lifecycle Consistency Verification', () => {
     const requests = result.requests;
 
     // Define pre-assignment stages where engineer should NOT be assigned
-    const preAssignmentStages = ['Submitted', 'Feasibility Review', 'Resource Allocation'];
+    const preAssignmentStages = ['Submitted', 'Manager Review'];
 
     // Track violations
     const violations = [];
@@ -100,8 +99,8 @@ test.describe('Lifecycle Consistency Verification', () => {
     console.log(JSON.stringify(statusWithEngineerCounts, null, 2));
 
     // Verify pre-assignment stages have NO engineers
-    const preAssignmentStages = ['Submitted', 'Feasibility Review', 'Resource Allocation'];
-    for (const stage of preAssignmentStages) {
+    const preAssignmentStagesCheck = ['Submitted', 'Manager Review'];
+    for (const stage of preAssignmentStagesCheck) {
       expect(statusWithEngineerCounts[stage] || 0).toBe(0);
     }
   });
@@ -116,7 +115,7 @@ test.describe('Lifecycle Consistency Verification', () => {
 
     // Check if any requests are visible with status badges
     const statusBadges = page.locator('[class*="status"], [class*="badge"]').filter({
-      hasText: /Submitted|Feasibility Review|Engineering Review|In Progress|Completed/i,
+      hasText: /Submitted|Manager Review|Engineering Review|In Progress|Completed/i,
     });
 
     const count = await statusBadges.count();
@@ -142,9 +141,9 @@ test.describe('Lifecycle Flow - Application Level', () => {
     const requestsBefore = beforeData.requests;
 
     // Count requests in pre-assignment stages
-    const preAssignmentStages = ['Submitted', 'Feasibility Review', 'Resource Allocation'];
+    const preAssignmentStagesFilter = ['Submitted', 'Manager Review'];
     const preAssignmentBefore = requestsBefore.filter((r: any) =>
-      preAssignmentStages.includes(r.status) && r.assignedTo !== null
+      preAssignmentStagesFilter.includes(r.status) && r.assignedTo !== null
     );
 
     expect(preAssignmentBefore.length).toBe(0);
@@ -180,7 +179,7 @@ test.describe('Migration 016 Verification', () => {
     // to 'Engineering Review' status
 
     const invalidStates = requests.filter((r: any) => {
-      const isPreAssignment = ['Submitted', 'Feasibility Review', 'Resource Allocation'].includes(r.status);
+      const isPreAssignment = ['Submitted', 'Manager Review'].includes(r.status);
       const hasEngineer = r.assignedTo !== null;
       return isPreAssignment && hasEngineer;
     });
@@ -208,8 +207,7 @@ test.describe('Migration 016 Verification', () => {
       total: requests.length,
       withEngineer: requests.filter((r: any) => r.assignedTo !== null).length,
       submittedWithEngineer: requests.filter((r: any) => r.status === 'Submitted' && r.assignedTo !== null).length,
-      feasibilityWithEngineer: requests.filter((r: any) => r.status === 'Feasibility Review' && r.assignedTo !== null).length,
-      allocationWithEngineer: requests.filter((r: any) => r.status === 'Resource Allocation' && r.assignedTo !== null).length,
+      managerReviewWithEngineer: requests.filter((r: any) => r.status === 'Manager Review' && r.assignedTo !== null).length,
       engineeringReviewWithEngineer: requests.filter((r: any) => r.status === 'Engineering Review' && r.assignedTo !== null).length,
     };
 
@@ -218,8 +216,7 @@ test.describe('Migration 016 Verification', () => {
 
     // Verify the constraint is working: no engineers in pre-assignment stages
     expect(stats.submittedWithEngineer).toBe(0);
-    expect(stats.feasibilityWithEngineer).toBe(0);
-    expect(stats.allocationWithEngineer).toBe(0);
+    expect(stats.managerReviewWithEngineer).toBe(0);
 
     console.log('✅ Database CHECK constraint is effectively preventing invalid states');
   });

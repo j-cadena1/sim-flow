@@ -1,4 +1,4 @@
-.PHONY: help dev dev-build dev-logs dev-down prod prod-build prod-logs prod-down test test-e2e clean db-shell db-backup db-restore status
+.PHONY: help dev dev-build dev-logs dev-down prod prod-build prod-logs prod-down test test-e2e test-e2e-build clean db-shell db-backup db-restore status
 
 # Default target - show help
 help:
@@ -20,7 +20,8 @@ help:
 	@echo ""
 	@echo "  🧪 TESTING"
 	@echo "     make test           Run unit tests in containers"
-	@echo "     make test-e2e       Run E2E tests (requires running env)"
+	@echo "     make test-e2e       Run E2E tests in container (auto-detects env)"
+	@echo "     make test-e2e-build Rebuild Playwright container"
 	@echo ""
 	@echo "  🗄️  DATABASE"
 	@echo "     make db-shell       Open PostgreSQL shell"
@@ -106,12 +107,27 @@ test:
 	docker compose -f docker-compose.dev.yaml exec frontend npm test
 
 test-e2e:
-	@echo "🎭 Running E2E tests with Playwright..."
-	@echo "⚠️  Make sure production environment is running (make prod)"
+	@echo "🎭 Running E2E tests with Playwright (in container)..."
 	@echo ""
-	npx playwright test
+	@if docker compose ps --quiet frontend 2>/dev/null | grep -q .; then \
+		echo "📦 Running against production environment..."; \
+		docker compose --profile e2e run --rm playwright; \
+	elif docker compose -f docker-compose.dev.yaml ps --quiet frontend 2>/dev/null | grep -q .; then \
+		echo "📦 Running against development environment..."; \
+		docker compose -f docker-compose.dev.yaml --profile e2e run --rm playwright; \
+	else \
+		echo "❌ No Sim-Flow environment running!"; \
+		echo "   Start with: make prod  or  make dev"; \
+		exit 1; \
+	fi
 	@echo ""
 	@echo "✅ E2E tests complete!"
+	@echo "   Reports: ./playwright-report/index.html"
+
+test-e2e-build:
+	@echo "🔨 Building Playwright container..."
+	docker compose --profile e2e build playwright
+	@echo "✅ Playwright container built!"
 
 # ============================================================================
 # DATABASE COMMANDS

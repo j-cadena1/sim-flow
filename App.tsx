@@ -4,13 +4,15 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { SimFlowProvider } from './contexts/SimFlowContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import { ModalProvider } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
+import { NotificationBell } from './components/NotificationBell';
 import Login from './components/Login';
-import { createQueryClient } from './lib/api/queryConfig';
+import { createQueryClient} from './lib/api/queryConfig';
 
 // Lazy load heavy components for better initial load time
 const NewRequest = lazy(() => import('./components/NewRequest').then(m => ({ default: m.NewRequest })));
@@ -19,6 +21,7 @@ const RequestDetail = lazy(() => import('./components/RequestDetail').then(m => 
 const Projects = lazy(() => import('./components/Projects').then(m => ({ default: m.Projects })));
 const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
 const Analytics = lazy(() => import('./components/Analytics'));
+const NotificationCenter = lazy(() => import('./components/NotificationCenter'));
 
 // Create React Query client with optimized caching configuration
 const queryClient = createQueryClient();
@@ -38,8 +41,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="flex min-h-screen bg-gray-50 dark:bg-slate-950">
       <Sidebar />
       <div className="flex-1 lg:ml-64 w-full">
-        <header className="h-16 border-b border-gray-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm sticky top-0 z-20 px-4 lg:px-8 flex items-center">
+        <header className="h-16 border-b border-gray-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm sticky top-0 z-20 px-4 lg:px-8 flex items-center justify-between">
           <h2 className="text-gray-600 dark:text-slate-400 text-sm ml-12 lg:ml-0">Engineering Virtualization Portal</h2>
+          <NotificationBell />
         </header>
         <main className="p-4 sm:p-6 lg:p-8">
           {children}
@@ -71,24 +75,27 @@ const AuthenticatedApp: React.FC = () => {
 
   // Show main app if authenticated
   return (
-    <SimFlowProvider>
-      <Router>
-        <Layout>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/requests" element={<RequestList />} />
-              <Route path="/requests/:id" element={<RequestDetail />} />
-              <Route path="/new" element={<NewRequest />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </Layout>
-      </Router>
-    </SimFlowProvider>
+    <NotificationProvider>
+      <SimFlowProvider>
+        <Router>
+          <Layout>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/requests" element={<RequestList />} />
+                <Route path="/requests/:id" element={<RequestDetail />} />
+                <Route path="/new" element={<NewRequest />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/notifications" element={<NotificationCenter />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </Layout>
+        </Router>
+      </SimFlowProvider>
+    </NotificationProvider>
   );
 };
 

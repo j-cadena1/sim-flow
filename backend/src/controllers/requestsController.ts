@@ -5,12 +5,12 @@
  * engineer assignment, comments, time tracking, and discussion workflows.
  *
  * Request Lifecycle:
- * 1. Submitted → Feasibility Review (Manager reviews)
- * 2. Feasibility Review → Engineering Review (Manager assigns engineer + hours)
+ * 1. Submitted → Manager Review (Manager reviews feasibility and assigns resources)
+ * 2. Manager Review → Engineering Review (Manager assigns engineer + hours)
  * 3. Engineering Review → In Progress (Engineer accepts) or Discussion (Engineer requests changes)
  * 4. Discussion → Engineering Review (Manager approves/denies hour changes)
- * 5. In Progress → Ready for Review (Engineer completes)
- * 6. Ready for Review → Completed (End-user accepts) or Revision (End-user requests changes)
+ * 5. In Progress → Completed (Engineer completes)
+ * 6. Completed → Accepted (End-user accepts) or Revision Requested → Revision Approval (Manager reviews)
  *
  * @module controllers/requestsController
  */
@@ -34,6 +34,7 @@ import {
   ErrorCode,
 } from '../utils/errors';
 import { asyncHandler } from '../middleware/errorHandler';
+import { sendNotification, sendNotificationToMultipleUsers } from '../services/notificationHelpers';
 
 /** Maximum number of requests that can be returned in a single query */
 const MAX_LIMIT = 1000;
@@ -257,6 +258,19 @@ export const updateRequestTitle = asyncHandler(async (req: Request, res: Respons
     });
   }
 
+  // First, get the current request to capture the old title
+  const currentResult = await query(`
+    SELECT * FROM requests WHERE id = $1
+  `, [id]);
+
+  if (currentResult.rows.length === 0) {
+    throw new NotFoundError('Request', id);
+  }
+
+  const currentRequest = currentResult.rows[0];
+  const oldTitle = currentRequest.title;
+
+  // Now update the title
   const result = await query(`
     UPDATE requests
     SET title = $1, updated_at = CURRENT_TIMESTAMP
@@ -264,16 +278,47 @@ export const updateRequestTitle = asyncHandler(async (req: Request, res: Respons
     RETURNING *
   `, [title.trim(), id]);
 
-  if (result.rows.length === 0) {
-    throw new NotFoundError('Request', id);
-  }
+  const updatedRequest = result.rows[0];
 
-  // Log activity
+  // Log activity with both old and new titles
   if (userId) {
     await query(`
       INSERT INTO activity_log (request_id, user_id, action, details)
       VALUES ($1, $2, $3, $4::jsonb)
-    `, [id, userId, 'title_changed', JSON.stringify({ title })]);
+    `, [id, userId, 'title_changed', JSON.stringify({
+      oldTitle,
+      newTitle: title.trim()
+    })]);
+  }
+
+  // Notify request creator about title change (if they didn't make the change)
+  if (updatedRequest.created_by && updatedRequest.created_by !== userId) {
+    await sendNotification({
+      userId: updatedRequest.created_by,
+      type: 'REQUEST_STATUS_CHANGED',
+      title: 'Request Title Changed',
+      message: `The title of your request was changed from "${oldTitle}" to "${title.trim()}"`,
+      link: `/requests/${id}`,
+      entityType: 'Request',
+      entityId: id,
+      triggeredBy: userId,
+    }).catch(err => logger.error('Failed to send title change notification:', err));
+  }
+
+  // Notify assigned engineer (if different from creator and changer)
+  if (updatedRequest.assigned_to &&
+      updatedRequest.assigned_to !== userId &&
+      updatedRequest.assigned_to !== updatedRequest.created_by) {
+    await sendNotification({
+      userId: updatedRequest.assigned_to,
+      type: 'REQUEST_STATUS_CHANGED',
+      title: 'Request Title Changed',
+      message: `The title of request was changed from "${oldTitle}" to "${title.trim()}"`,
+      link: `/requests/${id}`,
+      entityType: 'Request',
+      entityId: id,
+      triggeredBy: userId,
+    }).catch(err => logger.error('Failed to send title change notification:', err));
   }
 
   res.json({ request: toCamelCase(result.rows[0]) });
@@ -419,6 +464,24 @@ export const requestTitleChange = asyncHandler(async (req: Request, res: Respons
     }
   );
 
+  // Notify all managers about the title change request
+  const managersResult = await query(`
+    SELECT id FROM users WHERE role = 'Manager' AND deleted_at IS NULL
+  `);
+  const managerIds = managersResult.rows.map(row => row.id);
+
+  if (managerIds.length > 0) {
+    await sendNotificationToMultipleUsers(managerIds, {
+      type: 'TITLE_CHANGE_REQUESTED',
+      title: 'Title Change Request',
+      message: `${userName} requested to change title from "${currentTitle}" to "${proposedTitle.trim()}"`,
+      link: `/requests/${id}`,
+      entityType: 'TitleChange',
+      entityId: titleChangeRequest.id,
+      triggeredBy: userId,
+    }).catch(err => logger.error('Failed to send title change request notification:', err));
+  }
+
   res.status(201).json({ titleChangeRequest: toCamelCase(titleChangeRequest) });
 });
 
@@ -543,6 +606,22 @@ export const reviewTitleChangeRequest = async (req: Request, res: Response) => {
       }
     );
 
+    // Notify the engineer who requested the title change
+    if (titleChangeRequest.requested_by && titleChangeRequest.requested_by !== userId) {
+      await sendNotification({
+        userId: titleChangeRequest.requested_by,
+        type: 'TITLE_CHANGE_REVIEWED',
+        title: `Title Change ${approved ? 'Approved' : 'Denied'}`,
+        message: approved
+          ? `Your request to change title from "${titleChangeRequest.current_title}" to "${titleChangeRequest.proposed_title}" has been approved`
+          : `Your request to change title from "${titleChangeRequest.current_title}" to "${titleChangeRequest.proposed_title}" has been denied`,
+        link: `/requests/${titleChangeRequest.request_id}`,
+        entityType: 'TitleChange',
+        entityId: id,
+        triggeredBy: userId,
+      }).catch(err => logger.error('Failed to send title change notification:', err));
+    }
+
     res.json({ message: `Title change ${status.toLowerCase()}` });
   } catch (error) {
     logger.error('Error reviewing title change request:', error);
@@ -648,6 +727,47 @@ export const updateRequestStatus = asyncHandler(async (req: Request, res: Respon
     EntityType.REQUEST,
     parseInt(id),
     { status }
+  );
+
+  // Notify relevant users about status change
+  const updatedRequest = result.rows[0];
+  const statusNotifications = [];
+
+  // Notify request creator about status changes
+  if (updatedRequest.created_by && updatedRequest.created_by !== userId) {
+    statusNotifications.push(
+      sendNotification({
+        userId: updatedRequest.created_by,
+        type: 'REQUEST_STATUS_CHANGED',
+        title: 'Request Status Updated',
+        message: `Your request "${updatedRequest.title}" status changed to ${status}`,
+        link: `/requests/${id}`,
+        entityType: 'Request',
+        entityId: id,
+        triggeredBy: userId,
+      })
+    );
+  }
+
+  // Notify assigned engineer about status changes (if different from status changer)
+  if (updatedRequest.assigned_to && updatedRequest.assigned_to !== userId && updatedRequest.assigned_to !== updatedRequest.created_by) {
+    statusNotifications.push(
+      sendNotification({
+        userId: updatedRequest.assigned_to,
+        type: 'REQUEST_STATUS_CHANGED',
+        title: 'Request Status Updated',
+        message: `Request "${updatedRequest.title}" status changed to ${status}`,
+        link: `/requests/${id}`,
+        entityType: 'Request',
+        entityId: id,
+        triggeredBy: userId,
+      })
+    );
+  }
+
+  // Send all notifications
+  await Promise.all(statusNotifications).catch(err =>
+    logger.error('Failed to send status change notifications:', err)
   );
 
   res.json({ request: toCamelCase(result.rows[0]) });
@@ -789,6 +909,19 @@ export const assignEngineer = asyncHandler(async (req: Request, res: Response) =
     { engineerId, engineerName, estimatedHours }
   );
 
+  // Notify engineer of assignment
+  const requestData = result.rows[0];
+  await sendNotification({
+    userId: engineerId,
+    type: 'REQUEST_ASSIGNED',
+    title: 'New Request Assigned',
+    message: `You have been assigned to request "${requestData.title}" (${estimatedHours || 0}h estimated)`,
+    link: `/requests/${id}`,
+    entityType: 'Request',
+    entityId: id,
+    triggeredBy: userId,
+  }).catch(err => logger.error('Failed to send assignment notification:', err));
+
   res.json({ request: toCamelCase(result.rows[0]) });
 });
 
@@ -823,6 +956,54 @@ export const addComment = async (req: Request, res: Response) => {
       comment.id,
       { requestId: parseInt(id), content }
     );
+
+    // Get request details to notify relevant parties
+    const requestResult = await query(
+      'SELECT title, created_by, assigned_to FROM requests WHERE id = $1',
+      [id]
+    );
+
+    if (requestResult.rows.length > 0) {
+      const request = requestResult.rows[0];
+      const commentNotifications = [];
+
+      // Notify request creator (unless they're the commenter)
+      if (request.created_by && request.created_by !== userId) {
+        commentNotifications.push(
+          sendNotification({
+            userId: request.created_by,
+            type: 'REQUEST_COMMENT_ADDED',
+            title: 'New Comment on Your Request',
+            message: `${userName} commented on "${request.title}"`,
+            link: `/requests/${id}`,
+            entityType: 'Request',
+            entityId: id,
+            triggeredBy: userId,
+          })
+        );
+      }
+
+      // Notify assigned engineer (unless they're the commenter or same as creator)
+      if (request.assigned_to && request.assigned_to !== userId && request.assigned_to !== request.created_by) {
+        commentNotifications.push(
+          sendNotification({
+            userId: request.assigned_to,
+            type: 'REQUEST_COMMENT_ADDED',
+            title: 'New Comment on Request',
+            message: `${userName} commented on "${request.title}"`,
+            link: `/requests/${id}`,
+            entityType: 'Request',
+            entityId: id,
+            triggeredBy: userId,
+          })
+        );
+      }
+
+      // Send all notifications
+      await Promise.all(commentNotifications).catch(err =>
+        logger.error('Failed to send comment notifications:', err)
+      );
+    }
 
     res.status(201).json({ comment: toCamelCase(comment) });
   } catch (error) {
@@ -926,6 +1107,38 @@ export const addTimeEntry = async (req: Request, res: Response) => {
       { requestId: parseInt(id), hours, description }
     );
 
+    // Get request details to notify relevant parties
+    const requestResult = await query(
+      'SELECT title, created_by, project_id FROM requests WHERE id = $1',
+      [id]
+    );
+
+    if (requestResult.rows.length > 0) {
+      const request = requestResult.rows[0];
+      const timeNotifications = [];
+
+      // Notify request creator (if they opted in and aren't the logger)
+      if (request.created_by && request.created_by !== userId) {
+        timeNotifications.push(
+          sendNotification({
+            userId: request.created_by,
+            type: 'TIME_LOGGED',
+            title: 'Time Logged on Your Request',
+            message: `${userName} logged ${hours}h on "${request.title}"`,
+            link: `/requests/${id}`,
+            entityType: 'Request',
+            entityId: id,
+            triggeredBy: userId,
+          })
+        );
+      }
+
+      // Send all notifications
+      await Promise.all(timeNotifications).catch(err =>
+        logger.error('Failed to send time logging notifications:', err)
+      );
+    }
+
     res.status(201).json({ timeEntry: toCamelCase(timeEntry) });
   } catch (error) {
     logger.error('Error adding time entry:', error);
@@ -987,6 +1200,41 @@ export const createDiscussionRequest = asyncHandler(async (req: Request, res: Re
     discussionRequest.id,
     { requestId: parseInt(id), reason, suggestedHours }
   );
+
+  // Get request details and notify managers
+  const requestResult = await query(
+    'SELECT title, created_by FROM requests WHERE id = $1',
+    [id]
+  );
+
+  if (requestResult.rows.length > 0) {
+    const request = requestResult.rows[0];
+
+    // Get all managers to notify
+    const managersResult = await query(
+      "SELECT id FROM users WHERE role = 'Manager' AND deleted_at IS NULL"
+    );
+
+    // Notify all managers about the discussion request
+    const notificationPromises = managersResult.rows
+      .filter(manager => manager.id !== userId) // Don't notify if manager created discussion
+      .map(manager =>
+        sendNotification({
+          userId: manager.id,
+          type: 'DISCUSSION_REQUESTED',
+          title: 'Discussion Requested',
+          message: `Engineer requested discussion for "${request.title}"${suggestedHours ? ` (suggested ${suggestedHours}h)` : ''}`,
+          link: `/requests/${id}`,
+          entityType: 'Discussion',
+          entityId: discussionRequest.id,
+          triggeredBy: userId,
+        })
+      );
+
+    await Promise.all(notificationPromises).catch(err =>
+      logger.error('Failed to send discussion request notifications:', err)
+    );
+  }
 
   res.status(201).json({ discussionRequest: toCamelCase(discussionRequest) });
 });
@@ -1252,6 +1500,33 @@ export const reviewDiscussionRequest = asyncHandler(async (req: Request, res: Re
       managerResponse,
     }
   );
+
+  // Notify the engineer who requested the discussion
+  if (discussionRequest.engineer_id && discussionRequest.engineer_id !== userId) {
+    const requestData = await query(
+      'SELECT title FROM requests WHERE id = $1',
+      [discussionRequest.request_id]
+    );
+
+    if (requestData.rows.length > 0) {
+      const notificationMessage = action === 'approve'
+        ? `Your discussion request for "${requestData.rows[0].title}" was approved (${finalHours}h allocated)`
+        : action === 'override'
+        ? `Your discussion request for "${requestData.rows[0].title}" was overridden by manager (${finalHours}h allocated)`
+        : `Your discussion request for "${requestData.rows[0].title}" was denied`;
+
+      await sendNotification({
+        userId: discussionRequest.engineer_id,
+        type: 'DISCUSSION_REVIEWED',
+        title: `Discussion ${action === 'approve' ? 'Approved' : action === 'override' ? 'Overridden' : 'Denied'}`,
+        message: notificationMessage,
+        link: `/requests/${discussionRequest.request_id}`,
+        entityType: 'Discussion',
+        entityId: id,
+        triggeredBy: userId,
+      }).catch(err => logger.error('Failed to send discussion review notification:', err));
+    }
+  }
 
   res.json({ message: `Discussion request ${action}ed`, allocatedHours: finalHours });
 });

@@ -6,9 +6,8 @@ export enum UserRole {
 }
 
 export enum RequestStatus {
-  SUBMITTED = 'Submitted', // Waiting for feasibility
-  FEASIBILITY_REVIEW = 'Feasibility Review', // Manager reviewing
-  RESOURCE_ALLOCATION = 'Resource Allocation', // Manager approved feasibility, assigning engineer
+  SUBMITTED = 'Submitted', // Waiting for manager review
+  MANAGER_REVIEW = 'Manager Review', // Manager reviewing feasibility and assigning resources
   ENGINEERING_REVIEW = 'Engineering Review', // Engineer accepting/rejecting assignment
   DISCUSSION = 'Discussion', // Engineer requested discussion with manager
   IN_PROGRESS = 'In Progress', // Engineer working

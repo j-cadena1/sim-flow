@@ -5,6 +5,7 @@ import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
 import { getDirectoryUsers, syncUserFromDirectory } from '../services/graphService';
 import { logRequestAudit, AuditAction, EntityType } from '../services/auditService';
+import { sendNotification } from '../services/notificationHelpers';
 
 interface User {
   id: string;
@@ -119,6 +120,18 @@ export const updateUserRole = async (req: Request, res: Response) => {
       id,
       { role, targetUserEmail: user.email, targetUserName: user.name }
     );
+
+    // Notify the user about their role change
+    await sendNotification({
+      userId: id,
+      type: 'ADMIN_ACTION',
+      title: 'Role Updated',
+      message: `Your role has been changed to ${role} by an administrator`,
+      link: '/settings',
+      entityType: 'User',
+      entityId: id,
+      triggeredBy: admin?.userId,
+    }).catch(err => logger.error('Failed to send role change notification:', err));
 
     res.json({ user, message: 'User role updated successfully' });
   } catch (error) {

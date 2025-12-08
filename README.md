@@ -2,18 +2,30 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/j-cadena1/sim-flow/releases)
-[![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Docker](https://img.shields.io/badge/Docker-First-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
 Role-based engineering simulation request management system with analytics, audit logging, and Microsoft Entra ID SSO.
 
+## 🐳 Docker-First Philosophy
+
+**No Node.js installation required.** This project runs entirely in Docker containers.
+
+- ✅ Development with hot reload: `make dev`
+- ✅ Production deployment: `make prod`
+- ✅ All tests containerized: `make test` and `make test-e2e`
+- ✅ Database operations via Docker: `make db-backup`, `make db-shell`
+
+Everything you need is managed by Docker Compose. Just install Docker and you're ready to go.
+
 ## Features
 
 - **Role-Based Access**: Admin, Manager, Engineer, End-User
 - **Request Lifecycle**: Full tracking from submission to completion with enforced workflow stages
 - **Project Hour Tracking**: Budget allocation and monitoring
+- **Real-time Notifications**: WebSocket-based in-app notifications with user preferences
 - **SSO**: Microsoft Entra ID (Azure AD) PKCE authentication
 - **Analytics**: Real-time productivity and resource insights
 - **Security**: Session-based auth, rate limiting, audit logging
@@ -151,7 +163,7 @@ Restart containers: `make prod-down && make prod`
 ## Architecture
 
 - **Frontend**: React + TypeScript + Vite + TailwindCSS
-- **Backend**: Node.js + Express + TypeScript
+- **Backend**: Node.js + Express + TypeScript + Socket.IO
 - **Database**: PostgreSQL 16
 - **Auth**: Session cookies + Microsoft Entra ID PKCE
 - **Deployment**: Docker + Docker Compose
@@ -168,16 +180,16 @@ Migrations are in `database/migrations/` and auto-apply on startup.
 
 ## Testing
 
-```bash
-make test         # Unit tests
-make test-e2e     # E2E tests (Playwright)
+All tests run inside Docker containers - no local dependencies needed.
 
-# Or manually
-npx playwright test
-npx playwright test --ui
+```bash
+make test         # Unit tests (backend + frontend in containers)
+make test-e2e     # E2E tests (Playwright in container)
 ```
 
-**Test suite:** 86 E2E tests covering auth, roles, requests, lifecycle, analytics, forms, navigation.
+**Test suite:** 102 tests total (86 E2E + 16 backend unit tests) covering auth, roles, requests, lifecycle, analytics, forms, navigation, and notifications.
+
+Test reports are saved to `./playwright-report/` and `./test-results/`.
 
 ## Monitoring
 

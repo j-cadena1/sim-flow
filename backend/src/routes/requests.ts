@@ -190,7 +190,7 @@ router.post('/:id/comments', authenticate, validate(addCommentSchema), addCommen
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [Submitted, Feasibility Review, Resource Allocation, Engineering Review, Discussion, In Progress, Completed, Revision Requested, Accepted, Denied]
+ *                 enum: [Submitted, Manager Review, Engineering Review, Discussion, In Progress, Completed, Revision Requested, Revision Approval, Accepted, Denied]
  *     responses:
  *       200:
  *         description: Status updated
