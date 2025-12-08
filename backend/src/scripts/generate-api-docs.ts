@@ -75,12 +75,14 @@ This script helps generate Swagger/OpenAPI documentation.
 Current coverage:
 - Auth routes: 10/10 ✅
 - Requests routes: 19/19 ✅
-- Projects routes: 0/19 ⏳
-- Users routes: 0/2 ⏳
-- SSO routes: 0/3 ⏳
-- Analytics routes: 0/3 ⏳
-- Audit Logs routes: 0/3 ⏳
-- User Management routes: 0/11 ⏳
+- Projects routes: 19/19 ✅
+- Analytics routes: 3/3 ✅
+- SSO routes: 3/3 ✅
+- Audit Logs routes: 3/3 ✅
+- User Management routes: 11/11 ✅
+- Users routes: 2/2 ✅
+
+**TOTAL: 70/70 endpoints (100%) ✅**
 
 Access the interactive API documentation at:
 http://localhost:3001/api-docs

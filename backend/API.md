@@ -88,40 +88,46 @@ The API implements four user roles:
 - **Discussions**: Request and approve discussions with managers
 
 ### Projects (19 endpoints)
-- ⏳ Partially documented
+- ✅ Fully documented
 - Project CRUD operations
 - Status transitions and lifecycle management
 - Hour budget tracking
 - Request association and reassignment
+- Metrics, history, and activity tracking
 
 ### Analytics (3 endpoints)
-- ⏳ Not yet documented
+- ✅ Fully documented
 - Dashboard statistics
 - Completion time analysis
 - Hour allocation analysis
 
 ### SSO Configuration (3 endpoints)
-- ⏳ Not yet documented
-- Get/update SSO settings (Admin only)
+- ✅ Fully documented
+- Get/update SSO settings (qAdmin only)
 - Test SSO connection
 
 ### User Management (11 endpoints)
-- ⏳ Not yet documented
-- List/create/update/delete users
-- Role management
-- Bulk import from directory
-- User deactivation/restoration
+- ✅ Fully documented
+- List users with management info
+- Role management and user sync
+- Bulk import from Entra ID directory
+- User deactivation/restoration (soft delete)
+- Permanent deletion with archival
+- Deleted user lookups for historical tooltips
+- qAdmin password management
 
 ### Audit Logs (3 endpoints)
-- ⏳ Not yet documented
+- ✅ Fully documented
 - Query audit logs with filtering
 - Export audit logs to CSV
 - Get audit statistics
 
 ### Users (2 endpoints)
-- ⏳ Not yet documented
+- ✅ Fully documented
 - Get all users
 - Get current user profile
+
+**Total API Coverage**: 70/70 endpoints documented (100%) ✅
 
 ## Downloading the OpenAPI Specification
 
