@@ -255,23 +255,340 @@ router.patch('/:id/assign', requireRole(['Manager', 'Admin']), validate(assignEn
 router.delete('/:id', requireRole(['Admin', 'Manager']), deleteRequest);
 
 // Title change routes
+/**
+ * @swagger
+ * /requests/{id}/title-change-requests:
+ *   get:
+ *     summary: Get all title change requests for a specific request
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of title change requests
+ */
 router.get('/:id/title-change-requests', authenticate, getTitleChangeRequestsForRequest);
+
+/**
+ * @swagger
+ * /requests/{id}/title-change-request:
+ *   post:
+ *     summary: Request a title change for a request
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newTitle, reason]
+ *             properties:
+ *               newTitle:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 255
+ *               reason:
+ *                 type: string
+ *                 minLength: 1
+ *     responses:
+ *       201:
+ *         description: Title change request created
+ */
 router.post('/:id/title-change-request', authenticate, requestTitleChange);
+
+/**
+ * @swagger
+ * /requests/title-change-requests/pending:
+ *   get:
+ *     summary: Get all pending title change requests (Manager/Admin only)
+ *     tags: [Requests]
+ *     responses:
+ *       200:
+ *         description: List of pending title change requests
+ *       403:
+ *         description: Requires Manager or Admin role
+ */
 router.get('/title-change-requests/pending', requireRole(['Manager', 'Admin']), getPendingTitleChangeRequests);
+
+/**
+ * @swagger
+ * /requests/{id}/title:
+ *   patch:
+ *     summary: Update request title (Manager/Admin only)
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title]
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 255
+ *     responses:
+ *       200:
+ *         description: Title updated
+ *       403:
+ *         description: Requires Manager or Admin role
+ */
 router.patch('/:id/title', requireRole(['Manager', 'Admin']), updateRequestTitle);
+
+/**
+ * @swagger
+ * /requests/{id}/description:
+ *   patch:
+ *     summary: Update request description
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [description]
+ *             properties:
+ *               description:
+ *                 type: string
+ *                 minLength: 1
+ *     responses:
+ *       200:
+ *         description: Description updated
+ */
 router.patch('/:id/description', authenticate, updateRequestDescription);
+
+/**
+ * @swagger
+ * /requests/title-change-requests/{id}/review:
+ *   patch:
+ *     summary: Review (approve/deny) a title change request (Manager/Admin only)
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [approved]
+ *             properties:
+ *               approved:
+ *                 type: boolean
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Title change request reviewed
+ *       403:
+ *         description: Requires Manager or Admin role
+ */
 router.patch('/title-change-requests/:id/review', requireRole(['Manager', 'Admin']), reviewTitleChangeRequest);
 
 // Time tracking routes
+/**
+ * @swagger
+ * /requests/{id}/time:
+ *   get:
+ *     summary: Get time entries for a request
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of time entries
+ */
 router.get('/:id/time', authenticate, getTimeEntries);
+
+/**
+ * @swagger
+ * /requests/{id}/time:
+ *   post:
+ *     summary: Add a time entry to a request (Engineer/Admin only)
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [hours, description]
+ *             properties:
+ *               hours:
+ *                 type: number
+ *                 minimum: 0.1
+ *               description:
+ *                 type: string
+ *                 minLength: 1
+ *     responses:
+ *       201:
+ *         description: Time entry added
+ *       403:
+ *         description: Requires Engineer or Admin role
+ */
 router.post('/:id/time', requireRole(['Engineer', 'Admin']), addTimeEntry);
 
 // Discussion routes
+/**
+ * @swagger
+ * /requests/{id}/discussion-requests:
+ *   get:
+ *     summary: Get all discussion requests for a specific request
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of discussion requests
+ */
 router.get('/:id/discussion-requests', authenticate, getDiscussionRequestsForRequest);
+
+/**
+ * @swagger
+ * /requests/{id}/discussion-request:
+ *   post:
+ *     summary: Create a discussion request (Engineer/Admin only)
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 minLength: 1
+ *     responses:
+ *       201:
+ *         description: Discussion request created
+ *       403:
+ *         description: Requires Engineer or Admin role
+ */
 router.post('/:id/discussion-request', requireRole(['Engineer', 'Admin']), createDiscussionRequest);
+
+/**
+ * @swagger
+ * /requests/discussion-requests/{id}/review:
+ *   patch:
+ *     summary: Review (approve/deny) a discussion request (Manager/Admin only)
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [approved]
+ *             properties:
+ *               approved:
+ *                 type: boolean
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Discussion request reviewed
+ *       403:
+ *         description: Requires Manager or Admin role
+ */
 router.patch('/discussion-requests/:id/review', requireRole(['Manager', 'Admin']), reviewDiscussionRequest);
 
 // Admin-only route to change request requester
+/**
+ * @swagger
+ * /requests/{id}/requester:
+ *   patch:
+ *     summary: Change the requester of a request (Admin only)
+ *     tags: [Requests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newRequesterId]
+ *             properties:
+ *               newRequesterId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Requester updated
+ *       403:
+ *         description: Requires Admin role
+ */
 router.patch('/:id/requester', requireRole(['Admin']), updateRequestRequester);
 
 export default router;

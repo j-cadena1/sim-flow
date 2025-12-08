@@ -5,8 +5,18 @@ const options: swaggerJsdoc.Options = {
     openapi: '3.0.0',
     info: {
       title: 'Sim-Flow API',
-      version: '1.0.0',
-      description: 'Engineering Virtualization Portal API - Manage simulation requests, projects, and users',
+      version: '1.1.0',
+      description: `Engineering Virtualization Portal API - Manage simulation requests, projects, and users.
+
+**Features:**
+- Session-based authentication with HTTP-only cookies
+- Role-based access control (Admin, Manager, Engineer, User)
+- SSO integration with Microsoft Entra ID
+- Comprehensive request lifecycle management
+- Project and hour budget tracking
+- Real-time discussion and title change workflows
+- Audit logging for security compliance
+- Analytics and reporting`,
       contact: {
         name: 'Sim-Flow Support',
       },
@@ -55,6 +65,7 @@ const options: swaggerJsdoc.Options = {
                 'In Progress',
                 'Completed',
                 'Revision Requested',
+                'Revision Approval',
                 'Accepted',
                 'Denied',
               ],
