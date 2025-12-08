@@ -11,7 +11,7 @@ import {
   getSessions,
   revokeSessionById,
 } from '../controllers/authController';
-import { authLimiter, ssoLimiter } from '../middleware/rateLimiter';
+import { authLimiter, ssoLimiter, sensitiveOpLimiter } from '../middleware/rateLimiter';
 import { authenticate, optionalAuthenticate } from '../middleware/authentication';
 
 const router = Router();
@@ -23,6 +23,12 @@ const router = Router();
  *     summary: Login with email and password
  *     tags: [Authentication]
  *     security: []
+ *     description: |
+ *       Authenticates user with email and password. Security features:
+ *       - Account lockout: 5 failed attempts triggers 15-minute lockout
+ *       - Rate limiting: 30 attempts per 15 minutes (production)
+ *       - Constant-time password comparison (bcrypt)
+ *       - HTTP-only session cookie
  *     requestBody:
  *       required: true
  *       content:
@@ -45,9 +51,9 @@ const router = Router();
  *                 user:
  *                   $ref: '#/components/schemas/User'
  *       401:
- *         description: Invalid credentials
+ *         description: Invalid credentials or account locked
  *       429:
- *         description: Too many login attempts
+ *         description: Too many login attempts (rate limited)
  */
 router.post('/login', authLimiter, login);
 
@@ -139,6 +145,7 @@ router.post('/logout-others', authenticate, logoutOthers);
  *   get:
  *     summary: Get active sessions for current user
  *     tags: [Authentication]
+ *     description: Returns list of active sessions. Rate limited to prevent session enumeration attacks.
  *     responses:
  *       200:
  *         description: List of active sessions
@@ -151,8 +158,10 @@ router.post('/logout-others', authenticate, logoutOthers);
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Session'
+ *       429:
+ *         description: Too many requests
  */
-router.get('/sessions', authenticate, getSessions);
+router.get('/sessions', sensitiveOpLimiter, authenticate, getSessions);
 
 /**
  * @swagger
@@ -160,6 +169,7 @@ router.get('/sessions', authenticate, getSessions);
  *   delete:
  *     summary: Revoke a specific session
  *     tags: [Authentication]
+ *     description: Revokes a specific session by ID. Rate limited to prevent brute force attacks.
  *     parameters:
  *       - in: path
  *         name: sessionId
@@ -172,8 +182,10 @@ router.get('/sessions', authenticate, getSessions);
  *         description: Session revoked
  *       404:
  *         description: Session not found
+ *       429:
+ *         description: Too many requests
  */
-router.delete('/sessions/:sessionId', authenticate, revokeSessionById);
+router.delete('/sessions/:sessionId', sensitiveOpLimiter, authenticate, revokeSessionById);
 
 /**
  * @swagger

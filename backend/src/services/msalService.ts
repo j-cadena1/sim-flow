@@ -16,26 +16,56 @@ interface SSOConfig {
   source?: 'database' | 'environment';
 }
 
-// In-memory store for PKCE code verifiers (maps state -> code_verifier)
-// In production, consider using Redis or a database with TTL
+/**
+ * In-memory store for PKCE code verifiers (maps state -> code_verifier)
+ *
+ * SECURITY LIMITATION: This in-memory store works for single-instance deployments only.
+ * For multi-instance or load-balanced deployments, this will cause SSO failures because
+ * the callback may hit a different instance than the one that initiated the auth request.
+ *
+ * Production alternatives:
+ * 1. Redis with TTL (recommended)
+ * 2. Database table with automatic cleanup
+ * 3. Sticky sessions (not recommended)
+ *
+ * The store includes automatic cleanup of expired entries (10 minute TTL).
+ */
 const pkceStore = new Map<string, string>();
 
 /**
  * Get SSO configuration from environment variables
+ * Development uses DEV_ENTRA_SSO_* variables, production uses ENTRA_SSO_* variables
  * This serves as a fallback when database config is not available
  */
 const getSSOConfigFromEnv = (): SSOConfig | null => {
-  const tenantId = process.env.SSO_TENANT_ID;
-  const clientId = process.env.SSO_CLIENT_ID;
-  const clientSecret = process.env.SSO_CLIENT_SECRET;
-  const redirectUri = process.env.SSO_REDIRECT_URI;
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  // Development uses DEV_ENTRA_SSO_*, production uses ENTRA_SSO_*
+  const tenantId = isDevelopment
+    ? process.env.DEV_ENTRA_SSO_TENANT_ID
+    : process.env.ENTRA_SSO_TENANT_ID;
+  const clientId = isDevelopment
+    ? process.env.DEV_ENTRA_SSO_CLIENT_ID
+    : process.env.ENTRA_SSO_CLIENT_ID;
+  const clientSecret = isDevelopment
+    ? process.env.DEV_ENTRA_SSO_CLIENT_SECRET
+    : process.env.ENTRA_SSO_CLIENT_SECRET;
+  const redirectUri = isDevelopment
+    ? process.env.DEV_ENTRA_SSO_REDIRECT_URI
+    : process.env.ENTRA_SSO_REDIRECT_URI;
+  const authority = isDevelopment
+    ? process.env.DEV_ENTRA_SSO_AUTHORITY
+    : process.env.ENTRA_SSO_AUTHORITY;
+  const scopes = isDevelopment
+    ? process.env.DEV_ENTRA_SSO_SCOPES
+    : process.env.ENTRA_SSO_SCOPES;
 
   // All required fields must be present
   if (!tenantId || !clientId || !clientSecret || !redirectUri) {
     return null;
   }
 
-  logger.info('Using SSO configuration from environment variables');
+  logger.info(`Using Entra SSO configuration from ${isDevelopment ? 'development' : 'production'} environment variables`);
 
   return {
     id: 'env-config',
@@ -44,8 +74,8 @@ const getSSOConfigFromEnv = (): SSOConfig | null => {
     clientId,
     clientSecret,
     redirectUri,
-    authority: process.env.SSO_AUTHORITY || `https://login.microsoftonline.com/${tenantId}`,
-    scopes: process.env.SSO_SCOPES || 'openid,profile,email',
+    authority: authority || `https://login.microsoftonline.com/${tenantId}`,
+    scopes: scopes || 'openid,profile,email',
     source: 'environment',
   };
 };
@@ -88,20 +118,20 @@ export const getSSOConfigFromDB = async (): Promise<SSOConfig | null> => {
 };
 
 /**
- * Get SSO configuration - checks database first, then falls back to environment variables
- * Priority: Database config (if enabled) > Environment variables
+ * Get SSO configuration - checks environment variables first, then database
+ * Priority: Environment variables > Database config (if enabled)
  */
 export const getSSOConfig = async (): Promise<SSOConfig | null> => {
-  // First try database config
-  const dbConfig = await getSSOConfigFromDB();
-  if (dbConfig && dbConfig.enabled && dbConfig.tenantId && dbConfig.clientId && dbConfig.clientSecret) {
-    return dbConfig;
-  }
-
-  // Fall back to environment variables
+  // First check environment variables - they take precedence
   const envConfig = getSSOConfigFromEnv();
   if (envConfig) {
     return envConfig;
+  }
+
+  // Fall back to database config
+  const dbConfig = await getSSOConfigFromDB();
+  if (dbConfig && dbConfig.enabled && dbConfig.tenantId && dbConfig.clientId && dbConfig.clientSecret) {
+    return dbConfig;
   }
 
   return null;

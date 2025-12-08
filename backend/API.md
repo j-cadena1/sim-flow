@@ -1,10 +1,10 @@
-# Sim-Flow API Documentation
+# SimRQ API Documentation
 
-This document provides information about the Sim-Flow API and how to access the interactive documentation.
+This document provides information about the SimRQ API and how to access the interactive documentation.
 
 ## Interactive API Documentation
 
-Sim-Flow provides interactive API documentation using Swagger UI (OpenAPI 3.0).
+SimRQ provides interactive API documentation using Swagger UI (OpenAPI 3.0).
 
 ### Accessing the Documentation
 
@@ -41,7 +41,7 @@ The interactive documentation includes:
 
 ### Authentication
 
-Sim-Flow uses **session-based authentication** with HTTP-only cookies:
+SimRQ uses **session-based authentication** with HTTP-only cookies:
 
 1. **Login**: `POST /api/auth/login`
    - Credentials: email + password

@@ -68,7 +68,7 @@ const routeTemplates: Record<string, EndpointDoc[]> = {
 
 console.log(`
 ========================================
-Sim-Flow API Documentation Generator
+SimRQ API Documentation Generator
 ========================================
 
 This script helps generate Swagger/OpenAPI documentation.

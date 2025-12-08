@@ -10,7 +10,9 @@ const router = Router();
  *   get:
  *     summary: Get all users
  *     tags: [Users]
- *     description: Returns list of all users in the system
+ *     description: Returns list of all users in the system. Requires authentication.
+ *     security:
+ *       - sessionAuth: []
  *     responses:
  *       200:
  *         description: List of users
@@ -21,7 +23,7 @@ const router = Router();
  *               items:
  *                 $ref: '#/components/schemas/User'
  */
-router.get('/', getAllUsers);
+router.get('/', authenticate, getAllUsers);
 
 /**
  * @swagger

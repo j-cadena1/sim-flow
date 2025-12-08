@@ -5,9 +5,21 @@ import { logger } from './logger';
  * Rate Limiting Configuration
  * Different limits for different endpoint types to balance security and usability
  * More permissive in development/test environments for E2E testing
+ *
+ * DISABLE_RATE_LIMITING=true can be set for E2E tests to bypass rate limits entirely
  */
 
 const isProduction = process.env.NODE_ENV === 'production';
+const disableRateLimiting = process.env.DISABLE_RATE_LIMITING === 'true';
+
+/**
+ * Get max requests based on environment
+ * Uses very high limit when DISABLE_RATE_LIMITING is set for E2E tests
+ */
+function getMaxRequests(productionLimit: number, devLimit: number): number {
+  if (disableRateLimiting) return 100000; // Effectively unlimited for tests
+  return isProduction ? productionLimit : devLimit;
+}
 
 /**
  * Strict rate limiter for authentication endpoints
@@ -16,7 +28,7 @@ const isProduction = process.env.NODE_ENV === 'production';
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 30 : 100, // 30 attempts in production, 100 in development
+  max: getMaxRequests(30, 100), // 30 attempts in production, 100 in development
   message: {
     error: 'Too many login attempts. Please try again after 15 minutes.',
     code: 'RATE_LIMIT_EXCEEDED',
@@ -38,7 +50,7 @@ export const authLimiter = rateLimit({
  */
 export const ssoLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 20 : 100, // 20 attempts in production, 100 in development
+  max: getMaxRequests(20, 100), // 20 attempts in production, 100 in development
   message: {
     error: 'Too many SSO requests. Please try again after 15 minutes.',
     code: 'RATE_LIMIT_EXCEEDED',
@@ -61,7 +73,7 @@ export const ssoLimiter = rateLimit({
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // 1000 requests per 15 minutes
+  max: getMaxRequests(1000, 5000), // 1000 requests in production, 5000 in development
   message: {
     error: 'Too many requests from this IP. Please try again later.',
     code: 'RATE_LIMIT_EXCEEDED',
@@ -76,7 +88,7 @@ export const apiLimiter = rateLimit({
  */
 export const sensitiveOpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 30, // 30 sensitive operations per hour
+  max: getMaxRequests(30, 300), // 30 sensitive operations per hour in production, 300 in dev
   message: {
     error: 'Too many sensitive operations. Please try again later.',
     code: 'RATE_LIMIT_EXCEEDED',

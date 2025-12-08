@@ -14,30 +14,53 @@ export const Dashboard: React.FC = () => {
   const { data: projectMetrics = [] } = useProjectsWithMetrics();
   const { data: nearDeadlineProjects = [] } = useProjectsNearDeadline(7);
 
-  // Memoize stats calculations
+  // Memoize needsAttentionCount separately (matches logic described in Dashboard specification)
+  const needsAttentionCount = useMemo(() => {
+    if (!currentUser) return 0;
+
+    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER) {
+      return requests.filter(r => r.status === RequestStatus.MANAGER_REVIEW).length;
+    }
+    if (currentUser.role === UserRole.ENGINEER) {
+      return requests.filter(r =>
+        r.assignedTo === currentUser.id &&
+        (r.status === RequestStatus.ENGINEERING_REVIEW || r.status === RequestStatus.REVISION_REQUESTED)
+      ).length;
+    }
+    // End-User
+    return requests.filter(r =>
+      r.createdBy === currentUser.id &&
+      r.status === RequestStatus.REVISION_APPROVAL
+    ).length;
+  }, [requests, currentUser]);
+
+  // Memoize stats calculations with role-based filtering
   const stats = useMemo(() => {
-    const total = requests.length;
-    const inProgress = requests.filter(r => [RequestStatus.IN_PROGRESS, RequestStatus.ENGINEERING_REVIEW, RequestStatus.DISCUSSION].includes(r.status)).length;
-    const completed = requests.filter(r => r.status === RequestStatus.COMPLETED || r.status === RequestStatus.ACCEPTED).length;
-    const pending = requests.filter(r => [RequestStatus.SUBMITTED, RequestStatus.MANAGER_REVIEW].includes(r.status)).length;
-    const denied = requests.filter(r => r.status === RequestStatus.DENIED).length;
+    // Apply role-based filtering (matches RequestList logic)
+    let visibleRequests = requests;
+    if (currentUser.role === UserRole.USER) {
+      // End-users only see their own requests
+      visibleRequests = requests.filter(r => r.createdBy === currentUser.id);
+    } else if (currentUser.role === UserRole.ENGINEER) {
+      // Engineers see unassigned work ready for them, or their own assigned work
+      visibleRequests = requests.filter(r =>
+        r.assignedTo === currentUser.id || r.status === RequestStatus.ENGINEERING_REVIEW
+      );
+    }
+    // Admins and Managers see all requests (no filtering needed)
+
+    const total = visibleRequests.length;
+    const inProgress = visibleRequests.filter(r => [RequestStatus.IN_PROGRESS, RequestStatus.ENGINEERING_REVIEW, RequestStatus.DISCUSSION].includes(r.status)).length;
+    const completed = visibleRequests.filter(r => r.status === RequestStatus.COMPLETED || r.status === RequestStatus.ACCEPTED).length;
+    const pending = visibleRequests.filter(r => [RequestStatus.SUBMITTED, RequestStatus.MANAGER_REVIEW].includes(r.status)).length;
+    const denied = visibleRequests.filter(r => r.status === RequestStatus.DENIED).length;
 
     // User-specific stats
     const myRequests = requests.filter(r => r.createdBy === currentUser.id);
     const assignedToMe = requests.filter(r => r.assignedTo === currentUser.id);
-    const needsAttention = requests.filter(r => {
-      if (currentUser.role === UserRole.ENGINEER) {
-        return r.assignedTo === currentUser.id &&
-               [RequestStatus.IN_PROGRESS, RequestStatus.ENGINEERING_REVIEW, RequestStatus.DISCUSSION].includes(r.status);
-      }
-      if (currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) {
-        return [RequestStatus.MANAGER_REVIEW, RequestStatus.DISCUSSION].includes(r.status);
-      }
-      return false;
-    });
 
-    return { total, inProgress, completed, pending, denied, myRequests: myRequests.length, assignedToMe: assignedToMe.length, needsAttention: needsAttention.length };
-  }, [requests, currentUser]);
+    return { total, inProgress, completed, pending, denied, myRequests: myRequests.length, assignedToMe: assignedToMe.length, needsAttention: needsAttentionCount };
+  }, [requests, currentUser, needsAttentionCount]);
 
   // Project stats
   const projectStats = useMemo(() => {
@@ -70,19 +93,39 @@ export const Dashboard: React.FC = () => {
     value: number;
     icon: React.ComponentType<{ size?: number }>;
     color: string;
+    to?: string;
   }
 
-  const StatCard: React.FC<StatCardProps> = React.memo(({ label, value, icon: Icon, color }) => (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 relative overflow-hidden group shadow-sm">
-      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
-        <Icon size={64} />
+  const StatCard: React.FC<StatCardProps> = React.memo(({ label, value, icon: Icon, color, to }) => {
+    const content = (
+      <>
+        <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
+          <Icon size={64} />
+        </div>
+        <div className="relative z-10">
+          <p className="text-gray-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
+        </div>
+      </>
+    );
+
+    if (to) {
+      return (
+        <Link
+          to={to}
+          className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 relative overflow-hidden group shadow-sm hover:border-blue-500 dark:hover:border-blue-600 transition-all cursor-pointer"
+        >
+          {content}
+        </Link>
+      );
+    }
+
+    return (
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 relative overflow-hidden group shadow-sm">
+        {content}
       </div>
-      <div className="relative z-10">
-        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
-      </div>
-    </div>
-  ));
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -147,10 +190,28 @@ export const Dashboard: React.FC = () => {
 
       {/* At-a-Glance Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Requests" value={stats.total} icon={Activity} color="text-blue-500" />
-        <StatCard label="In Progress" value={stats.inProgress} icon={Clock} color="text-indigo-500" />
-        <StatCard label="Completed" value={stats.completed} icon={CheckCircle} color="text-green-500" />
-        <StatCard label="Pending Review" value={stats.pending} icon={AlertOctagon} color="text-yellow-500" />
+        <StatCard label="Total Requests" value={stats.total} icon={Activity} color="text-blue-500" to="/requests" />
+        <StatCard
+          label="In Progress"
+          value={stats.inProgress}
+          icon={Clock}
+          color="text-indigo-500"
+          to={`/requests?status=${RequestStatus.IN_PROGRESS},${RequestStatus.ENGINEERING_REVIEW},${RequestStatus.DISCUSSION}`}
+        />
+        <StatCard
+          label="Completed"
+          value={stats.completed}
+          icon={CheckCircle}
+          color="text-green-500"
+          to={`/requests?status=${RequestStatus.COMPLETED},${RequestStatus.ACCEPTED}`}
+        />
+        <StatCard
+          label="Pending Review"
+          value={stats.pending}
+          icon={AlertOctagon}
+          color="text-yellow-500"
+          to={`/requests?status=${RequestStatus.SUBMITTED},${RequestStatus.MANAGER_REVIEW}`}
+        />
       </div>
 
       {/* Personal Overview */}
@@ -163,7 +224,7 @@ export const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {stats.needsAttention > 0 && (
               <Link
-                to="/requests"
+                to="/requests?filter=needs-attention"
                 className="group bg-white dark:bg-slate-900 p-4 rounded-lg border border-orange-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-600 transition-all"
               >
                 <div className="flex items-center justify-between">
@@ -177,7 +238,7 @@ export const Dashboard: React.FC = () => {
             )}
             {currentUser.role === UserRole.ENGINEER && stats.assignedToMe > 0 && (
               <Link
-                to="/requests"
+                to="/requests?filter=assigned-to-me"
                 className="group bg-white dark:bg-slate-900 p-4 rounded-lg border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
               >
                 <div className="flex items-center justify-between">
@@ -190,7 +251,7 @@ export const Dashboard: React.FC = () => {
               </Link>
             )}
             <Link
-              to="/requests"
+              to="/requests?filter=my-requests"
               className="group bg-white dark:bg-slate-900 p-4 rounded-lg border border-gray-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-600 transition-all"
             >
               <div className="flex items-center justify-between">

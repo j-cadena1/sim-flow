@@ -259,8 +259,8 @@ export const useAddComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ requestId, content }: { requestId: string; content: string }) => {
-      const response = await apiClient.post<{ comment: Comment }>(`/requests/${requestId}/comments`, { content });
+    mutationFn: async ({ requestId, content, visibleToRequester }: { requestId: string; content: string; visibleToRequester?: boolean }) => {
+      const response = await apiClient.post<{ comment: Comment }>(`/requests/${requestId}/comments`, { content, visibleToRequester });
       return response.data.comment;
     },
     onSuccess: (_, variables) => {

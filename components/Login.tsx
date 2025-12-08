@@ -77,7 +77,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
               <LogIn className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Sim-Flow</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">SimRQ</h1>
           <p className="text-gray-500 dark:text-slate-400">Sign in to continue</p>
         </div>
 
@@ -187,7 +187,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
 
         {/* Footer */}
         <p className="text-center text-gray-500 dark:text-slate-500 text-sm mt-6">
-          Sim-Flow &copy; 2025 - Simulated Workflow Management
+          SimRQ &copy; 2025 - Simulation Request Management
         </p>
       </div>
     </div>

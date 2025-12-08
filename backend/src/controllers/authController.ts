@@ -48,6 +48,11 @@ import {
   revokeSessionById as revokeSessionByDbId,
   validateSession,
 } from '../services/sessionService';
+import {
+  checkLockoutStatus,
+  recordLoginAttempt,
+  clearFailedAttempts,
+} from '../services/loginAttemptService';
 
 interface User {
   id: string;
@@ -78,14 +83,21 @@ function clearSessionCookie(res: Response): void {
  * Creates a new session and sets HTTP-only session cookie.
  * Uses constant-time password comparison via bcrypt.
  *
+ * Security Features:
+ * - Account lockout after 5 failed attempts (15 minute lockout)
+ * - Login attempt tracking for audit purposes
+ * - Constant-time password comparison (bcrypt)
+ * - Generic error messages to prevent user enumeration
+ *
  * @param req.body.email - User email address
  * @param req.body.password - User password
  * @returns user - User info (id, name, email, role, avatarUrl)
  * @throws ValidationError if credentials are missing
- * @throws AuthenticationError if credentials are invalid
+ * @throws AuthenticationError if credentials are invalid or account is locked
  */
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
+  const ipAddress = getIpFromRequest(req);
 
   // Validation
   if (!email || !password) {
@@ -94,13 +106,30 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Check if account is locked due to too many failed attempts
+  const lockoutStatus = await checkLockoutStatus(normalizedEmail);
+  if (lockoutStatus.isLocked) {
+    const minutesRemaining = lockoutStatus.lockoutExpiresAt
+      ? Math.ceil((lockoutStatus.lockoutExpiresAt.getTime() - Date.now()) / 60000)
+      : 15;
+    logger.warn(`Login blocked - account locked: ${normalizedEmail}`);
+    throw new AuthenticationError(
+      `Account temporarily locked due to too many failed attempts. Try again in ${minutesRemaining} minutes.`,
+      ErrorCode.AUTH_INVALID_CREDENTIALS
+    );
+  }
+
   // Find user by email (exclude soft-deleted users)
   const result = await query(
     'SELECT id, name, email, password_hash, role, avatar_url, deleted_at FROM users WHERE email = $1',
-    [email.toLowerCase().trim()]
+    [normalizedEmail]
   );
 
   if (result.rows.length === 0) {
+    // Record failed attempt before throwing error
+    await recordLoginAttempt(normalizedEmail, ipAddress, false);
     // Generic error message to prevent user enumeration
     logger.warn(`Failed login attempt for email: ${email}`);
     throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
@@ -110,6 +139,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   // Check if user is deactivated
   if (user.deletedAt) {
+    await recordLoginAttempt(normalizedEmail, ipAddress, false);
     logger.warn(`Login attempt for deactivated user: ${user.id} (${email})`);
     throw new AuthenticationError('This account has been deactivated. Please contact an administrator.', ErrorCode.AUTH_INVALID_CREDENTIALS);
   }
@@ -118,9 +148,14 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isPasswordValid) {
+    await recordLoginAttempt(normalizedEmail, ipAddress, false);
     logger.warn(`Failed login attempt for user: ${user.id} (${email})`);
     throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
   }
+
+  // Successful login - record attempt and clear any failed attempts
+  await recordLoginAttempt(normalizedEmail, ipAddress, true);
+  await clearFailedAttempts(normalizedEmail);
 
   // Generate and store session
   const sessionId = generateSessionId();
@@ -128,7 +163,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     user.id,
     sessionId,
     getUserAgentFromRequest(req),
-    getIpFromRequest(req)
+    ipAddress
   );
 
   // Set session cookie
@@ -152,7 +187,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     userName: user.name,
     action: AuditAction.LOGIN,
     entityType: EntityType.AUTH,
-    ipAddress: getIpFromRequest(req),
+    ipAddress,
     userAgent: getUserAgentFromRequest(req),
     details: { role: user.role },
   });

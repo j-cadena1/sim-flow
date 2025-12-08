@@ -34,7 +34,7 @@ If applicable, add screenshots to help explain your problem.
 - **Deployment**: [Docker / Manual]
 - **OS**: [e.g. Ubuntu 22.04, macOS 14]
 - **Browser**: [e.g. Chrome 120, Firefox 121]
-- **Sim-Flow Version**: [e.g. 1.0.0]
+- **SimRq Version**: [e.g. 1.0.0]
 - **Docker Version**: [e.g. 24.0.6]
 
 ## Logs

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Analytics Service
  *
- * Provides comprehensive analytics and reporting for the Sim-Flow dashboard.
+ * Provides comprehensive analytics and reporting for the SimRQ dashboard.
  * Aggregates data from requests, projects, users, and time entries.
  *
  * Key Metrics:

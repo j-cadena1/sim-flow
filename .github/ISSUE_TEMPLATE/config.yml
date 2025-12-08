@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security Vulnerability
-    url: https://github.com/j-cadena1/sim-flow/security/advisories/new
+    url: https://github.com/j-cadena1/sim-rq/security/advisories/new
     about: Please report security vulnerabilities through GitHub Security Advisories
   - name: Question or Discussion
-    url: https://github.com/j-cadena1/sim-flow/discussions
+    url: https://github.com/j-cadena1/sim-rq/discussions
     about: Ask questions or discuss ideas

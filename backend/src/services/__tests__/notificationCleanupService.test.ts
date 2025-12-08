@@ -56,16 +56,18 @@ describe('NotificationCleanupService', () => {
       );
     });
 
-    test('should schedule initial cleanup after 5 seconds', () => {
+    test('should schedule initial cleanup after 5 seconds', async () => {
       vi.useFakeTimers();
+
+      (cleanupOldNotifications as any).mockResolvedValue(0);
 
       initializeNotificationCleanup();
 
       // Fast-forward time by 5 seconds
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
-      // The setTimeout callback should have been queued
-      expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 5000);
+      // The initial cleanup should have run and logged
+      expect(logger.info).toHaveBeenCalledWith('Running initial notification cleanup');
     });
   });
 
@@ -85,9 +87,24 @@ describe('NotificationCleanupService', () => {
     });
 
     test('should handle case when job is not initialized', () => {
+      // Call stopNotificationCleanup without first calling initializeNotificationCleanup
+      // Since the previous test initialized a job, we need to stop it first
+      // and then the second call should handle the null case gracefully
+
+      // Clear all mocks so we can track fresh calls
+      vi.clearAllMocks();
+
+      // After the previous test, cleanupJob is set. Stop it.
       stopNotificationCleanup();
 
-      // Should not throw an error
+      // Clear again to track only the next call
+      vi.clearAllMocks();
+
+      // Now call stop again when cleanupJob should be null after stop
+      // This should not throw and should not log "job stopped" since job is already null
+      expect(() => stopNotificationCleanup()).not.toThrow();
+
+      // Verify the "stopped" message was not logged since job was already null
       expect(logger.info).not.toHaveBeenCalledWith('Notification cleanup job stopped');
     });
   });

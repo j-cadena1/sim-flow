@@ -36,7 +36,7 @@ export const logger = winston.createLogger({
     structuredFormat
   ),
   defaultMeta: {
-    service: 'sim-flow-api',
+    service: 'simrq-api',
     environment: process.env.NODE_ENV || 'development',
   },
   transports: [

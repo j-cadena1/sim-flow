@@ -57,14 +57,27 @@ test.describe('Role-Based Access Control', () => {
       await expect(page.getByText(userName)).toBeVisible({ timeout: 10000 });
     });
 
-    test('should NOT have access to Settings as manager', async ({ page }) => {
+    test('manager can access Settings but sees limited tabs', async ({ page }) => {
       await loginAsManager(page);
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Settings link should not be visible for non-admin
+      // Settings link IS visible to all users (for Sessions and Notification preferences)
       const settingsLink = page.getByRole('link', { name: /settings/i });
-      await expect(settingsLink).not.toBeVisible();
+      await expect(settingsLink).toBeVisible();
+
+      // Click to navigate to settings
+      await settingsLink.click();
+      await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 5000 });
+
+      // Manager should see Sessions and Notifications tabs but NOT admin tabs
+      await expect(page.getByRole('button', { name: /sessions/i })).toBeVisible();
+      // Use getByText for Notifications tab to avoid conflict with notification bell icon
+      await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
+
+      // Admin-only tabs should NOT be visible
+      await expect(page.getByText('User Management')).not.toBeVisible();
+      await expect(page.getByText('Audit Log')).not.toBeVisible();
     });
 
     test('should have access to Projects as manager', async ({ page }) => {
@@ -101,14 +114,27 @@ test.describe('Role-Based Access Control', () => {
       await expect(page.getByText(userName)).toBeVisible({ timeout: 10000 });
     });
 
-    test('should NOT have access to Settings as engineer', async ({ page }) => {
+    test('engineer can access Settings but sees limited tabs', async ({ page }) => {
       await loginAsEngineer(page);
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Settings link should not be visible for non-admin
+      // Settings link IS visible to all users (for Sessions and Notification preferences)
       const settingsLink = page.getByRole('link', { name: /settings/i });
-      await expect(settingsLink).not.toBeVisible();
+      await expect(settingsLink).toBeVisible();
+
+      // Click to navigate to settings
+      await settingsLink.click();
+      await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 5000 });
+
+      // Engineer should see Sessions and Notifications tabs but NOT admin tabs
+      await expect(page.getByRole('button', { name: /sessions/i })).toBeVisible();
+      // Use getByText for Notifications tab to avoid conflict with notification bell icon
+      await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
+
+      // Admin-only tabs should NOT be visible
+      await expect(page.getByText('User Management')).not.toBeVisible();
+      await expect(page.getByText('Audit Log')).not.toBeVisible();
     });
 
     test('should have access to assigned requests as engineer', async ({ page }) => {
@@ -137,15 +163,28 @@ test.describe('Role-Based Access Control', () => {
       await expect(page.getByText(userName)).toBeVisible({ timeout: 10000 });
     });
 
-    test('should NOT have access to Settings as user', async ({ page }) => {
+    test('user can access Settings but sees limited tabs', async ({ page }) => {
       const { authenticateUser } = await import('../helpers/auth');
       await authenticateUser(page, TEST_USERS.user);
 
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // Settings link should not be visible for non-admin
+      // Settings link IS visible to all users (for Sessions and Notification preferences)
       const settingsLink = page.getByRole('link', { name: /settings/i });
-      await expect(settingsLink).not.toBeVisible();
+      await expect(settingsLink).toBeVisible();
+
+      // Click to navigate to settings
+      await settingsLink.click();
+      await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 5000 });
+
+      // End-User should see Sessions and Notifications tabs but NOT admin tabs
+      await expect(page.getByRole('button', { name: /sessions/i })).toBeVisible();
+      // Use getByText for Notifications tab to avoid conflict with notification bell icon
+      await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
+
+      // Admin-only tabs should NOT be visible
+      await expect(page.getByText('User Management')).not.toBeVisible();
+      await expect(page.getByText('Audit Log')).not.toBeVisible();
     });
 
     test('should have access to Requests as user', async ({ page }) => {
@@ -172,7 +211,7 @@ test.describe('Role-Based Access Control', () => {
       await logout(page);
 
       // Should be back at login page
-      await expect(page.getByRole('heading', { name: 'Sim-Flow' })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: 'SimRQ' })).toBeVisible({ timeout: 10000 });
 
       // Login as manager
       await loginAsManager(page);

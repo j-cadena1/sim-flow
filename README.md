@@ -1,7 +1,7 @@
-# Sim-Flow
+# SimRQ
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/j-cadena1/sim-flow/releases)
+[![Version](https://img.shields.io/badge/version-0.8.0--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
 [![Docker](https://img.shields.io/badge/Docker-First-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
@@ -37,7 +37,7 @@ Everything you need is managed by Docker Compose. Just install Docker and you're
 ### Production
 
 ```bash
-git clone https://github.com/j-cadena1/sim-flow.git
+git clone https://github.com/j-cadena1/sim-rq.git
 cd sim-flow
 make prod
 ```
@@ -81,9 +81,9 @@ make clean        # Remove all containers
 
 ## Reverse Proxy Setup
 
-Sim-Flow exposes port **8080** only. Point your reverse proxy there:
+SimRQ exposes port **8080** only. Point your reverse proxy there:
 
-1. Start Sim-Flow: `make prod`
+1. Start SimRQ: `make prod`
 2. Configure proxy to forward to `http://<server>:8080`
 3. Set `CORS_ORIGIN=https://your-domain.com` in `.env`
 4. Restart: `make prod-down && make prod`
@@ -151,14 +151,14 @@ Restart containers: `make prod-down && make prod`
    - Set Redirect URI: `https://your-domain.com/api/auth/sso/callback`
    - Note Tenant ID, Client ID, create Client Secret
 
-2. **Sim-Flow Settings:**
+2. **SimRQ Settings:**
    - Login as qAdmin
    - Navigate to Settings → SSO Configuration
    - Enter Tenant ID, Client ID, Client Secret
    - Set Redirect URI: `https://your-domain.com/api/auth/sso/callback`
    - Enable and save
 
-**Important:** Redirect URI must match exactly in both Azure and Sim-Flow. The `.env` method is preferred for production as it survives database resets.
+**Important:** Redirect URI must match exactly in both Azure and SimRQ. The `.env` method is preferred for production as it survives database resets.
 
 ## Architecture
 

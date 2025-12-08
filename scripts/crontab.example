@@ -1,4 +1,4 @@
-# Sim-Flow Automated Backup Schedule
+# SimRq Automated Backup Schedule
 # Add these entries to your crontab with: crontab -e
 # Or install system-wide: sudo crontab -e
 

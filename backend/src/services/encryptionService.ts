@@ -8,7 +8,7 @@ import { logger } from '../middleware/logger';
 
 // Encryption key from environment (32 bytes for AES-256)
 // In production, use: openssl rand -base64 32
-const ENCRYPTION_KEY_ENV = process.env.SSO_ENCRYPTION_KEY;
+const ENCRYPTION_KEY_ENV = process.env.ENTRA_SSO_ENCRYPTION_KEY;
 
 // Derive a 32-byte key from the environment variable or fallback
 function getEncryptionKey(): Buffer {
@@ -26,14 +26,14 @@ function getEncryptionKey(): Buffer {
     return crypto.createHash('sha256').update(ENCRYPTION_KEY_ENV).digest();
   }
 
-  // Development fallback - log warning
+  // Production requires a proper encryption key - fail fast
   if (process.env.NODE_ENV === 'production') {
-    logger.error('SSO_ENCRYPTION_KEY not set in production! SSO secrets will not be properly encrypted.');
-  } else {
-    logger.warn('SSO_ENCRYPTION_KEY not set. Using development fallback key.');
+    logger.error('FATAL: ENTRA_SSO_ENCRYPTION_KEY not set in production! Server cannot start securely.');
+    process.exit(1);
   }
 
-  // Deterministic fallback for development (DO NOT use in production)
+  // Development fallback only
+  logger.warn('ENTRA_SSO_ENCRYPTION_KEY not set. Using development fallback key (not for production).');
   return crypto.createHash('sha256').update('dev-only-insecure-encryption-key').digest();
 }
 

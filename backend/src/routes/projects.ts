@@ -21,10 +21,11 @@ import {
   deleteProjectRequests,
 } from '../controllers/projectsController';
 import { requireRole } from '../middleware/authorization';
+import { authenticate } from '../middleware/authentication';
 
 const router = express.Router();
 
-// Public routes (all authenticated users can view)
+// Authenticated routes (all authenticated users can view)
 
 /**
  * @swagger
@@ -32,6 +33,9 @@ const router = express.Router();
  *   get:
  *     summary: Get all projects
  *     tags: [Projects]
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns list of all projects. Requires authentication.
  *     parameters:
  *       - in: query
  *         name: status
@@ -42,8 +46,10 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: List of projects
+ *       401:
+ *         description: Authentication required
  */
-router.get('/', getAllProjects);
+router.get('/', authenticate, getAllProjects);
 
 /**
  * @swagger
@@ -51,12 +57,16 @@ router.get('/', getAllProjects);
  *   get:
  *     summary: Get all projects with health metrics
  *     tags: [Projects]
- *     description: Returns projects with hour utilization, remaining budget, and deadline status
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns projects with hour utilization, remaining budget, and deadline status. Requires authentication.
  *     responses:
  *       200:
  *         description: List of projects with metrics
+ *       401:
+ *         description: Authentication required
  */
-router.get('/metrics', getAllProjectsWithMetrics);
+router.get('/metrics', authenticate, getAllProjectsWithMetrics);
 
 /**
  * @swagger
@@ -64,6 +74,9 @@ router.get('/metrics', getAllProjectsWithMetrics);
  *   get:
  *     summary: Get projects approaching deadline
  *     tags: [Projects]
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns projects with deadlines within threshold days. Requires authentication.
  *     parameters:
  *       - in: query
  *         name: days
@@ -74,8 +87,10 @@ router.get('/metrics', getAllProjectsWithMetrics);
  *     responses:
  *       200:
  *         description: List of projects nearing deadline
+ *       401:
+ *         description: Authentication required
  */
-router.get('/near-deadline', getProjectsApproachingDeadline);
+router.get('/near-deadline', authenticate, getProjectsApproachingDeadline);
 
 /**
  * @swagger
@@ -83,6 +98,9 @@ router.get('/near-deadline', getProjectsApproachingDeadline);
  *   get:
  *     summary: Get a specific project by ID
  *     tags: [Projects]
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns details for a specific project. Requires authentication.
  *     parameters:
  *       - in: path
  *         name: id
@@ -93,10 +111,12 @@ router.get('/near-deadline', getProjectsApproachingDeadline);
  *     responses:
  *       200:
  *         description: Project details
+ *       401:
+ *         description: Authentication required
  *       404:
  *         description: Project not found
  */
-router.get('/:id', getProjectById);
+router.get('/:id', authenticate, getProjectById);
 
 /**
  * @swagger
@@ -104,6 +124,9 @@ router.get('/:id', getProjectById);
  *   get:
  *     summary: Get health metrics for a specific project
  *     tags: [Projects]
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns project health metrics (utilization, remaining budget, etc.). Requires authentication.
  *     parameters:
  *       - in: path
  *         name: id
@@ -114,8 +137,10 @@ router.get('/:id', getProjectById);
  *     responses:
  *       200:
  *         description: Project health metrics (utilization, remaining budget, etc.)
+ *       401:
+ *         description: Authentication required
  */
-router.get('/:id/metrics', getProjectHealthMetrics);
+router.get('/:id/metrics', authenticate, getProjectHealthMetrics);
 
 /**
  * @swagger
@@ -123,6 +148,9 @@ router.get('/:id/metrics', getProjectHealthMetrics);
  *   get:
  *     summary: Get hour transaction history for a project
  *     tags: [Projects]
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns list of hour allocations, extensions, and adjustments. Requires authentication.
  *     parameters:
  *       - in: path
  *         name: id
@@ -133,8 +161,10 @@ router.get('/:id/metrics', getProjectHealthMetrics);
  *     responses:
  *       200:
  *         description: List of hour allocations, extensions, and adjustments
+ *       401:
+ *         description: Authentication required
  */
-router.get('/:id/hours/history', getProjectHourTransactions);
+router.get('/:id/hours/history', authenticate, getProjectHourTransactions);
 
 /**
  * @swagger
@@ -142,7 +172,9 @@ router.get('/:id/hours/history', getProjectHourTransactions);
  *   get:
  *     summary: Get valid status transitions for a project
  *     tags: [Projects]
- *     description: Returns which status transitions are allowed based on current project state
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns which status transitions are allowed based on current project state. Requires authentication.
  *     parameters:
  *       - in: path
  *         name: id
@@ -153,8 +185,10 @@ router.get('/:id/hours/history', getProjectHourTransactions);
  *     responses:
  *       200:
  *         description: List of valid status transitions
+ *       401:
+ *         description: Authentication required
  */
-router.get('/:id/transitions', getProjectValidTransitions);
+router.get('/:id/transitions', authenticate, getProjectValidTransitions);
 
 /**
  * @swagger
@@ -162,6 +196,9 @@ router.get('/:id/transitions', getProjectValidTransitions);
  *   get:
  *     summary: Get status change history for a project
  *     tags: [Projects]
+ *     security:
+ *       - sessionAuth: []
+ *     description: Returns list of status changes with timestamps and reasons. Requires authentication.
  *     parameters:
  *       - in: path
  *         name: id
@@ -172,8 +209,10 @@ router.get('/:id/transitions', getProjectValidTransitions);
  *     responses:
  *       200:
  *         description: List of status changes with timestamps and reasons
+ *       401:
+ *         description: Authentication required
  */
-router.get('/:id/history', getProjectHistory);
+router.get('/:id/history', authenticate, getProjectHistory);
 
 /**
  * @swagger
@@ -181,7 +220,9 @@ router.get('/:id/history', getProjectHistory);
  *   get:
  *     summary: Check if project can accept new requests
  *     tags: [Projects]
- *     description: Validates project status and hour budget availability
+ *     security:
+ *       - sessionAuth: []
+ *     description: Validates project status and hour budget availability. Requires authentication.
  *     parameters:
  *       - in: path
  *         name: id
@@ -192,8 +233,10 @@ router.get('/:id/history', getProjectHistory);
  *     responses:
  *       200:
  *         description: Boolean indicating if project can accept requests
+ *       401:
+ *         description: Authentication required
  */
-router.get('/:id/can-accept', checkProjectAcceptance);
+router.get('/:id/can-accept', authenticate, checkProjectAcceptance);
 
 // Manager/Admin only routes
 
@@ -201,7 +244,10 @@ router.get('/:id/can-accept', checkProjectAcceptance);
  * @swagger
  * /projects:
  *   post:
- *     summary: Create a new project (Manager/Admin only)
+ *     summary: Create or request a new project (all roles)
+ *     description: |
+ *       Managers/Admins create Active projects directly.
+ *       End-Users/Engineers create Pending projects that require Manager/Admin approval.
  *     tags: [Projects]
  *     requestBody:
  *       required: true
@@ -234,9 +280,9 @@ router.get('/:id/can-accept', checkProjectAcceptance);
  *       400:
  *         description: Validation error
  *       403:
- *         description: Requires Manager or Admin role
+ *         description: Authentication required (all roles can request projects)
  */
-router.post('/', requireRole(['Manager', 'Admin']), createProject);
+router.post('/', authenticate, createProject);
 
 /**
  * @swagger

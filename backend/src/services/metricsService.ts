@@ -135,7 +135,7 @@ export async function generatePrometheusMetrics(): Promise<string> {
   const lines: string[] = [];
 
   // Add header
-  lines.push('# Sim-Flow Application Metrics');
+  lines.push('# SimRQ Application Metrics');
   lines.push('');
 
   // Node.js info

@@ -1,4 +1,4 @@
--- Seed Historical Data for Sim-Flow
+-- Seed Historical Data for SimRq
 -- Generates 90 days of realistic simulation request data
 
 -- Clear existing seed data (but preserve real users and SSO config)

@@ -38,7 +38,7 @@ interface SimFlowContextType {
   addRequest: (title: string, description: string, vendor: string, priority: 'Low' | 'Medium' | 'High', projectId: string, onBehalfOfUserId?: string) => void;
   updateRequestStatus: (id: string, status: RequestStatus) => void;
   assignEngineer: (id: string, engineerId: string, hours: number) => void;
-  addComment: (requestId: string, content: string) => void;
+  addComment: (requestId: string, content: string, visibleToRequester?: boolean) => void;
   getUsersByRole: (role: UserRole) => User[];
 }
 
@@ -103,8 +103,8 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
-  const addComment = (requestId: string, content: string) => {
-    addCommentMutation.mutate({ requestId, content });
+  const addComment = (requestId: string, content: string, visibleToRequester?: boolean) => {
+    addCommentMutation.mutate({ requestId, content, visibleToRequester });
   };
 
   const getUsersByRole = (role: UserRole) => {

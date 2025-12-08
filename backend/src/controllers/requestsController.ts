@@ -119,6 +119,7 @@ export const getAllRequests = async (req: Request, res: Response) => {
  */
 export const getRequestById = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  const userRole = req.user?.role;
 
   const requestResult = await query(`
     SELECT
@@ -134,10 +135,15 @@ export const getRequestById = asyncHandler(async (req: Request, res: Response) =
     throw new NotFoundError('Request', id);
   }
 
-  const commentsResult = await query(
-    'SELECT * FROM comments WHERE request_id = $1 ORDER BY created_at ASC',
-    [id]
-  );
+  // Filter comments based on user role
+  // End-Users only see comments with visible_to_requester = true
+  // Engineers, Managers, and Admins see all comments
+  const canSeeInternalComments = ['Engineer', 'Manager', 'Admin'].includes(userRole || '');
+  const commentsQuery = canSeeInternalComments
+    ? 'SELECT * FROM comments WHERE request_id = $1 ORDER BY created_at ASC'
+    : 'SELECT * FROM comments WHERE request_id = $1 AND visible_to_requester = true ORDER BY created_at ASC';
+
+  const commentsResult = await query(commentsQuery, [id]);
 
   res.json({
     request: toCamelCase(requestResult.rows[0]),
@@ -935,16 +941,16 @@ export const assignEngineer = asyncHandler(async (req: Request, res: Response) =
 export const addComment = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { content } = req.body;
+    const { content, visibleToRequester } = req.body;
     const userId = req.user?.userId;
     const userName = req.user?.name || 'Unknown';
     const userRole = req.user?.role || 'User';
 
     const result = await query(`
-      INSERT INTO comments (request_id, author_id, author_name, author_role, content)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO comments (request_id, author_id, author_name, author_role, content, visible_to_requester)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [id, userId || null, userName, userRole, content]);
+    `, [id, userId || null, userName, userRole, content, visibleToRequester !== undefined ? visibleToRequester : true]);
 
     const comment = result.rows[0];
 
@@ -967,8 +973,9 @@ export const addComment = async (req: Request, res: Response) => {
       const request = requestResult.rows[0];
       const commentNotifications = [];
 
-      // Notify request creator (unless they're the commenter)
-      if (request.created_by && request.created_by !== userId) {
+      // Notify request creator (unless they're the commenter or comment is internal)
+      const shouldNotifyRequester = visibleToRequester !== false;
+      if (request.created_by && request.created_by !== userId && shouldNotifyRequester) {
         commentNotifications.push(
           sendNotification({
             userId: request.created_by,

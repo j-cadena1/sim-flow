@@ -93,7 +93,7 @@ router.get('/', requireRole(['Admin']), getAllUsersManagement);
  *                     type: string
  *                   imported:
  *                     type: boolean
- *                     description: Whether user already exists in Sim-Flow
+ *                     description: Whether user already exists in SimRQ
  *       400:
  *         description: SSO not configured
  *       403:
@@ -400,7 +400,17 @@ router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
  *   post:
  *     summary: Change qAdmin password (Admin only)
  *     tags: [User Management]
- *     description: Updates password for the qadmin@simflow.local account (qAdmin must provide current password, other Admins can change without it)
+ *     description: |
+ *       Updates password for the qadmin@simflow.local account.
+ *       qAdmin must provide current password; other Admins can change without it.
+ *
+ *       **Password Requirements:**
+ *       - Minimum 12 characters
+ *       - At least one uppercase letter (A-Z)
+ *       - At least one lowercase letter (a-z)
+ *       - At least one number (0-9)
+ *       - At least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/?)
+ *       - Cannot contain common weak patterns (password, qwerty, 123456, admin, simflow)
  *     requestBody:
  *       required: true
  *       content:
@@ -416,12 +426,13 @@ router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
  *               newPassword:
  *                 type: string
  *                 format: password
- *                 minLength: 8
+ *                 minLength: 12
+ *                 description: Must meet complexity requirements (see description)
  *     responses:
  *       200:
  *         description: Password updated
  *       400:
- *         description: Current password incorrect or new password too weak
+ *         description: Current password incorrect or new password does not meet requirements
  *       403:
  *         description: Requires Admin role
  */

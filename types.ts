@@ -68,6 +68,7 @@ export interface Comment {
   content: string;
   timestamp?: string;
   createdAt?: string; // Backend uses createdAt
+  visibleToRequester?: boolean; // When false, only visible to Engineers, Managers, and Admins
 }
 
 export interface Project {

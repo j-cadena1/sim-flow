@@ -395,8 +395,10 @@ describe('NotificationService', () => {
 
   describe('shouldNotify', () => {
     test('should return false if in-app notifications disabled', async () => {
+      // Mock getPreferences returning disabled in_app
+      // The mock toCamelCase returns the object as-is, so we need camelCase keys
       (pool.query as any).mockResolvedValue({
-        rows: [{ in_app_enabled: false }],
+        rows: [{ inAppEnabled: false }],
       });
 
       const result = await notificationService.shouldNotify('user-123', 'REQUEST_ASSIGNED');
@@ -405,26 +407,34 @@ describe('NotificationService', () => {
     });
 
     test('should check specific preference field', async () => {
+      // shouldNotify calls getPreferences, which returns camelCase after transformation
+      // Since we mock toCamelCase to return the object as-is, we need to provide camelCase keys
+      const mockPrefs = {
+        inAppEnabled: true,
+        requestAssigned: true,
+        requestStatusChanged: false,
+      };
+
       (pool.query as any).mockResolvedValue({
-        rows: [
-          {
-            in_app_enabled: true,
-            request_assigned: true,
-            request_status_changed: false,
-          },
-        ],
+        rows: [mockPrefs],
       });
 
       const result1 = await notificationService.shouldNotify('user-123', 'REQUEST_ASSIGNED');
       expect(result1).toBe(true);
+
+      // Reset mock for second call
+      (pool.query as any).mockResolvedValue({
+        rows: [mockPrefs],
+      });
 
       const result2 = await notificationService.shouldNotify('user-123', 'REQUEST_STATUS_CHANGED');
       expect(result2).toBe(false);
     });
 
     test('should default to true for unmapped notification types', async () => {
+      // Provide camelCase since mock toCamelCase returns object as-is
       (pool.query as any).mockResolvedValue({
-        rows: [{ in_app_enabled: true }],
+        rows: [{ inAppEnabled: true }],
       });
 
       const result = await notificationService.shouldNotify('user-123', 'UNMAPPED_TYPE' as any);
@@ -442,9 +452,9 @@ describe('NotificationService', () => {
       const deletedCount = await notificationService.cleanupOldNotifications();
 
       expect(deletedCount).toBe(15);
+      // The query doesn't take any parameters
       expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM notifications'),
-        []
+        expect.stringContaining('DELETE FROM notifications')
       );
     });
 

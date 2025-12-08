@@ -628,18 +628,65 @@ export const batchGetDeletedUsers = async (req: Request, res: Response) => {
 };
 
 /**
+ * Validate password strength
+ * Requires: minimum 12 characters, uppercase, lowercase, number, special character
+ * Returns error message or null if valid
+ */
+const validatePasswordStrength = (password: string): string | null => {
+  if (password.length < 12) {
+    return 'Password must be at least 12 characters long';
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter';
+  }
+  if (!/[a-z]/.test(password)) {
+    return 'Password must contain at least one lowercase letter';
+  }
+  if (!/[0-9]/.test(password)) {
+    return 'Password must contain at least one number';
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    return 'Password must contain at least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/?)';
+  }
+  // Check for common weak patterns
+  const commonPatterns = ['password', 'qwerty', '123456', 'admin', 'simflow'];
+  const lowerPassword = password.toLowerCase();
+  for (const pattern of commonPatterns) {
+    if (lowerPassword.includes(pattern)) {
+      return 'Password contains common weak patterns';
+    }
+  }
+  return null;
+};
+
+/**
  * Change password for qAdmin local account
  * Admin only - allows qAdmin or any Admin role user to change the qAdmin password
+ *
+ * Password requirements:
+ * - Minimum 12 characters
+ * - At least one uppercase letter
+ * - At least one lowercase letter
+ * - At least one number
+ * - At least one special character
+ * - No common weak patterns (password, qwerty, 123456, admin, simflow)
  */
 export const changeQAdminPassword = async (req: Request, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const admin = req.user;
 
-    // Validation
-    if (!newPassword || newPassword.length < 8) {
+    // Validate password strength
+    if (!newPassword) {
       return res.status(400).json({
-        error: 'New password must be at least 8 characters long',
+        error: 'New password is required',
+      });
+    }
+
+    const strengthError = validatePasswordStrength(newPassword);
+    if (strengthError) {
+      return res.status(400).json({
+        error: strengthError,
       });
     }
 

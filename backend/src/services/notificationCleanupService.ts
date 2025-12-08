@@ -45,6 +45,7 @@ export function initializeNotificationCleanup(): void {
 export function stopNotificationCleanup(): void {
   if (cleanupJob) {
     cleanupJob.stop();
+    cleanupJob = null;
     logger.info('Notification cleanup job stopped');
   }
 }

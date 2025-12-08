@@ -37,7 +37,7 @@ Please include the following information:
 
 ### Security Best Practices
 
-When deploying Sim-Flow:
+When deploying SimRQ:
 
 - Change default admin password immediately
 - Use strong database passwords
@@ -69,4 +69,4 @@ When we receive a security bug report, we will:
 3. Prepare fixes for all supported versions
 4. Release security patches as soon as possible
 
-We appreciate your help in keeping Sim-Flow secure!
+We appreciate your help in keeping SimRQ secure!

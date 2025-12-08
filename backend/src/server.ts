@@ -10,6 +10,7 @@ import { logger } from './middleware/logger';
 import { addRequestId, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { enforceSecureConfig } from './utils/configValidator';
 import { cleanupExpiredSessions } from './services/sessionService';
+import { cleanupOldLoginAttempts } from './services/loginAttemptService';
 import { recordHttpRequest, generatePrometheusMetrics } from './services/metricsService';
 import { initializeWebSocket } from './services/websocketService';
 import { initializeNotificationCleanup, stopNotificationCleanup } from './services/notificationCleanupService';
@@ -40,8 +41,51 @@ const PORT = process.env.PORT || 3001;
 // This enables: req.ip, req.protocol, req.secure, req.hostname to work correctly
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware with explicit Content Security Policy
+// CSP helps prevent XSS, clickjacking, and other code injection attacks
+const isProduction = process.env.NODE_ENV === 'production';
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // Required for inline styles in UI components
+      imgSrc: ["'self'", "data:", "https://api.dicebear.com", "blob:"], // Allow avatars and data URIs
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'", "wss:", "ws:"], // Allow WebSocket connections
+      frameSrc: ["'none'"], // Prevent clickjacking
+      objectSrc: ["'none'"], // Block plugins
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"], // Prevent embedding in iframes (clickjacking protection)
+      // Only add upgradeInsecureRequests in production
+      ...(isProduction && { upgradeInsecureRequests: [] }),
+    },
+  },
+  // Strict-Transport-Security: max-age=31536000; includeSubDomains
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  // X-Content-Type-Options: nosniff
+  noSniff: true,
+  // X-Frame-Options: DENY (also handled by CSP frame-ancestors)
+  frameguard: { action: 'deny' },
+  // Referrer-Policy: strict-origin-when-cross-origin
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+/**
+ * CORS Configuration
+ *
+ * CSRF Protection Notes:
+ * - SameSite: 'strict' cookies prevent CSRF by default (session cookie won't be sent on cross-origin requests)
+ * - CORS with credentials: true requires explicit origin (no wildcards)
+ * - All state-changing endpoints require authentication via session cookie
+ * - No token-based CSRF protection needed when using SameSite: strict
+ */
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
@@ -111,7 +155,7 @@ app.get('/metrics', async (req, res) => {
 // Swagger API documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'Sim-Flow API Documentation',
+  customSiteTitle: 'SimRQ API Documentation',
 }));
 
 // OpenAPI spec as JSON
@@ -145,22 +189,26 @@ initializeWebSocket(httpServer);
 
 // Start server
 const server = httpServer.listen(PORT, () => {
-  logger.info(`🚀 Sim-Flow API server running on port ${PORT}`);
+  logger.info(`🚀 SimRQ API server running on port ${PORT}`);
   logger.info(`📡 WebSocket server initialized`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  // Schedule periodic cleanup of expired sessions (every hour)
+  // Schedule periodic cleanup of expired sessions and login attempts (every hour)
   setInterval(async () => {
     try {
       await cleanupExpiredSessions();
+      await cleanupOldLoginAttempts();
     } catch (error) {
-      logger.error('Error during session cleanup:', error);
+      logger.error('Error during scheduled cleanup:', error);
     }
   }, 60 * 60 * 1000); // 1 hour
 
   // Run initial cleanup on startup
-  cleanupExpiredSessions().catch((error) => {
-    logger.error('Error during initial session cleanup:', error);
+  Promise.all([
+    cleanupExpiredSessions(),
+    cleanupOldLoginAttempts(),
+  ]).catch((error) => {
+    logger.error('Error during initial cleanup:', error);
   });
 
   // Initialize notification cleanup job

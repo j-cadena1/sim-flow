@@ -166,6 +166,7 @@ export interface Comment {
   author_role: UserRole;
   content: string;
   created_at: Date;
+  visible_to_requester: boolean; // When false, only visible to Engineers, Managers, and Admins
 }
 
 export interface ActivityLog {

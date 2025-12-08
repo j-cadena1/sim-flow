@@ -1,5 +1,5 @@
 {
-  "name": "Sim-Flow Dashboard",
+  "name": "SimRQ Dashboard",
   "description": "A role-based engineering simulation request management system.",
   "requestFramePermissions": []
 }

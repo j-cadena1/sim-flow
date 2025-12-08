@@ -22,9 +22,16 @@ interface SSOConfig {
 /**
  * Get current SSO configuration
  * Admin only - returns config without sensitive data (client_secret masked)
+ * Also returns isEnvConfigured flag when SSO is managed via environment variables
  */
 export const getSSOConfig = async (req: Request, res: Response) => {
   try {
+    // Check if SSO is configured via environment variables (environment-specific)
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isEnvConfigured = isDevelopment
+      ? !!(process.env.DEV_ENTRA_SSO_TENANT_ID && process.env.DEV_ENTRA_SSO_CLIENT_ID && process.env.DEV_ENTRA_SSO_CLIENT_SECRET)
+      : !!(process.env.ENTRA_SSO_TENANT_ID && process.env.ENTRA_SSO_CLIENT_ID && process.env.ENTRA_SSO_CLIENT_SECRET);
+
     const result = await query('SELECT * FROM sso_configuration LIMIT 1');
 
     if (result.rows.length === 0) {
@@ -40,7 +47,10 @@ export const getSSOConfig = async (req: Request, res: Response) => {
     };
 
     logger.info('Retrieved SSO configuration');
-    res.json({ config: safeConfig });
+    res.json({
+      config: safeConfig,
+      isEnvConfigured // Signal to frontend that SSO is managed via environment variables
+    });
   } catch (error) {
     logger.error('Error fetching SSO configuration:', error);
     res.status(500).json({ error: 'Failed to fetch SSO configuration' });
@@ -50,9 +60,24 @@ export const getSSOConfig = async (req: Request, res: Response) => {
 /**
  * Update SSO configuration
  * Admin only - updates all SSO settings
+ * Blocked when SSO is configured via environment variables
  */
 export const updateSSOConfig = async (req: Request, res: Response) => {
   try {
+    // Block updates if SSO is managed via environment variables (environment-specific)
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isEnvConfigured = isDevelopment
+      ? !!(process.env.DEV_ENTRA_SSO_TENANT_ID && process.env.DEV_ENTRA_SSO_CLIENT_ID && process.env.DEV_ENTRA_SSO_CLIENT_SECRET)
+      : !!(process.env.ENTRA_SSO_TENANT_ID && process.env.ENTRA_SSO_CLIENT_ID && process.env.ENTRA_SSO_CLIENT_SECRET);
+
+    if (isEnvConfigured) {
+      logger.warn('Attempted to update SSO configuration when managed via environment variables');
+      return res.status(403).json({
+        error: 'SSO configuration is managed via environment variables and cannot be modified through the UI',
+        isEnvConfigured: true
+      });
+    }
+
     const user = req.user;
     const {
       enabled,

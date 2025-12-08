@@ -3,7 +3,7 @@
 # Default target - show help
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  Sim-Flow Docker Commands"
+	@echo "  SimRQ Docker Commands"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "  🚀 DEVELOPMENT"
@@ -109,14 +109,25 @@ test:
 test-e2e:
 	@echo "🎭 Running E2E tests with Playwright (in container)..."
 	@echo ""
+	@# Enable DISABLE_RATE_LIMITING for E2E tests to avoid rate limit issues
 	@if docker compose ps --quiet frontend 2>/dev/null | grep -q .; then \
 		echo "📦 Running against production environment..."; \
+		echo "🔓 Restarting backend with rate limiting disabled for tests..."; \
+		DISABLE_RATE_LIMITING=true docker compose up -d backend; \
+		sleep 5; \
 		docker compose --profile e2e run --rm playwright; \
+		echo "🔒 Restarting backend with normal rate limiting..."; \
+		docker compose up -d backend; \
 	elif docker compose -f docker-compose.dev.yaml ps --quiet frontend 2>/dev/null | grep -q .; then \
 		echo "📦 Running against development environment..."; \
+		echo "🔓 Restarting backend with rate limiting disabled for tests..."; \
+		DISABLE_RATE_LIMITING=true docker compose -f docker-compose.dev.yaml up -d backend; \
+		sleep 5; \
 		docker compose -f docker-compose.dev.yaml --profile e2e run --rm playwright; \
+		echo "🔒 Restarting backend with normal rate limiting..."; \
+		docker compose -f docker-compose.dev.yaml up -d backend; \
 	else \
-		echo "❌ No Sim-Flow environment running!"; \
+		echo "❌ No SimRQ environment running!"; \
 		echo "   Start with: make prod  or  make dev"; \
 		exit 1; \
 	fi
@@ -169,7 +180,7 @@ status:
 	@docker compose -f docker-compose.dev.yaml ps 2>/dev/null || echo "  (not running)"
 
 clean:
-	@echo "⚠️  This will remove ALL Sim-Flow containers, volumes, and images!"
+	@echo "⚠️  This will remove ALL SimRQ containers, volumes, and images!"
 	@echo "   Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
 	@echo ""

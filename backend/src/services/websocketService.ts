@@ -46,7 +46,7 @@ export function initializeWebSocket(httpServer: HTTPServer): void {
 
     // Send welcome message
     socket.emit('connected', {
-      message: 'Connected to Sim-Flow notifications',
+      message: 'Connected to SimRQ notifications',
       userId,
     });
   });

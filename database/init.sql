@@ -1,4 +1,4 @@
--- Sim-Flow Database Schema
+-- SimRq Database Schema
 -- PostgreSQL 16
 
 -- Enable UUID extension
@@ -118,6 +118,10 @@ INSERT INTO users (name, email, password_hash, role, avatar_url) VALUES
 \i /docker-entrypoint-initdb.d/migrations/015_fix_project_codes.sql
 \i /docker-entrypoint-initdb.d/migrations/016_fix_lifecycle_consistency.sql
 \i /docker-entrypoint-initdb.d/migrations/017_add_discussion_to_lifecycle_check.sql
+\i /docker-entrypoint-initdb.d/migrations/018_remove_approved_status.sql
+\i /docker-entrypoint-initdb.d/migrations/019_merge_manager_review_statuses.sql
+\i /docker-entrypoint-initdb.d/migrations/020_add_comment_visibility.sql
+\i /docker-entrypoint-initdb.d/migrations/021_add_login_attempts.sql
 
 -- Grant permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO simflow_user;

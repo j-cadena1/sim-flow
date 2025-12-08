@@ -164,6 +164,13 @@ export const Settings: React.FC = () => {
       setIsLoading(true);
       const response = await apiClient.get('/sso/config');
       setConfig(response.data.config);
+
+      // Update SSO source based on backend flag
+      if (response.data.isEnvConfigured) {
+        setSsoSource('environment');
+      } else {
+        setSsoSource('database');
+      }
     } catch (error) {
       console.error('Error loading SSO config:', error);
       showToast('Failed to load SSO configuration', 'error');

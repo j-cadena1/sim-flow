@@ -26,7 +26,6 @@ export const UserSchema = z.object({
   name: z.string(),
   email: z.string().email().optional(),
   role: UserRoleSchema,
-  avatar: z.string().optional(),
   avatarUrl: z.string().optional(),
 });
 
@@ -230,11 +229,6 @@ export const ErrorResponseSchema = z.object({
     timestamp: z.string(),
     requestId: z.string().optional(),
   }),
-});
-
-// Legacy error format (for backward compatibility)
-export const LegacyErrorResponseSchema = z.object({
-  error: z.string(),
 });
 
 // ============================================================================

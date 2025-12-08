@@ -23,7 +23,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
-    container_name: sim-flow-db
+    container_name: simflow-db
     environment:
       POSTGRES_DB: simflow
       POSTGRES_USER: simflow_user
@@ -53,7 +53,7 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
     image: sim-flow-backend:latest
-    container_name: sim-flow-api
+    container_name: simflow-api
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       DB_HOST: postgres
@@ -65,11 +65,15 @@ services:
       PORT: 3001
       LOG_LEVEL: info
       # SSO Configuration (optional - from .env file)
-      SSO_ENCRYPTION_KEY: ${SSO_ENCRYPTION_KEY:-}
-      SSO_TENANT_ID: ${SSO_TENANT_ID:-}
-      SSO_CLIENT_ID: ${SSO_CLIENT_ID:-}
-      SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
-      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-}
+      ENTRA_SSO_ENCRYPTION_KEY: ${ENTRA_SSO_ENCRYPTION_KEY:-}
+      ENTRA_SSO_TENANT_ID: ${ENTRA_SSO_TENANT_ID:-}
+      ENTRA_SSO_CLIENT_ID: ${ENTRA_SSO_CLIENT_ID:-}
+      ENTRA_SSO_CLIENT_SECRET: ${ENTRA_SSO_CLIENT_SECRET:-}
+      ENTRA_SSO_REDIRECT_URI: ${ENTRA_SSO_REDIRECT_URI:-}
+      ENTRA_SSO_AUTHORITY: ${ENTRA_SSO_AUTHORITY:-}
+      ENTRA_SSO_SCOPES: ${ENTRA_SSO_SCOPES:-}
+      # Testing: Set DISABLE_RATE_LIMITING=true to bypass rate limits for E2E tests
+      DISABLE_RATE_LIMITING: ${DISABLE_RATE_LIMITING:-}
     # Backend only accessible within Docker network - frontend proxies API requests
     expose:
       - "3001"
@@ -100,7 +104,7 @@ services:
         NODE_VERSION: ${NODE_VERSION:-20}
         NGINX_VERSION: ${NGINX_VERSION:-alpine}
     image: sim-flow-frontend:latest
-    container_name: sim-flow-frontend
+    container_name: simflow-frontend
     ports:
       - "8080:80"
     depends_on:
@@ -128,7 +132,7 @@ services:
       context: .
       dockerfile: Dockerfile.playwright
     image: sim-flow-playwright:latest
-    container_name: sim-flow-playwright
+    container_name: simflow-playwright
     environment:
       # Point to frontend container via Docker network
       BASE_URL: http://frontend:80

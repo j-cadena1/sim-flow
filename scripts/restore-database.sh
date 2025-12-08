@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Sim-Flow Database Restore Script
+# SimRq Database Restore Script
 # Restores PostgreSQL database from backup
 # Usage: ./restore-database.sh /path/to/backup.sql.gz
 #
@@ -18,7 +18,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== Sim-Flow Database Restore ===${NC}"
+echo -e "${YELLOW}=== SimRq Database Restore ===${NC}"
 echo "Timestamp: $(date)"
 
 # Check if backup file was provided

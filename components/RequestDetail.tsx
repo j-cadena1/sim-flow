@@ -97,6 +97,7 @@ export const RequestDetail: React.FC = () => {
 
   const [comment, setComment] = useState('');
   const [commentError, setCommentError] = useState('');
+  const [visibleToRequester, setVisibleToRequester] = useState(false); // Default to internal (not visible)
 
   if (isLoading)
     return <div className="text-gray-600 dark:text-slate-400">Loading...</div>;
@@ -173,7 +174,8 @@ export const RequestDetail: React.FC = () => {
               request.id,
               `DISCUSSION REQUESTED: ${reason}${
                 suggestedHours ? ` (Suggested hours: ${suggestedHours})` : ''
-              }`
+              }`,
+              true
             );
             showToast('Discussion request sent to manager', 'success');
           },
@@ -194,7 +196,7 @@ export const RequestDetail: React.FC = () => {
       'Please provide a reason for the revision request:',
       (reason) => {
         if (reason.trim()) {
-          addComment(request.id, `REVISION REQUESTED: ${reason}`);
+          addComment(request.id, `REVISION REQUESTED: ${reason}`, true);
           updateRequestStatus(request.id, RequestStatus.REVISION_APPROVAL);
           showToast('Revision requested - pending manager approval', 'success');
         }
@@ -207,7 +209,7 @@ export const RequestDetail: React.FC = () => {
       'Approve Revision',
       'Send this request back to engineering for revisions?',
       () => {
-        addComment(request.id, 'Manager approved revision request - returned to engineering');
+        addComment(request.id, 'Manager approved revision request - returned to engineering', true);
         updateRequestStatus(request.id, RequestStatus.IN_PROGRESS);
         showToast('Revision approved - returned to engineering', 'success');
       }
@@ -219,7 +221,7 @@ export const RequestDetail: React.FC = () => {
       'Deny Revision',
       'Close this request as completed without changes?',
       () => {
-        addComment(request.id, 'Manager denied revision request - marked as completed');
+        addComment(request.id, 'Manager denied revision request - marked as completed', true);
         updateRequestStatus(request.id, RequestStatus.COMPLETED);
         showToast('Revision denied - marked as completed', 'success');
       }
@@ -227,7 +229,7 @@ export const RequestDetail: React.FC = () => {
   };
 
   const handleAccept = () => {
-    addComment(request.id, 'Work accepted by requester.');
+    addComment(request.id, 'Work accepted by requester.', true);
     updateRequestStatus(request.id, RequestStatus.ACCEPTED);
     showToast('Work accepted successfully', 'success');
   };
@@ -241,8 +243,9 @@ export const RequestDetail: React.FC = () => {
       return;
     }
 
-    addComment(request.id, comment);
+    addComment(request.id, comment, visibleToRequester);
     setComment('');
+    setVisibleToRequester(false); // Reset to default (internal) after posting
     showToast('Comment added', 'success');
   };
 
@@ -563,10 +566,13 @@ export const RequestDetail: React.FC = () => {
           comments={comments}
           comment={comment}
           commentError={commentError}
+          showVisibilityCheckbox={['Engineer', 'Manager', 'Admin'].includes(currentUser.role)}
+          visibleToRequester={visibleToRequester}
           onCommentChange={(value) => {
             setComment(value);
             if (commentError) setCommentError('');
           }}
+          onVisibilityChange={setVisibleToRequester}
           onCommentSubmit={handlePostComment}
         />
 

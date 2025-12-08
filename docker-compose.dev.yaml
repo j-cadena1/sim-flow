@@ -10,7 +10,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
-    container_name: sim-flow-db-dev
+    container_name: simflow-db-dev
     environment:
       POSTGRES_DB: simflow
       POSTGRES_USER: simflow_user
@@ -40,7 +40,7 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
     image: sim-flow-backend:dev
-    container_name: sim-flow-api-dev
+    container_name: simflow-api-dev
     environment:
       NODE_ENV: development
       DB_HOST: postgres
@@ -51,6 +51,14 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       PORT: 3001
       LOG_LEVEL: debug
+      # SSO Configuration (optional - managed via environment variables)
+      DEV_ENTRA_SSO_TENANT_ID: ${DEV_ENTRA_SSO_TENANT_ID:-}
+      DEV_ENTRA_SSO_CLIENT_ID: ${DEV_ENTRA_SSO_CLIENT_ID:-}
+      DEV_ENTRA_SSO_CLIENT_SECRET: ${DEV_ENTRA_SSO_CLIENT_SECRET:-}
+      DEV_ENTRA_SSO_REDIRECT_URI: ${DEV_ENTRA_SSO_REDIRECT_URI:-}
+      DEV_ENTRA_SSO_AUTHORITY: ${DEV_ENTRA_SSO_AUTHORITY:-}
+      DEV_ENTRA_SSO_SCOPES: ${DEV_ENTRA_SSO_SCOPES:-}
+      ENTRA_SSO_ENCRYPTION_KEY: ${ENTRA_SSO_ENCRYPTION_KEY:-}
     ports:
       - "3001:3001"
       - "9229:9229"  # Node.js debugger port
@@ -82,7 +90,7 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
     image: sim-flow-frontend:dev
-    container_name: sim-flow-frontend-dev
+    container_name: simflow-frontend-dev
     environment:
       # Backend URL for Vite proxy - uses Docker service name
       VITE_API_URL: http://backend:3001
@@ -118,7 +126,7 @@ services:
       context: .
       dockerfile: Dockerfile.playwright
     image: sim-flow-playwright:dev
-    container_name: sim-flow-playwright
+    container_name: simflow-playwright
     environment:
       # Point to frontend container via Docker network
       BASE_URL: http://frontend:5173

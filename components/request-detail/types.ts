@@ -73,8 +73,14 @@ export interface RequestCommentsProps {
   comment: string;
   /** Comment validation error */
   commentError: string;
+  /** Whether the "Show requester" checkbox should be displayed */
+  showVisibilityCheckbox: boolean;
+  /** Current visibility checkbox state */
+  visibleToRequester: boolean;
   /** Callback when comment changes */
   onCommentChange: (value: string) => void;
+  /** Callback when visibility checkbox changes */
+  onVisibilityChange: (visible: boolean) => void;
   /** Callback when comment is submitted */
   onCommentSubmit: () => void;
 }

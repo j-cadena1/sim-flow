@@ -43,6 +43,7 @@ export const assignEngineerSchema = z.object({
 
 export const addCommentSchema = z.object({
   content: z.string().min(1).max(2000).transform(sanitize),
+  visibleToRequester: z.boolean().optional().default(true), // Default to visible for backwards compatibility
 });
 
 // Validation middleware factory

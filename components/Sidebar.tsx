@@ -64,7 +64,7 @@ export const Sidebar: React.FC = () => {
             <Cpu className="text-white" size={24} />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Sim-Flow</h1>
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">SimRQ</h1>
             <p className="text-xs text-gray-500 dark:text-slate-400">Engineering Portal</p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an idea for Sim-Flow
+about: Suggest an idea for SimRq
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''

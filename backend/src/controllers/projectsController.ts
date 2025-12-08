@@ -169,9 +169,12 @@ export const createProject = async (req: Request, res: Response) => {
 
     const code = `${nextNumber}-${currentYear}`;
 
-    // Default status: Manager creates as 'Active', User creates as 'Pending'
-    // Use 'Active' instead of legacy 'Approved'
-    const projectStatus = status || 'Pending';
+    // Default status based on user role:
+    // - Managers/Admins can create Active projects directly
+    // - End-Users/Engineers create Pending projects that require approval
+    const userRole = req.user?.role;
+    const projectStatus = status ||
+      (['Manager', 'Admin'].includes(userRole || '') ? 'Active' : 'Pending');
     const projectPriority = priority || 'Medium';
 
     const result = await query(

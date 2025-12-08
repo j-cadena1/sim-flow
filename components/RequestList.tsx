@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSimFlow } from '../contexts/SimFlowContext';
 import { RequestStatus, UserRole } from '../types';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../constants';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Clock, User as UserIcon, AlertTriangle, CheckCircle, Archive, Search, Filter, Plus, ArrowUpDown, Bell, Target, Briefcase } from 'lucide-react';
 
 type SortOption = 'date-desc' | 'date-asc' | 'priority-desc' | 'priority-asc' | 'status' | 'title-asc' | 'title-desc';
@@ -10,11 +10,30 @@ type QuickFilter = 'all' | 'my-requests' | 'assigned-to-me' | 'needs-attention';
 
 export const RequestList: React.FC = () => {
   const { requests, currentUser } = useSimFlow();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'Low' | 'Medium' | 'High'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('date-desc');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+
+  // Initialize filter from URL parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const filterParam = params.get('filter');
+    const statusParam = params.get('status');
+
+    if (filterParam === 'needs-attention' || filterParam === 'my-requests' || filterParam === 'assigned-to-me') {
+      setQuickFilter(filterParam as QuickFilter);
+    }
+
+    // Handle status parameter (can be single or comma-separated values)
+    if (statusParam) {
+      // For now, if multiple statuses are provided, we'll store them as a comma-separated string
+      // and handle them in the filter logic below
+      setStatusFilter(statusParam as any);
+    }
+  }, [location.search]);
 
   const getStatusColor = (status: RequestStatus) => STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'bg-slate-700 text-slate-300';
 
@@ -40,14 +59,18 @@ export const RequestList: React.FC = () => {
       } else if (quickFilter === 'assigned-to-me') {
         if (req.assignedTo !== currentUser.id) return false;
       } else if (quickFilter === 'needs-attention') {
-        // Needs attention: High priority OR in specific statuses that require action
-        const actionNeededStatuses = [
-          RequestStatus.SUBMITTED,
-          RequestStatus.MANAGER_REVIEW,
-          RequestStatus.ENGINEERING_REVIEW,
-          RequestStatus.DISCUSSION,
-        ];
-        const needsAttention = req.priority === 'High' || actionNeededStatuses.includes(req.status);
+        // Role-based "Needs Attention" logic (matches Dashboard logic)
+        let needsAttention = false;
+        if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER) {
+          needsAttention = req.status === RequestStatus.MANAGER_REVIEW;
+        } else if (currentUser.role === UserRole.ENGINEER) {
+          needsAttention = req.assignedTo === currentUser.id &&
+            (req.status === RequestStatus.ENGINEERING_REVIEW || req.status === RequestStatus.REVISION_REQUESTED);
+        } else {
+          // End-User
+          needsAttention = req.createdBy === currentUser.id &&
+            req.status === RequestStatus.REVISION_APPROVAL;
+        }
         if (!needsAttention) return false;
       }
 
@@ -62,9 +85,12 @@ export const RequestList: React.FC = () => {
         }
       }
 
-      // Status filter
-      if (statusFilter !== 'all' && req.status !== statusFilter) {
-        return false;
+      // Status filter (can be single value or comma-separated values)
+      if (statusFilter !== 'all') {
+        const statusValues = statusFilter.includes(',') ? statusFilter.split(',') : [statusFilter];
+        if (!statusValues.includes(req.status)) {
+          return false;
+        }
       }
 
       // Priority filter

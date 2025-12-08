@@ -19,12 +19,16 @@ import { RequestCommentsProps } from './types';
  * - Inline comment submission form
  * - User attribution and timestamps
  * - Validation feedback
+ * - Visibility toggle (for Engineers, Managers, Admins)
  */
 export const RequestComments: React.FC<RequestCommentsProps> = ({
   comments,
   comment,
   commentError,
+  showVisibilityCheckbox,
+  visibleToRequester,
   onCommentChange,
+  onVisibilityChange,
   onCommentSubmit,
 }) => {
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,10 +48,17 @@ export const RequestComments: React.FC<RequestCommentsProps> = ({
         {comments.map((c) => (
           <div key={c.id} className="bg-gray-50 dark:bg-slate-950 p-3 rounded-lg border border-gray-200 dark:border-slate-800">
             <div className="flex justify-between items-baseline mb-1">
-              <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
-                {c.authorName}{' '}
-                <span className="text-gray-500 dark:text-slate-600 text-xs">({c.authorRole})</span>
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
+                  {c.authorName}{' '}
+                  <span className="text-gray-500 dark:text-slate-600 text-xs">({c.authorRole})</span>
+                </span>
+                {c.visibleToRequester === false && (
+                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded">
+                    Internal
+                  </span>
+                )}
+              </div>
               <span className="text-xs text-gray-500 dark:text-slate-600">
                 {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A'}
               </span>
@@ -74,6 +85,23 @@ export const RequestComments: React.FC<RequestCommentsProps> = ({
             <ArrowLeft size={16} className="rotate-180" />
           </button>
         </div>
+        {showVisibilityCheckbox && (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="visibleToRequester"
+              checked={visibleToRequester}
+              onChange={(e) => onVisibilityChange(e.target.checked)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-600 rounded focus:ring-blue-500"
+            />
+            <label
+              htmlFor="visibleToRequester"
+              className="text-sm text-gray-700 dark:text-slate-300 cursor-pointer select-none"
+            >
+              Show requester
+            </label>
+          </div>
+        )}
         {commentError && (
           <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
             <AlertTriangle size={14} />

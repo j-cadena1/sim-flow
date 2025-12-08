@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Sim-Flow Database Backup Script
+# SimRq Database Backup Script
 # Backs up PostgreSQL database to local storage
 # Usage: ./backup-database.sh
 #
@@ -22,7 +22,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}=== Sim-Flow Database Backup ===${NC}"
+echo -e "${GREEN}=== SimRq Database Backup ===${NC}"
 echo "Timestamp: $(date)"
 echo "Backup file: ${BACKUP_FILE}"
 

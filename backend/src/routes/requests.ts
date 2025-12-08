@@ -157,6 +157,11 @@ router.post('/', authenticate, validate(createRequestSchema), createRequest);
  *               content:
  *                 type: string
  *                 minLength: 1
+ *                 description: Comment text content
+ *               visibleToRequester:
+ *                 type: boolean
+ *                 default: true
+ *                 description: When false, comment is only visible to Engineers, Managers, and Admins (internal notes)
  *     responses:
  *       201:
  *         description: Comment added
