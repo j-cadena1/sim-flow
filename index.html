@@ -3,79 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SimRQ Engineering</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              slate: {
-                850: '#1e293b',
-                900: '#0f172a',
-                950: '#020617',
-              }
-            },
-            keyframes: {
-              'slide-in': {
-                '0%': { transform: 'translateX(100%)', opacity: '0' },
-                '100%': { transform: 'translateX(0)', opacity: '1' }
-              },
-              'scale-in': {
-                '0%': { transform: 'scale(0.95)', opacity: '0' },
-                '100%': { transform: 'scale(1)', opacity: '1' }
-              }
-            },
-            animation: {
-              'slide-in': 'slide-in 0.3s ease-out',
-              'scale-in': 'scale-in 0.2s ease-out'
-            }
-          }
+    <title>Sim RQ Engineering</title>
+    <link rel="icon" type="image/png" href="/SimRQ-Favicon-web.png" />
+    <link rel="apple-touch-icon" href="/SimRQ-Favicon-Apple.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/SimRQ-Favicon-Android.png" />
+    <script type="importmap">
+      {
+        "imports": {
+          "react/": "https://aistudiocdn.com/react@^19.2.0/",
+          "react": "https://aistudiocdn.com/react@^19.2.0",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+          "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+          "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+          "recharts": "https://aistudiocdn.com/recharts@^3.5.1"
         }
       }
     </script>
-    <style>
-      /* Light mode date inputs */
-      input[type="date"] {
-        color-scheme: light;
-      }
-
-      input[type="date"]::-webkit-calendar-picker-indicator {
-        cursor: pointer;
-      }
-
-      /* Dark mode date inputs */
-      .dark input[type="date"] {
-        color-scheme: dark;
-      }
-
-      .dark input[type="date"]::-webkit-datetime-edit,
-      .dark input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-      .dark input[type="date"]::-webkit-datetime-edit-text,
-      .dark input[type="date"]::-webkit-datetime-edit-month-field,
-      .dark input[type="date"]::-webkit-datetime-edit-day-field,
-      .dark input[type="date"]::-webkit-datetime-edit-year-field {
-        color: rgb(226, 232, 240); /* slate-200 */
-      }
-
-      .dark input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(1);
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1"
-  }
-}
-</script>
-</head>
+  </head>
   <body class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

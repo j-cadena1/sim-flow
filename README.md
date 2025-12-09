@@ -1,4 +1,4 @@
-# SimRQ
+# Sim RQ
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-0.8.0--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
@@ -8,6 +8,23 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
 Role-based engineering simulation request management system with analytics, audit logging, and Microsoft Entra ID SSO.
+
+## 🔐 Deployment Model
+
+**Sim RQ is designed for Microsoft Entra ID SSO-first environments.** This application is intended to be deployed in organizations using Microsoft Entra ID (Azure AD) for centralized identity management.
+
+- **Production authentication:** Microsoft Entra ID SSO only
+- **Local user accounts:** Development and testing purposes only
+- **No self-registration:** Users are provisioned through SSO authentication
+- **Future scope:** Local user creation functionality is not planned
+
+The included local accounts (qAdmin, test users) exist solely for:
+
+- Development and testing without SSO configuration
+- Role-based access control (RBAC) testing
+- Demo environments
+
+In production deployments, configure Microsoft Entra ID SSO and disable local login if desired.
 
 ## 🐳 Docker-First Philosophy
 
@@ -26,9 +43,9 @@ Everything you need is managed by Docker Compose. Just install Docker and you're
 - **Request Lifecycle**: Full tracking from submission to completion with enforced workflow stages
 - **Project Hour Tracking**: Budget allocation and monitoring
 - **Real-time Notifications**: WebSocket-based in-app notifications with user preferences
-- **SSO**: Microsoft Entra ID (Azure AD) PKCE authentication
+- **SSO**: Microsoft Entra ID (Azure AD) PKCE authentication with production-ready multi-instance support
 - **Analytics**: Real-time productivity and resource insights
-- **Security**: Session-based auth, rate limiting, audit logging
+- **Security**: Session-based auth with atomic session limits, rate limiting, audit logging, database-backed PKCE storage
 
 ## Quick Start
 
@@ -38,7 +55,7 @@ Everything you need is managed by Docker Compose. Just install Docker and you're
 
 ```bash
 git clone https://github.com/j-cadena1/sim-rq.git
-cd sim-flow
+cd simrq
 make prod
 ```
 
@@ -64,26 +81,33 @@ make status       # Show container status
 make clean        # Remove all containers
 ```
 
-## Default Credentials
+## Default Credentials (Development Only)
+
+**These credentials are for development and testing only.** In production, authentication should be handled exclusively through Microsoft Entra ID SSO.
 
 **Admin:**
 
-- Email: `qadmin@simflow.local`
+- Email: `qadmin@sim-rq.local`
 - Password: `admin123`
 
-**Test Accounts:**
+**Test Accounts (for RBAC testing):**
 
-- Manager: `bob@simflow.local` / `manager123`
-- Engineer: `charlie@simflow.local` / `engineer123`
-- User: `alice@simflow.local` / `user123`
+- Manager: `bob@sim-rq.local` / `manager123`
+- Engineer: `charlie@sim-rq.local` / `engineer123`
+- User: `alice@sim-rq.local` / `user123`
 
-**⚠️ Change admin password in production!**
+**⚠️ Production Deployment:**
+
+- Change the admin password immediately
+- Configure Microsoft Entra ID SSO (see SSO Configuration section)
+- All real users should authenticate via SSO
+- Disable the local administrator account and delete local users
 
 ## Reverse Proxy Setup
 
-SimRQ exposes port **8080** only. Point your reverse proxy there:
+Sim RQ exposes port **8080** only. Point your reverse proxy there:
 
-1. Start SimRQ: `make prod`
+1. Start Sim RQ: `make prod`
 2. Configure proxy to forward to `http://<server>:8080`
 3. Set `CORS_ORIGIN=https://your-domain.com` in `.env`
 4. Restart: `make prod-down && make prod`
@@ -93,13 +117,13 @@ SimRQ exposes port **8080** only. Point your reverse proxy there:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name simflow.yourdomain.com;
+    server_name sim-rq.yourdomain.com;
 
-    ssl_certificate /etc/letsencrypt/live/simflow.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/simflow.yourdomain.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/sim-rq.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/sim-rq.yourdomain.com/privkey.pem;
 
     location / {
-        proxy_pass http://<sim-flow-server>:8080;
+        proxy_pass http://<sim-rq-server>:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -118,14 +142,20 @@ Create `.env` for production:
 # Database
 DB_PASSWORD=YourStrongPassword123!
 
-# SSO Encryption (if using SSO)
-SSO_ENCRYPTION_KEY=$(openssl rand -base64 32)
+# SSO Encryption (REQUIRED if using SSO)
+ENTRA_SSO_ENCRYPTION_KEY=$(openssl rand -base64 32)
 
 # CORS (your public domain)
 CORS_ORIGIN=https://your-domain.com
 
 # Environment
 NODE_ENV=production
+```
+
+**Important:** The `ENTRA_SSO_ENCRYPTION_KEY` is **required** if you plan to use SSO. The server will fail to start if this key is missing and SSO is configured. Generate a secure key with:
+
+```bash
+openssl rand -base64 32
 ```
 
 ## SSO Configuration
@@ -151,14 +181,14 @@ Restart containers: `make prod-down && make prod`
    - Set Redirect URI: `https://your-domain.com/api/auth/sso/callback`
    - Note Tenant ID, Client ID, create Client Secret
 
-2. **SimRQ Settings:**
+2. **Sim RQ Settings:**
    - Login as qAdmin
    - Navigate to Settings → SSO Configuration
    - Enter Tenant ID, Client ID, Client Secret
    - Set Redirect URI: `https://your-domain.com/api/auth/sso/callback`
    - Enable and save
 
-**Important:** Redirect URI must match exactly in both Azure and SimRQ. The `.env` method is preferred for production as it survives database resets.
+**Important:** Redirect URI must match exactly in both Azure and Sim RQ. The `.env` method is preferred for production as it survives database resets.
 
 ## Architecture
 
@@ -196,8 +226,8 @@ Test reports are saved to `./playwright-report/` and `./test-results/`.
 ### Health Checks
 
 - Application: `http://<server>:8080/health`
-- Backend (internal): `http://sim-flow-api:3001/health`
-- Readiness (internal): `http://sim-flow-api:3001/ready`
+- Backend (internal): `http://sim-rq-api:3001/health`
+- Readiness (internal): `http://sim-rq-api:3001/ready`
 
 ### Logs
 
@@ -208,13 +238,39 @@ make dev-logs     # View dev logs
 
 ### Metrics
 
-Prometheus metrics at `http://sim-flow-api:3001/metrics` (internal only)
+Prometheus metrics at `http://sim-rq-api:3001/metrics` (internal only)
+
+## Production Deployment Notes
+
+### Multi-Instance / Load Balancer Support
+
+✅ **Sim RQ supports multi-instance deployments** with proper configuration:
+
+- **PKCE state storage**: Database-backed (multi-instance safe)
+- **Session management**: PostgreSQL-based with atomic row-level locking
+- **WebSocket**: Each instance maintains its own connections
+- **Cleanup jobs**: Run independently on each instance (idempotent)
+
+**Requirements for load-balanced deployments:**
+
+1. Database must be shared across all instances
+2. Set `ENTRA_SSO_ENCRYPTION_KEY` in environment (required for SSO)
+3. Use sticky sessions for WebSocket connections (optional, improves UX)
+4. Ensure reverse proxy forwards `X-Forwarded-For` and `X-Forwarded-Proto` headers
+
+**Example Docker deployment with 3 replicas:**
+
+```bash
+docker compose up --scale backend=3 -d
+```
+
+All authentication flows (including SSO PKCE) will work correctly across instances.
 
 ## Security Checklist
 
 - [ ] Change default admin password
 - [ ] Set strong `DB_PASSWORD` in `.env`
-- [ ] Set `SSO_ENCRYPTION_KEY` (if using SSO)
+- [ ] Set `ENTRA_SSO_ENCRYPTION_KEY` (if using SSO) - **REQUIRED** for SSO
 - [ ] Configure `CORS_ORIGIN` to your domain
 - [ ] Use HTTPS with reverse proxy
 - [ ] Restrict database port (5432) to localhost

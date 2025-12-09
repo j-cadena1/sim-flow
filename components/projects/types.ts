@@ -120,6 +120,7 @@ export interface ProjectsHeaderProps {
 export interface ProjectTableProps {
   projects: Project[];
   canManageProjects: boolean;
+  currentUserId: string;
   editingProjectId: string | null;
   editingProjectName: string;
   projectMenuId: string | null;

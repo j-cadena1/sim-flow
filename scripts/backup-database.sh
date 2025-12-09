@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# SimRq Database Backup Script
+# Sim RQ Database Backup Script
 # Backs up PostgreSQL database to local storage
 # Usage: ./backup-database.sh
 #
@@ -8,13 +8,13 @@
 set -e
 
 # Configuration
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/simflow}"
-DB_CONTAINER="${DB_CONTAINER:-sim-flow-db}"
-DB_NAME="${DB_NAME:-simflow}"
-DB_USER="${DB_USER:-simflow_user}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/sim-rq}"
+DB_CONTAINER="${DB_CONTAINER:-sim-rq-db}"
+DB_NAME="${DB_NAME:-sim-rq}"
+DB_USER="${DB_USER:-sim-rq_user}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BACKUP_FILE="${BACKUP_DIR}/simflow_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="${BACKUP_DIR}/sim-rq_${TIMESTAMP}.sql.gz"
 
 # Colors for output
 RED='\033[0;31m'
@@ -22,7 +22,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}=== SimRq Database Backup ===${NC}"
+echo -e "${GREEN}=== Sim RQ Database Backup ===${NC}"
 echo "Timestamp: $(date)"
 echo "Backup file: ${BACKUP_FILE}"
 
@@ -52,10 +52,10 @@ fi
 
 # Clean up old backups (keep only last RETENTION_DAYS days)
 echo "Cleaning up old backups (keeping last ${RETENTION_DAYS} days)..."
-find "${BACKUP_DIR}" -name "simflow_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete
+find "${BACKUP_DIR}" -name "sim-rq_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete
 
 # Count remaining backups
-BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "simflow_*.sql.gz" -type f | wc -l)
+BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "sim-rq_*.sql.gz" -type f | wc -l)
 echo "Total backups in storage: ${BACKUP_COUNT}"
 
 echo -e "${GREEN}=== Backup Complete ===${NC}"

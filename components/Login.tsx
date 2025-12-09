@@ -77,7 +77,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
               <LogIn className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">SimRQ</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Sim RQ</h1>
           <p className="text-gray-500 dark:text-slate-400">Sign in to continue</p>
         </div>
 
@@ -103,7 +103,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder="qadmin@simflow.local"
+                placeholder="qadmin@sim-rq.local"
                 disabled={isLoading}
                 autoComplete="email"
                 autoFocus
@@ -187,7 +187,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, error, isLoading }) => {
 
         {/* Footer */}
         <p className="text-center text-gray-500 dark:text-slate-500 text-sm mt-6">
-          SimRQ &copy; 2025 - Simulation Request Management
+          Sim RQ &copy; 2025 - Simulation Request Management
         </p>
       </div>
     </div>

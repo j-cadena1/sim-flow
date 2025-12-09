@@ -135,7 +135,7 @@ export async function generatePrometheusMetrics(): Promise<string> {
   const lines: string[] = [];
 
   // Add header
-  lines.push('# SimRQ Application Metrics');
+  lines.push('# Sim RQ Application Metrics');
   lines.push('');
 
   // Node.js info
@@ -188,25 +188,25 @@ export async function generatePrometheusMetrics(): Promise<string> {
   lines.push('');
 
   // Application metrics
-  lines.push('# HELP simflow_active_sessions Number of active user sessions');
-  lines.push('# TYPE simflow_active_sessions gauge');
-  lines.push(`simflow_active_sessions ${dbMetrics.activeConnections}`);
+  lines.push('# HELP sim_rq_active_sessions Number of active user sessions');
+  lines.push('# TYPE sim_rq_active_sessions gauge');
+  lines.push(`sim_rq_active_sessions ${dbMetrics.activeConnections}`);
   lines.push('');
 
-  lines.push('# HELP simflow_users_total Total number of users');
-  lines.push('# TYPE simflow_users_total gauge');
-  lines.push(`simflow_users_total ${dbMetrics.totalUsers}`);
+  lines.push('# HELP sim_rq_users_total Total number of users');
+  lines.push('# TYPE sim_rq_users_total gauge');
+  lines.push(`sim_rq_users_total ${dbMetrics.totalUsers}`);
   lines.push('');
 
-  lines.push('# HELP simflow_requests_total Total number of simulation requests');
-  lines.push('# TYPE simflow_requests_total gauge');
-  lines.push(`simflow_requests_total ${dbMetrics.totalSimRequests}`);
+  lines.push('# HELP sim_rq_requests_total Total number of simulation requests');
+  lines.push('# TYPE sim_rq_requests_total gauge');
+  lines.push(`sim_rq_requests_total ${dbMetrics.totalSimRequests}`);
   lines.push('');
 
-  lines.push('# HELP simflow_requests_by_status Simulation requests by status');
-  lines.push('# TYPE simflow_requests_by_status gauge');
+  lines.push('# HELP sim_rq_requests_by_status Simulation requests by status');
+  lines.push('# TYPE sim_rq_requests_by_status gauge');
   for (const [status, count] of Object.entries(dbMetrics.requestsByStatus)) {
-    lines.push(`simflow_requests_by_status{status="${status}"} ${count}`);
+    lines.push(`sim_rq_requests_by_status{status="${status}"} ${count}`);
   }
 
   return lines.join('\n');

@@ -64,7 +64,7 @@ export const Sidebar: React.FC = () => {
             <Cpu className="text-white" size={24} />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">SimRQ</h1>
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Sim RQ</h1>
             <p className="text-xs text-gray-500 dark:text-slate-400">Engineering Portal</p>
           </div>
         </div>
@@ -94,7 +94,9 @@ export const Sidebar: React.FC = () => {
             <img src={currentUser.avatarUrl} alt="User" className="w-8 h-8 rounded-full bg-gray-300 dark:bg-slate-700" />
             <div className="overflow-hidden">
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{currentUser.name}</p>
-              <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{currentUser.role}</p>
+              {currentUser.role === UserRole.ADMIN && (
+                <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{currentUser.role}</p>
+              )}
             </div>
           </div>
 

@@ -16,25 +16,25 @@ export interface TestUser {
 
 export const TEST_USERS = {
   admin: {
-    email: 'qadmin@simflow.local',
+    email: 'qadmin@sim-rq.local',
     password: 'admin123',
     name: 'qAdmin',
     role: 'Admin' as const,
   },
   manager: {
-    email: 'bob@simflow.local',
+    email: 'bob@sim-rq.local',
     password: 'manager123',
     name: 'Bob Manager',
     role: 'Manager' as const,
   },
   engineer: {
-    email: 'charlie@simflow.local',
+    email: 'charlie@sim-rq.local',
     password: 'engineer123',
     name: 'Charlie Engineer',
     role: 'Engineer' as const,
   },
   user: {
-    email: 'alice@simflow.local',
+    email: 'alice@sim-rq.local',
     password: 'user123',
     name: 'Alice User',
     role: 'User' as const,
@@ -46,8 +46,8 @@ export const TEST_USERS = {
  * This bypasses the login form and rate limiting
  */
 export async function authenticateUser(page: Page, user: TestUser, baseURL?: string) {
-  // Use baseURL from page context if not provided
-  const url = baseURL || page.context()._options.baseURL || process.env.BASE_URL || 'http://localhost:8080';
+  // Use baseURL from parameter or fall back to environment/default
+  const url = baseURL || process.env.BASE_URL || 'http://localhost:8080';
 
   // Create a new API request context
   const apiContext = await playwrightRequest.newContext({

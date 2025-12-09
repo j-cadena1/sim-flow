@@ -10,13 +10,14 @@ import { ImportUsersModal } from './settings/ImportUsersModal';
 import { DeleteUserModal } from './settings/DeleteUserModal';
 import { AuditLog } from './settings/AuditLog';
 import { ChangeQAdminPassword } from './settings/ChangeQAdminPassword';
+import { QAdminManagement } from './settings/QAdminManagement';
 import { NotificationPreferences } from './settings/NotificationPreferences';
 import { useAuditLogs, useAuditStats, exportAuditLogsCSV } from '../lib/api/hooks';
 import { Shield, FileDown, Filter, Calendar, RefreshCw } from 'lucide-react';
 
 // Only the local qAdmin account can configure SSO
 // qAdmin is also a protected system account that cannot be modified or deleted
-const QADMIN_EMAIL = 'qadmin@simflow.local';
+const QADMIN_EMAIL = 'qadmin@sim-rq.local';
 
 // Check if a user is the protected system administrator
 const isProtectedUser = (email: string): boolean => {
@@ -44,6 +45,7 @@ interface ManagedUser {
   lastSyncAt: string | null;
   createdAt: string;
   deletedAt: string | null;
+  isSystemDisabled?: boolean; // For qAdmin: indicates disabled via system setting
 }
 
 interface DirectoryUser {
@@ -411,6 +413,7 @@ export const Settings: React.FC = () => {
       {activeTab === 'users' && (
         <UserManagement
           users={users}
+          currentUserId={user?.id || ''}
           isLoadingUsers={isLoadingUsers}
           isLoadingDirectory={isLoadingDirectory}
           showDeactivated={showDeactivated}
@@ -466,13 +469,16 @@ export const Settings: React.FC = () => {
         />
       )}
 
-      {/* Security Tab - Change qAdmin Password */}
+      {/* Security Tab - Change qAdmin Password and qAdmin Management */}
       {activeTab === 'security' && (
-        <ChangeQAdminPassword
-          isQAdmin={isQAdmin}
-          onSuccess={() => showToast('Password changed successfully', 'success')}
-          onError={(message) => showToast(message, 'error')}
-        />
+        <div className="space-y-6">
+          <ChangeQAdminPassword
+            isQAdmin={isQAdmin}
+            onSuccess={() => showToast('Password changed successfully', 'success')}
+            onError={(message) => showToast(message, 'error')}
+          />
+          <QAdminManagement />
+        </div>
       )}
 
       {/* Sessions Tab */}

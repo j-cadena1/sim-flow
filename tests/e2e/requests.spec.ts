@@ -9,7 +9,7 @@ test.describe('Simulation Requests', () => {
 
     // Wait for dashboard to load - if login page appears, the session may have expired
     const dashboardHeading = page.getByRole('heading', { name: 'Dashboard' });
-    const loginHeading = page.getByRole('heading', { name: 'SimRQ' });
+    const loginHeading = page.getByRole('heading', { name: 'Sim RQ' });
 
     // Wait for either dashboard or login to appear
     await Promise.race([

@@ -3,7 +3,7 @@
 # Default target - show help
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  SimRQ Docker Commands"
+	@echo "  Sim RQ Docker Commands"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "  🚀 DEVELOPMENT"
@@ -127,7 +127,7 @@ test-e2e:
 		echo "🔒 Restarting backend with normal rate limiting..."; \
 		docker compose -f docker-compose.dev.yaml up -d backend; \
 	else \
-		echo "❌ No SimRQ environment running!"; \
+		echo "❌ No Sim RQ environment running!"; \
 		echo "   Start with: make prod  or  make dev"; \
 		exit 1; \
 	fi
@@ -146,24 +146,24 @@ test-e2e-build:
 
 db-shell:
 	@echo "🗄️  Opening PostgreSQL shell..."
-	@echo "   Database: simflow"
-	@echo "   User: simflow_user"
+	@echo "   Database: sim-rq"
+	@echo "   User: sim-rq_user"
 	@echo ""
-	@docker compose exec postgres psql -U simflow_user -d simflow || \
-	 docker compose -f docker-compose.dev.yaml exec postgres psql -U simflow_user -d simflow
+	@docker compose exec postgres psql -U sim-rq_user -d sim-rq || \
+	 docker compose -f docker-compose.dev.yaml exec postgres psql -U sim-rq_user -d sim-rq
 
 db-backup:
 	@echo "💾 Backing up database..."
-	@docker compose exec postgres pg_dump -U simflow_user simflow > backup.sql 2>/dev/null || \
-	 docker compose -f docker-compose.dev.yaml exec postgres pg_dump -U simflow_user simflow > backup.sql
+	@docker compose exec postgres pg_dump -U sim-rq_user sim-rq > backup.sql 2>/dev/null || \
+	 docker compose -f docker-compose.dev.yaml exec postgres pg_dump -U sim-rq_user sim-rq > backup.sql
 	@echo "✅ Database backed up to backup.sql"
 
 db-restore:
 	@echo "⚠️  Restoring database from backup.sql..."
 	@echo "   This will OVERWRITE current data. Press Ctrl+C to cancel."
 	@sleep 3
-	@docker compose exec -T postgres psql -U simflow_user simflow < backup.sql 2>/dev/null || \
-	 docker compose -f docker-compose.dev.yaml exec -T postgres psql -U simflow_user simflow < backup.sql
+	@docker compose exec -T postgres psql -U sim-rq_user sim-rq < backup.sql 2>/dev/null || \
+	 docker compose -f docker-compose.dev.yaml exec -T postgres psql -U sim-rq_user sim-rq < backup.sql
 	@echo "✅ Database restored from backup.sql"
 
 # ============================================================================
@@ -180,13 +180,13 @@ status:
 	@docker compose -f docker-compose.dev.yaml ps 2>/dev/null || echo "  (not running)"
 
 clean:
-	@echo "⚠️  This will remove ALL SimRQ containers, volumes, and images!"
+	@echo "⚠️  This will remove ALL Sim RQ containers, volumes, and images!"
 	@echo "   Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
 	@echo ""
 	@echo "🧹 Cleaning up..."
 	-docker compose down -v 2>/dev/null
 	-docker compose -f docker-compose.dev.yaml down -v 2>/dev/null
-	-docker rmi sim-flow-frontend:latest sim-flow-backend:latest 2>/dev/null
-	-docker rmi sim-flow-frontend:dev sim-flow-backend:dev 2>/dev/null
+	-docker rmi sim-rq-frontend:latest sim-rq-backend:latest 2>/dev/null
+	-docker rmi sim-rq-frontend:dev sim-rq-backend:dev 2>/dev/null
 	@echo "✅ Cleanup complete!"

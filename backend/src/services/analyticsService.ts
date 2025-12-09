@@ -1,7 +1,7 @@
 /**
  * @fileoverview Analytics Service
  *
- * Provides comprehensive analytics and reporting for the SimRQ dashboard.
+ * Provides comprehensive analytics and reporting for the Sim RQ dashboard.
  * Aggregates data from requests, projects, users, and time entries.
  *
  * Key Metrics:
@@ -240,7 +240,7 @@ export const getDashboardStats = async (
         AVG(EXTRACT(EPOCH FROM (r.updated_at - r.created_at)) / 86400) FILTER (WHERE r.status = 'Completed') as avg_completion_days
       FROM users u
       LEFT JOIN requests r ON r.assigned_to = u.id
-      LEFT JOIN time_entries te ON te.engineer_id = u.id
+      LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE u.role = 'Engineer'
       GROUP BY u.id, u.name
       HAVING COUNT(r.id) > 0

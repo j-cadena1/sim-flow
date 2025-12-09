@@ -1,15 +1,15 @@
-# SimRq Automated Backup Schedule
+# Sim RQ Automated Backup Schedule
 # Add these entries to your crontab with: crontab -e
 # Or install system-wide: sudo crontab -e
 
 # Daily backup at 2:00 AM
-0 2 * * * /path/to/sim-flow/scripts/backup-database.sh >> /var/log/simflow-backup.log 2>&1
+0 2 * * * /path/to/sim-rq/scripts/backup-database.sh >> /var/log/sim-rq-backup.log 2>&1
 
 # Weekly backup on Sunday at 3:00 AM (with longer retention)
-0 3 * * 0 RETENTION_DAYS=90 /path/to/sim-flow/scripts/backup-database.sh >> /var/log/simflow-backup.log 2>&1
+0 3 * * 0 RETENTION_DAYS=90 /path/to/sim-rq/scripts/backup-database.sh >> /var/log/sim-rq-backup.log 2>&1
 
 # Monthly backup on 1st of month at 4:00 AM (with even longer retention)
-0 4 1 * * RETENTION_DAYS=365 /path/to/sim-flow/scripts/backup-database.sh >> /var/log/simflow-backup.log 2>&1
+0 4 1 * * RETENTION_DAYS=365 /path/to/sim-rq/scripts/backup-database.sh >> /var/log/sim-rq-backup.log 2>&1
 
 # Optional: Clean up old log files (keep last 30 days)
-0 5 * * * find /var/log -name "simflow-backup*.log" -mtime +30 -delete
+0 5 * * * find /var/log -name "sim-rq-backup*.log" -mtime +30 -delete

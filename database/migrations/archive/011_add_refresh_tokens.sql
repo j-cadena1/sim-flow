@@ -22,7 +22,7 @@ CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 CREATE INDEX idx_refresh_tokens_cleanup ON refresh_tokens(expires_at, revoked_at);
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON refresh_tokens TO simflow_user;
+GRANT ALL PRIVILEGES ON refresh_tokens TO "sim-rq_user";
 
 -- Comment explaining the table
 COMMENT ON TABLE refresh_tokens IS 'Stores refresh tokens for JWT token refresh flow. Tokens are hashed for security.';

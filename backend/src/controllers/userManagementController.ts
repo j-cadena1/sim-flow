@@ -6,6 +6,12 @@ import { toCamelCase } from '../utils/caseConverter';
 import { getDirectoryUsers, syncUserFromDirectory } from '../services/graphService';
 import { logRequestAudit, AuditAction, EntityType } from '../services/auditService';
 import { sendNotification } from '../services/notificationHelpers';
+import {
+  isQAdminDisabled,
+  disableQAdmin,
+  enableQAdmin,
+  countEntraIdAdmins,
+} from '../services/systemSettingsService';
 
 interface User {
   id: string;
@@ -18,10 +24,11 @@ interface User {
   lastSyncAt: string | null;
   createdAt: string;
   deletedAt: string | null;
+  isSystemDisabled?: boolean; // For qAdmin: indicates disabled via system setting
 }
 
 // Protected system account - cannot be modified or deleted
-const PROTECTED_EMAIL = 'qadmin@simflow.local';
+const PROTECTED_EMAIL = 'qadmin@sim-rq.local';
 
 /**
  * Check if a user is a protected system account
@@ -41,6 +48,7 @@ interface DeletedUserInfo {
 /**
  * Get all users with their auth source
  * Admin only - includes both active and deactivated users
+ * Also includes system-level disable status for qAdmin
  */
 export const getAllUsersManagement = async (req: Request, res: Response) => {
   try {
@@ -59,8 +67,22 @@ export const getAllUsersManagement = async (req: Request, res: Response) => {
 
     const users = toCamelCase<User[]>(result.rows);
 
-    logger.info(`Retrieved ${users.length} users for management (includeDeactivated: ${includeDeactivated})`);
-    res.json({ users });
+    // Check if qAdmin is disabled via system setting
+    const qAdminDisabled = await isQAdminDisabled();
+
+    // Add isSystemDisabled flag for qAdmin
+    const usersWithStatus = users.map(user => ({
+      ...user,
+      isSystemDisabled: isProtectedUser(user.email) ? qAdminDisabled : undefined,
+    }));
+
+    // Filter out system-disabled qAdmin if not showing deactivated users
+    const filteredUsers = includeDeactivated
+      ? usersWithStatus
+      : usersWithStatus.filter(user => !user.isSystemDisabled);
+
+    logger.info(`Retrieved ${filteredUsers.length} users for management (includeDeactivated: ${includeDeactivated})`);
+    res.json({ users: filteredUsers });
   } catch (error) {
     logger.error('Error fetching users for management:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -500,7 +522,7 @@ export const permanentlyDeleteUser = async (req: Request, res: Response) => {
 
     // Archive user info to deleted_users table
     await query(
-      `INSERT INTO deleted_users (id, email, name, role, deleted_by, deletion_reason, original_created_at, sso_id)
+      `INSERT INTO deleted_users (id, email, name, role, deleted_by, deletion_reason, original_created_at, entra_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO UPDATE SET
          deleted_at = NOW(),
@@ -649,7 +671,7 @@ const validatePasswordStrength = (password: string): string | null => {
     return 'Password must contain at least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/?)';
   }
   // Check for common weak patterns
-  const commonPatterns = ['password', 'qwerty', '123456', 'admin', 'simflow'];
+  const commonPatterns = ['password', 'qwerty', '123456', 'admin', 'sim-rq'];
   const lowerPassword = password.toLowerCase();
   for (const pattern of commonPatterns) {
     if (lowerPassword.includes(pattern)) {
@@ -669,7 +691,7 @@ const validatePasswordStrength = (password: string): string | null => {
  * - At least one lowercase letter
  * - At least one number
  * - At least one special character
- * - No common weak patterns (password, qwerty, 123456, admin, simflow)
+ * - No common weak patterns (password, qwerty, 123456, admin, sim-rq)
  */
 export const changeQAdminPassword = async (req: Request, res: Response) => {
   try {
@@ -755,5 +777,152 @@ export const changeQAdminPassword = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Error changing qAdmin password:', error);
     res.status(500).json({ error: 'Failed to change password' });
+  }
+};
+
+/**
+ * Get qAdmin account status
+ * Returns whether qAdmin is disabled and count of Entra ID admins
+ * Admin only
+ */
+export const getQAdminStatus = async (req: Request, res: Response) => {
+  try {
+    const admin = req.user;
+
+    if (!admin?.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Only admins from Entra ID can manage qAdmin status
+    const adminUser = await query(
+      'SELECT auth_source FROM users WHERE id = $1',
+      [admin.userId]
+    );
+
+    const isEntraIdAdmin = adminUser.rows[0]?.auth_source === 'entra_id';
+    const disabled = await isQAdminDisabled();
+    const entraIdAdminCount = await countEntraIdAdmins();
+
+    res.json({
+      disabled,
+      entraIdAdminCount,
+      canManage: isEntraIdAdmin, // Only Entra ID admins can disable qAdmin
+    });
+  } catch (error) {
+    logger.error('Error getting qAdmin status:', error);
+    res.status(500).json({ error: 'Failed to get qAdmin status' });
+  }
+};
+
+/**
+ * Disable qAdmin account
+ * Requires at least one Entra ID admin to exist
+ * Only Entra ID admins can perform this action
+ */
+export const disableQAdminAccount = async (req: Request, res: Response) => {
+  try {
+    const admin = req.user;
+
+    if (!admin?.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Only Entra ID admins can disable qAdmin
+    const adminUser = await query(
+      'SELECT auth_source, email FROM users WHERE id = $1',
+      [admin.userId]
+    );
+
+    if (adminUser.rows.length === 0 || adminUser.rows[0].auth_source !== 'entra_id') {
+      return res.status(403).json({
+        error: 'Only Entra ID administrators can disable the local admin account',
+      });
+    }
+
+    // Check if already disabled
+    const currentStatus = await isQAdminDisabled();
+    if (currentStatus) {
+      return res.status(400).json({ error: 'qAdmin account is already disabled' });
+    }
+
+    // Attempt to disable (will throw error if no Entra ID admins exist)
+    try {
+      await disableQAdmin(admin.userId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to disable qAdmin';
+      return res.status(400).json({ error: message });
+    }
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.DISABLE_QADMIN,
+      EntityType.SYSTEM,
+      'qadmin',
+      {
+        disabledBy: adminUser.rows[0].email,
+      }
+    );
+
+    logger.warn(`qAdmin account disabled by ${adminUser.rows[0].email} (${admin.userId})`);
+    res.json({
+      message: 'Local admin account (qAdmin) has been disabled for security. Authentication is now exclusively through Entra ID SSO.',
+    });
+  } catch (error) {
+    logger.error('Error disabling qAdmin:', error);
+    res.status(500).json({ error: 'Failed to disable qAdmin account' });
+  }
+};
+
+/**
+ * Enable qAdmin account
+ * Only Entra ID admins can perform this action
+ */
+export const enableQAdminAccount = async (req: Request, res: Response) => {
+  try {
+    const admin = req.user;
+
+    if (!admin?.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Only Entra ID admins can enable qAdmin
+    const adminUser = await query(
+      'SELECT auth_source, email FROM users WHERE id = $1',
+      [admin.userId]
+    );
+
+    if (adminUser.rows.length === 0 || adminUser.rows[0].auth_source !== 'entra_id') {
+      return res.status(403).json({
+        error: 'Only Entra ID administrators can enable the local admin account',
+      });
+    }
+
+    // Check if already enabled
+    const currentStatus = await isQAdminDisabled();
+    if (!currentStatus) {
+      return res.status(400).json({ error: 'qAdmin account is already enabled' });
+    }
+
+    await enableQAdmin(admin.userId);
+
+    // Log audit trail
+    await logRequestAudit(
+      req,
+      AuditAction.ENABLE_QADMIN,
+      EntityType.SYSTEM,
+      'qadmin',
+      {
+        enabledBy: adminUser.rows[0].email,
+      }
+    );
+
+    logger.info(`qAdmin account enabled by ${adminUser.rows[0].email} (${admin.userId})`);
+    res.json({
+      message: 'Local admin account (qAdmin) has been enabled. Local authentication is now available.',
+    });
+  } catch (error) {
+    logger.error('Error enabling qAdmin:', error);
+    res.status(500).json({ error: 'Failed to enable qAdmin account' });
   }
 };

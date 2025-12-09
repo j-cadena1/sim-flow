@@ -211,7 +211,7 @@ test.describe('Role-Based Access Control', () => {
       await logout(page);
 
       // Should be back at login page
-      await expect(page.getByRole('heading', { name: 'SimRQ' })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: 'Sim RQ' })).toBeVisible({ timeout: 10000 });
 
       // Login as manager
       await loginAsManager(page);

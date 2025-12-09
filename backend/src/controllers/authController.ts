@@ -53,6 +53,7 @@ import {
   recordLoginAttempt,
   clearFailedAttempts,
 } from '../services/loginAttemptService';
+import { isQAdminDisabled } from '../services/systemSettingsService';
 
 interface User {
   id: string;
@@ -142,6 +143,19 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     await recordLoginAttempt(normalizedEmail, ipAddress, false);
     logger.warn(`Login attempt for deactivated user: ${user.id} (${email})`);
     throw new AuthenticationError('This account has been deactivated. Please contact an administrator.', ErrorCode.AUTH_INVALID_CREDENTIALS);
+  }
+
+  // Check if qAdmin account is disabled
+  if (normalizedEmail === 'qadmin@sim-rq.local') {
+    const qAdminDisabled = await isQAdminDisabled();
+    if (qAdminDisabled) {
+      await recordLoginAttempt(normalizedEmail, ipAddress, false);
+      logger.warn(`Login attempt for disabled qAdmin account`);
+      throw new AuthenticationError(
+        'Local admin account has been disabled. Please authenticate using Microsoft Entra ID SSO.',
+        ErrorCode.AUTH_INVALID_CREDENTIALS
+      );
+    }
   }
 
   // Verify password
@@ -398,10 +412,13 @@ export const initiateSSO = async (req: Request, res: Response) => {
 /**
  * Handle SSO callback
  * Exchanges authorization code for tokens and creates/updates user
+ * Supports both GET (OAuth redirect) and POST (frontend submission)
  */
 export const handleSSOCallback = async (req: Request, res: Response) => {
   try {
-    const { code, state } = req.query;
+    // Support both GET (query params from OAuth redirect) and POST (body from frontend)
+    const code = (req.query.code as string) || req.body.code;
+    const state = (req.query.state as string) || req.body.state;
 
     if (!code || typeof code !== 'string') {
       return res.status(400).json({ error: 'Authorization code is required' });

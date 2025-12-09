@@ -29,9 +29,24 @@ export function validateConfig(): ConfigValidationResult {
 
   // Validate DB_PASSWORD
   const dbPassword = process.env.DB_PASSWORD;
-  const insecureDbPasswords = ['password', '123456', 'simflow', 'postgres', 'admin'];
+  const insecureDbPasswords = ['password', '123456', 'sim-rq', 'simrq', 'postgres', 'admin'];
   if (dbPassword && insecureDbPasswords.some(insecure => dbPassword.toLowerCase() === insecure)) {
     const message = 'DB_PASSWORD appears to be a weak password. Use a strong password in production.';
+    if (isProduction) {
+      errors.push(message);
+    } else {
+      warnings.push(message);
+    }
+  }
+
+  // Validate ENTRA_SSO_ENCRYPTION_KEY (required for SSO if SSO is enabled)
+  // Note: The encryption service will fail fast if this is missing and SSO is configured
+  // This validation provides early warning about the requirement
+  if (!process.env.ENTRA_SSO_ENCRYPTION_KEY) {
+    const message = 'ENTRA_SSO_ENCRYPTION_KEY is not set. Required if SSO will be configured. Generate with: openssl rand -base64 32';
+    warnings.push(message);
+  } else if (process.env.ENTRA_SSO_ENCRYPTION_KEY.length < 32) {
+    const message = 'ENTRA_SSO_ENCRYPTION_KEY appears to be weak (less than 32 characters). Generate a stronger key with: openssl rand -base64 32';
     if (isProduction) {
       errors.push(message);
     } else {

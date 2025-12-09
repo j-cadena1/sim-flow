@@ -21,8 +21,8 @@ test.describe('Authentication', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Should see the login form - SimRQ heading
-    await expect(page.getByRole('heading', { name: 'SimRQ' })).toBeVisible({ timeout: 10000 });
+    // Should see the login form - Sim RQ heading
+    await expect(page.getByRole('heading', { name: 'Sim RQ' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('#email')).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
   });
@@ -65,6 +65,6 @@ test.describe('Authentication', () => {
     await page.getByRole('button', { name: 'Sign Out' }).click();
 
     // Should redirect back to login
-    await expect(page.getByRole('heading', { name: 'SimRQ' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Sim RQ' })).toBeVisible({ timeout: 10000 });
   });
 });

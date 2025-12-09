@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Playwright E2E Test Configuration for SimRQ
+ * Playwright E2E Test Configuration for Sim RQ
  * Run with: npx playwright test
  */
 export default defineConfig({

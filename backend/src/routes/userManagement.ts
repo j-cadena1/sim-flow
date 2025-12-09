@@ -12,6 +12,9 @@ import {
   getDeletedUserInfo,
   batchGetDeletedUsers,
   changeQAdminPassword,
+  getQAdminStatus,
+  disableQAdminAccount,
+  enableQAdminAccount,
 } from '../controllers/userManagementController';
 
 const router = Router();
@@ -93,7 +96,7 @@ router.get('/', requireRole(['Admin']), getAllUsersManagement);
  *                     type: string
  *                   imported:
  *                     type: boolean
- *                     description: Whether user already exists in SimRQ
+ *                     description: Whether user already exists in Sim RQ
  *       400:
  *         description: SSO not configured
  *       403:
@@ -401,7 +404,7 @@ router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
  *     summary: Change qAdmin password (Admin only)
  *     tags: [User Management]
  *     description: |
- *       Updates password for the qadmin@simflow.local account.
+ *       Updates password for the qadmin@sim-rq.local account.
  *       qAdmin must provide current password; other Admins can change without it.
  *
  *       **Password Requirements:**
@@ -410,7 +413,7 @@ router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
  *       - At least one lowercase letter (a-z)
  *       - At least one number (0-9)
  *       - At least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/?)
- *       - Cannot contain common weak patterns (password, qwerty, 123456, admin, simflow)
+ *       - Cannot contain common weak patterns (password, qwerty, 123456, admin, sim-rq)
  *     requestBody:
  *       required: true
  *       content:
@@ -437,5 +440,73 @@ router.delete('/:id', requireRole(['Admin']), permanentlyDeleteUser);
  *         description: Requires Admin role
  */
 router.post('/change-qadmin-password', requireRole(['Admin']), changeQAdminPassword);
+
+/**
+ * @swagger
+ * /user-management/qadmin-status:
+ *   get:
+ *     summary: Get qAdmin account status (Admin only)
+ *     tags: [User Management]
+ *     description: Returns whether qAdmin account is disabled and count of Entra ID admins
+ *     responses:
+ *       200:
+ *         description: qAdmin status information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 disabled:
+ *                   type: boolean
+ *                   description: Whether qAdmin local login is disabled
+ *                 entraIdAdminCount:
+ *                   type: integer
+ *                   description: Number of active Entra ID admins
+ *                 canManage:
+ *                   type: boolean
+ *                   description: Whether current user can manage qAdmin status (Entra ID admins only)
+ *       403:
+ *         description: Requires Admin role
+ */
+router.get('/qadmin-status', requireRole(['Admin']), getQAdminStatus);
+
+/**
+ * @swagger
+ * /user-management/qadmin/disable:
+ *   post:
+ *     summary: Disable qAdmin account (Entra ID Admins only)
+ *     tags: [User Management]
+ *     description: |
+ *       Disables local authentication for qadmin@sim-rq.local account for enhanced security.
+ *       Requires at least one active Entra ID admin to exist.
+ *       Only Entra ID administrators can perform this action.
+ *     responses:
+ *       200:
+ *         description: qAdmin account disabled successfully
+ *       400:
+ *         description: Already disabled or no Entra ID admins exist
+ *       403:
+ *         description: Only Entra ID administrators can disable qAdmin
+ */
+router.post('/qadmin/disable', requireRole(['Admin']), disableQAdminAccount);
+
+/**
+ * @swagger
+ * /user-management/qadmin/enable:
+ *   post:
+ *     summary: Enable qAdmin account (Entra ID Admins only)
+ *     tags: [User Management]
+ *     description: |
+ *       Re-enables local authentication for qadmin@sim-rq.local account.
+ *       Only Entra ID administrators can perform this action.
+ *     responses:
+ *       200:
+ *         description: qAdmin account enabled successfully
+ *       400:
+ *         description: Already enabled
+ *       403:
+ *         description: Only Entra ID administrators can enable qAdmin
+ */
+router.post('/qadmin/enable', requireRole(['Admin']), enableQAdminAccount);
 
 export default router;

@@ -29,7 +29,7 @@ async function globalSetup(config: FullConfig) {
     // Call the login API directly to get session cookies
     const response = await page.request.post(`${url}/api/auth/login`, {
       data: {
-        email: 'qadmin@simflow.local',
+        email: 'qadmin@sim-rq.local',
         password: 'admin123',
       },
     });

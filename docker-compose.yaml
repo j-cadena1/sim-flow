@@ -23,11 +23,11 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
-    container_name: simflow-db
+    container_name: sim-rq-db
     environment:
-      POSTGRES_DB: simflow
-      POSTGRES_USER: simflow_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-SimFlow2025!Secure}
+      POSTGRES_DB: sim-rq
+      POSTGRES_USER: sim-rq_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SimRQ2025!Secure}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     # Database port not exposed to host in production - only accessible within Docker network
     # Use docker-compose.dev.yaml for development with exposed ports
@@ -36,14 +36,14 @@ services:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U simflow_user -d simflow"]
+      test: ["CMD-SHELL", "pg_isready -U sim-rq_user -d sim-rq"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
     networks:
-      - simflow-network
+      - sim-rq-network
 
   # Backend API
   backend:
@@ -52,15 +52,15 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
-    image: sim-flow-backend:latest
-    container_name: simflow-api
+    image: sim-rq-backend:latest
+    container_name: sim-rq-api
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: simflow
-      DB_USER: simflow_user
-      DB_PASSWORD: ${DB_PASSWORD:-SimFlow2025!Secure}
+      DB_NAME: sim-rq
+      DB_USER: sim-rq_user
+      DB_PASSWORD: ${DB_PASSWORD:-SimRQ2025!Secure}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       PORT: 3001
       LOG_LEVEL: info
@@ -88,7 +88,7 @@ services:
       start_period: 20s
     restart: unless-stopped
     networks:
-      - simflow-network
+      - sim-rq-network
     logging:
       driver: "json-file"
       options:
@@ -103,8 +103,8 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
         NGINX_VERSION: ${NGINX_VERSION:-alpine}
-    image: sim-flow-frontend:latest
-    container_name: simflow-frontend
+    image: sim-rq-frontend:latest
+    container_name: sim-rq-frontend
     ports:
       - "8080:80"
     depends_on:
@@ -118,7 +118,7 @@ services:
       start_period: 5s
     restart: unless-stopped
     networks:
-      - simflow-network
+      - sim-rq-network
     logging:
       driver: "json-file"
       options:
@@ -131,8 +131,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.playwright
-    image: sim-flow-playwright:latest
-    container_name: simflow-playwright
+    image: sim-rq-playwright:latest
+    container_name: sim-rq-playwright
     environment:
       # Point to frontend container via Docker network
       BASE_URL: http://frontend:80
@@ -144,13 +144,13 @@ services:
       frontend:
         condition: service_healthy
     networks:
-      - simflow-network
+      - sim-rq-network
     # Don't start automatically - only run on demand
     profiles:
       - e2e
 
 networks:
-  simflow-network:
+  sim-rq-network:
     driver: bridge
 
 volumes:

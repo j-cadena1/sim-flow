@@ -43,4 +43,4 @@ VALUES (
 CREATE INDEX idx_sso_configuration_enabled ON sso_configuration(enabled);
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON sso_configuration TO simflow_user;
+GRANT ALL PRIVILEGES ON sso_configuration TO "sim-rq_user";

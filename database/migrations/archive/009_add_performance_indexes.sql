@@ -42,8 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_requests_creator_status ON requests(created_by, s
 CREATE INDEX IF NOT EXISTS idx_requests_project_status ON requests(project_id, status) WHERE project_id IS NOT NULL;
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO simflow_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO simflow_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "sim-rq_user";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "sim-rq_user";
 
 -- Analyze tables to update statistics after index creation
 ANALYZE users;

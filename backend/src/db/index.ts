@@ -13,8 +13,8 @@ for (const envVar of requiredEnvVars) {
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'simflow',
-  user: process.env.DB_USER || 'simflow_user',
+  database: process.env.DB_NAME || 'sim-rq',
+  user: process.env.DB_USER || 'sim-rq_user',
   password: process.env.DB_PASSWORD,
   min: parseInt(process.env.DB_POOL_MIN || '2'),
   max: parseInt(process.env.DB_POOL_MAX || '10'),

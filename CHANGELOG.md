@@ -1,22 +1,55 @@
 # Changelog
 
-All notable changes to SimRQ will be documented in this file.
+All notable changes to Sim RQ will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!-- markdownlint-disable MD024 -->
 
-## [Unreleased]
+## [0.9.0] - 2025-12-08
+
+### Added
+
+- **qAdmin account disable/enable functionality** - Entra ID admins can now disable the local qAdmin account for enhanced security
+  - New API endpoints: `GET /api/users/management/qadmin-status`, `POST /api/users/management/qadmin/disable`, `POST /api/users/management/qadmin/enable`
+  - Requires at least one active Entra ID admin before qAdmin can be disabled
+  - Only Entra ID administrators can manage qAdmin status
+  - Login controller blocks disabled qAdmin account from authenticating
+  - New `system_settings` database table for configuration storage
+  - UI component in Settings → Security tab with modern modal dialogs
+  - Audit logging for all qAdmin disable/enable actions
+  - Enforces SSO-only authentication when qAdmin is disabled
 
 ### Changed
 
-- **Project renamed from "Sim-Flow" to "SimRQ"** - Updated all user-facing text, documentation, and branding
-  - GitHub repository migrated from `j-cadena1/sim-flow` to `j-cadena1/sim-rq`
-  - Application stylization standardized to "SimRQ" (uppercase Q)
-  - Docker container names updated to `simflow-*` pattern (lowercase, no hyphens)
-  - Logger service name updated to `simrq-api`
-  - All 36+ files updated for consistent branding
+- **Complete rebrand from "Sim-Flow" to "SimRQ"** - Comprehensive update of all identifiers and branding
+  - Application name: "SimRQ" (user-facing)
+  - Technical identifiers: `sim-rq` (URLs, containers, database, files)
+  - GitHub repository: `j-cadena1/sim-rq`
+  - Docker containers: `sim-rq-db`, `sim-rq-api`, `sim-rq-frontend`, `sim-rq-playwright`
+  - Docker networks: `sim-rq-network`, `sim-rq-dev`
+  - Database name: `sim-rq`, user: `sim-rq_user`
+  - Test email domain: `@sim-rq.local` (e.g., `qadmin@sim-rq.local`)
+  - Prometheus metrics prefix: `sim_rq_*`
+  - Backup files: `sim-rq_*.sql.gz`
+  - 60+ files updated for complete consistency
+- **Tailwind CSS v4 migration** - Migrated from CDN to build-time processing with `@tailwindcss/vite` plugin
+  - Eliminates "CDN should not be used in production" warning
+  - Faster page loads with pre-compiled CSS
+  - Custom theme defined in `index.css` using `@theme` directive
+- **WebSocket connection reliability** - Added 100ms delay before Socket.IO connection to prevent race conditions during Vite hot reload
+- **README updated** - Added "Deployment Model" section clarifying SSO-first approach and purpose of local accounts
+- **API documentation** - Updated to 73/73 endpoints (100% coverage) with new qAdmin management endpoints
+- **Database migrations consolidated** - Archived 21 incremental migrations into single `init.sql` for cleaner fresh installs
+
+### Fixed
+
+- WebSocket proxy configuration for Vite dev server (`/socket.io` proxy with `ws: true`)
+- Dashboard "Personal Overview" section now correctly hidden for End-User role
+- Recharts responsive container dimension warnings (using explicit height instead of percentage)
+- Favicon paths corrected (removed `/public/` prefix)
+- Docker development volume mounts for `index.tsx`, `index.css`, and `hooks/` directory
 
 ## [0.8.1] - 2025-12-08
 
@@ -133,6 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics dashboard tests
 - Navigation and UI tests
 
+[0.9.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.0
 [0.8.1]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.8.1
 [0.8.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.8.0
 [0.7.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.7.0

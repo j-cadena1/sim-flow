@@ -11,6 +11,7 @@ import { addRequestId, errorHandler, notFoundHandler } from './middleware/errorH
 import { enforceSecureConfig } from './utils/configValidator';
 import { cleanupExpiredSessions } from './services/sessionService';
 import { cleanupOldLoginAttempts } from './services/loginAttemptService';
+import { cleanupExpiredPKCEStates } from './services/msalService';
 import { recordHttpRequest, generatePrometheusMetrics } from './services/metricsService';
 import { initializeWebSocket } from './services/websocketService';
 import { initializeNotificationCleanup, stopNotificationCleanup } from './services/notificationCleanupService';
@@ -155,7 +156,7 @@ app.get('/metrics', async (req, res) => {
 // Swagger API documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'SimRQ API Documentation',
+  customSiteTitle: 'Sim RQ API Documentation',
 }));
 
 // OpenAPI spec as JSON
@@ -189,15 +190,16 @@ initializeWebSocket(httpServer);
 
 // Start server
 const server = httpServer.listen(PORT, () => {
-  logger.info(`🚀 SimRQ API server running on port ${PORT}`);
+  logger.info(`🚀 Sim RQ API server running on port ${PORT}`);
   logger.info(`📡 WebSocket server initialized`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  // Schedule periodic cleanup of expired sessions and login attempts (every hour)
+  // Schedule periodic cleanup of expired sessions, login attempts, and PKCE states (every hour)
   setInterval(async () => {
     try {
       await cleanupExpiredSessions();
       await cleanupOldLoginAttempts();
+      await cleanupExpiredPKCEStates();
     } catch (error) {
       logger.error('Error during scheduled cleanup:', error);
     }
@@ -207,6 +209,7 @@ const server = httpServer.listen(PORT, () => {
   Promise.all([
     cleanupExpiredSessions(),
     cleanupOldLoginAttempts(),
+    cleanupExpiredPKCEStates(),
   ]).catch((error) => {
     logger.error('Error during initial cleanup:', error);
   });

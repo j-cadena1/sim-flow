@@ -46,21 +46,4 @@ CREATE TRIGGER update_projects_updated_at
     BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Step 6: Create sample projects (optional - for testing)
--- Note: Using auto-generated code format NNNNNN-YYYY
-DO $$
-DECLARE
-    manager_id UUID;
-    current_year TEXT := EXTRACT(YEAR FROM CURRENT_DATE)::TEXT;
-BEGIN
-    -- Get the manager user ID
-    SELECT id INTO manager_id FROM users WHERE role = 'Manager' LIMIT 1;
-
-    IF manager_id IS NOT NULL THEN
-        INSERT INTO projects (name, code, total_hours, used_hours, status, created_by, created_by_name) VALUES
-            ('Manufacturing Cell Optimization', '100001-' || current_year, 500, 0, 'Approved', manager_id, 'Bob Manager'),
-            ('Warehouse Automation', '100002-' || current_year, 300, 0, 'Approved', manager_id, 'Bob Manager'),
-            ('Quality Control Robotics', '100003-' || current_year, 200, 0, 'Approved', manager_id, 'Bob Manager')
-        ON CONFLICT (code) DO NOTHING;
-    END IF;
-END $$;
+-- Note: No sample projects are seeded. Create projects through the UI after deployment.

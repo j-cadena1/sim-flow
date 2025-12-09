@@ -8,36 +8,41 @@ import { logger } from '../middleware/logger';
 
 // Encryption key from environment (32 bytes for AES-256)
 // In production, use: openssl rand -base64 32
-const ENCRYPTION_KEY_ENV = process.env.ENTRA_SSO_ENCRYPTION_KEY;
+let ENCRYPTION_KEY: Buffer | null = null;
 
-// Derive a 32-byte key from the environment variable or fallback
+// Derive a 32-byte key from the environment variable (lazy-loaded on first use)
 function getEncryptionKey(): Buffer {
+  // Return cached key if already initialized
+  if (ENCRYPTION_KEY) {
+    return ENCRYPTION_KEY;
+  }
+
+  const ENCRYPTION_KEY_ENV = process.env.ENTRA_SSO_ENCRYPTION_KEY;
+
   if (ENCRYPTION_KEY_ENV) {
     // If base64 encoded, decode it; otherwise use as-is and hash to correct length
     try {
       const decoded = Buffer.from(ENCRYPTION_KEY_ENV, 'base64');
       if (decoded.length === 32) {
-        return decoded;
+        ENCRYPTION_KEY = decoded;
+        return ENCRYPTION_KEY;
       }
     } catch {
       // Not base64, fall through to hash
     }
     // Hash the key to ensure correct length
-    return crypto.createHash('sha256').update(ENCRYPTION_KEY_ENV).digest();
+    ENCRYPTION_KEY = crypto.createHash('sha256').update(ENCRYPTION_KEY_ENV).digest();
+    return ENCRYPTION_KEY;
   }
 
-  // Production requires a proper encryption key - fail fast
-  if (process.env.NODE_ENV === 'production') {
-    logger.error('FATAL: ENTRA_SSO_ENCRYPTION_KEY not set in production! Server cannot start securely.');
-    process.exit(1);
-  }
-
-  // Development fallback only
-  logger.warn('ENTRA_SSO_ENCRYPTION_KEY not set. Using development fallback key (not for production).');
-  return crypto.createHash('sha256').update('dev-only-insecure-encryption-key').digest();
+  // Fail with clear error message when encryption is attempted without key
+  const error = new Error(
+    'ENTRA_SSO_ENCRYPTION_KEY is required for SSO encryption. ' +
+    'Generate with: openssl rand -base64 32'
+  );
+  logger.error('Encryption key missing:', error.message);
+  throw error;
 }
-
-const ENCRYPTION_KEY = getEncryptionKey();
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // GCM recommended IV length
 const AUTH_TAG_LENGTH = 16;
@@ -67,8 +72,9 @@ export function encrypt(plaintext: string): string {
   }
 
   try {
+    const key = getEncryptionKey(); // Lazy-load key on first encryption
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv, {
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
 
@@ -111,11 +117,12 @@ export function decrypt(encryptedValue: string): string {
 
     const [ivBase64, authTagBase64, ciphertextBase64] = parts;
 
+    const key = getEncryptionKey(); // Lazy-load key on first decryption
     const iv = Buffer.from(ivBase64, 'base64');
     const authTag = Buffer.from(authTagBase64, 'base64');
     const ciphertext = Buffer.from(ciphertextBase64, 'base64');
 
-    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv, {
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
     decipher.setAuthTag(authTag);

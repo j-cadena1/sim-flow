@@ -180,39 +180,45 @@ export async function revokeOtherUserSessions(
 }
 
 /**
- * Enforce maximum session limit per user
+ * Enforce maximum session limit per user with atomic row-level locking
  * Revokes oldest sessions if user exceeds limit
+ *
+ * Uses SELECT FOR UPDATE to prevent race conditions in concurrent login scenarios
  */
 async function enforceSessionLimit(userId: string): Promise<void> {
   try {
-    // Count active sessions
+    // Use a single transaction with row-level locking to prevent race conditions
+    await query('BEGIN');
+
+    // Lock and count active sessions atomically
     const countResult = await query(
-      `SELECT COUNT(*) as count FROM refresh_tokens
-       WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()`,
+      `SELECT id FROM refresh_tokens
+       WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+       ORDER BY created_at ASC
+       FOR UPDATE`,
       [userId]
     );
 
-    const activeCount = parseInt(countResult.rows[0].count, 10);
+    const activeCount = countResult.rows.length;
 
     if (activeCount >= MAX_SESSIONS_PER_USER) {
-      // Revoke oldest sessions to make room
+      // Revoke oldest sessions to make room (already locked by FOR UPDATE)
       const sessionsToRevoke = activeCount - MAX_SESSIONS_PER_USER + 1;
+      const idsToRevoke = countResult.rows.slice(0, sessionsToRevoke).map(row => row.id);
 
       await query(
         `UPDATE refresh_tokens
          SET revoked_at = NOW(), revoked_reason = 'session_limit'
-         WHERE id IN (
-           SELECT id FROM refresh_tokens
-           WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
-           ORDER BY created_at ASC
-           LIMIT $2
-         )`,
-        [userId, sessionsToRevoke]
+         WHERE id = ANY($1)`,
+        [idsToRevoke]
       );
 
       logger.info(`Revoked ${sessionsToRevoke} old sessions for user ${userId} due to session limit`);
     }
+
+    await query('COMMIT');
   } catch (error) {
+    await query('ROLLBACK');
     logger.error('Error enforcing session limit:', error);
     // Don't throw - this is a best-effort operation
   }

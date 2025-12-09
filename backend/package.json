@@ -1,8 +1,8 @@
 {
-  "name": "sim-flow-backend",
+  "name": "sim-rq-backend",
   "version": "0.8.0",
-  "description": "SimRQ Backend API",
-  "author": "SimRQ Contributors",
+  "description": "Sim RQ Backend API",
+  "author": "Sim RQ Contributors",
   "license": "MIT",
   "repository": {
     "type": "git",

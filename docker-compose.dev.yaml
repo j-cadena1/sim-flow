@@ -10,11 +10,11 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
-    container_name: simflow-db-dev
+    container_name: sim-rq-db-dev
     environment:
-      POSTGRES_DB: simflow
-      POSTGRES_USER: simflow_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-SimFlow2025!Secure}
+      POSTGRES_DB: sim-rq
+      POSTGRES_USER: sim-rq_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SimRQ2025!Secure}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     ports:
       - "5432:5432"
@@ -23,14 +23,14 @@ services:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U simflow_user -d simflow"]
+      test: ["CMD-SHELL", "pg_isready -U sim-rq_user -d sim-rq"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
     networks:
-      - simflow-dev
+      - sim-rq-dev
 
   # Backend API (Development mode with hot reload)
   backend:
@@ -39,15 +39,15 @@ services:
       dockerfile: Dockerfile.dev
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
-    image: sim-flow-backend:dev
-    container_name: simflow-api-dev
+    image: sim-rq-backend:dev
+    container_name: sim-rq-api-dev
     environment:
       NODE_ENV: development
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: simflow
-      DB_USER: simflow_user
-      DB_PASSWORD: ${DB_PASSWORD:-SimFlow2025!Secure}
+      DB_NAME: sim-rq
+      DB_USER: sim-rq_user
+      DB_PASSWORD: ${DB_PASSWORD:-SimRQ2025!Secure}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       PORT: 3001
       LOG_LEVEL: debug
@@ -79,7 +79,7 @@ services:
       start_period: 30s
     restart: unless-stopped
     networks:
-      - simflow-dev
+      - sim-rq-dev
     command: npm run dev
 
   # Frontend (Development mode with hot reload via Vite)
@@ -89,8 +89,8 @@ services:
       dockerfile: Dockerfile.dev
       args:
         NODE_VERSION: ${NODE_VERSION:-20}
-    image: sim-flow-frontend:dev
-    container_name: simflow-frontend-dev
+    image: sim-rq-frontend:dev
+    container_name: sim-rq-frontend-dev
     environment:
       # Backend URL for Vite proxy - uses Docker service name
       VITE_API_URL: http://backend:3001
@@ -105,10 +105,14 @@ services:
       - ./public:/app/public:ro
       - ./App.tsx:/app/App.tsx:ro
       - ./index.html:/app/index.html:ro
-      - ./main.tsx:/app/main.tsx:ro
+      - ./index.tsx:/app/index.tsx:ro
+      - ./index.css:/app/index.css:ro
       - ./vite.config.ts:/app/vite.config.ts:ro
       - ./tsconfig.json:/app/tsconfig.json:ro
-      # Note: Tailwind is loaded via CDN in index.html, no config files needed
+      - ./tests:/app/tests:ro
+      - ./types.ts:/app/types.ts:ro
+      - ./constants.ts:/app/constants.ts:ro
+      - ./hooks:/app/hooks:ro
       # Use named volume for node_modules
       - frontend_node_modules:/app/node_modules
     depends_on:
@@ -116,7 +120,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - simflow-dev
+      - sim-rq-dev
     command: npm run dev -- --host 0.0.0.0
 
   # Playwright E2E Tests (on-demand)
@@ -125,8 +129,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.playwright
-    image: sim-flow-playwright:dev
-    container_name: simflow-playwright
+    image: sim-rq-playwright:dev
+    container_name: sim-rq-playwright
     environment:
       # Point to frontend container via Docker network
       BASE_URL: http://frontend:5173
@@ -144,13 +148,13 @@ services:
       frontend:
         condition: service_started
     networks:
-      - simflow-dev
+      - sim-rq-dev
     # Don't start automatically - only run on demand
     profiles:
       - e2e
 
 networks:
-  simflow-dev:
+  sim-rq-dev:
     driver: bridge
 
 volumes:

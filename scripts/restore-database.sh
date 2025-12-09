@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# SimRq Database Restore Script
+# Sim RQ Database Restore Script
 # Restores PostgreSQL database from backup
 # Usage: ./restore-database.sh /path/to/backup.sql.gz
 #
@@ -8,9 +8,9 @@
 set -e
 
 # Configuration
-DB_CONTAINER="${DB_CONTAINER:-sim-flow-db}"
-DB_NAME="${DB_NAME:-simflow}"
-DB_USER="${DB_USER:-simflow_user}"
+DB_CONTAINER="${DB_CONTAINER:-sim-rq-db}"
+DB_NAME="${DB_NAME:-sim-rq}"
+DB_USER="${DB_USER:-sim-rq_user}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -18,7 +18,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== SimRq Database Restore ===${NC}"
+echo -e "${YELLOW}=== Sim RQ Database Restore ===${NC}"
 echo "Timestamp: $(date)"
 
 # Check if backup file was provided
@@ -27,7 +27,7 @@ if [ -z "$1" ]; then
     echo "Usage: $0 /path/to/backup.sql.gz"
     echo ""
     echo "Available backups:"
-    find /var/backups/simflow -name "simflow_*.sql.gz" -type f -printf "%T@ %p\n" | sort -rn | head -10 | awk '{print $2}'
+    find /var/backups/sim-rq -name "sim-rq_*.sql.gz" -type f -printf "%T@ %p\n" | sort -rn | head -10 | awk '{print $2}'
     exit 1
 fi
 
@@ -58,7 +58,7 @@ if [ "$REPLY" != "yes" ]; then
 fi
 
 # Create a safety backup before restore
-SAFETY_BACKUP="/tmp/simflow_pre_restore_$(date +"%Y%m%d_%H%M%S").sql.gz"
+SAFETY_BACKUP="/tmp/sim-rq_pre_restore_$(date +"%Y%m%d_%H%M%S").sql.gz"
 echo "Creating safety backup before restore..."
 docker exec "${DB_CONTAINER}" pg_dump -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${SAFETY_BACKUP}"
 echo "Safety backup saved to: ${SAFETY_BACKUP}"

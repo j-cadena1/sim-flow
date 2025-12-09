@@ -18,7 +18,7 @@ const router = Router();
  *       200:
  *         description: SSO configuration
  *       403:
- *         description: Requires qAdmin account (qadmin@simflow.local)
+ *         description: Requires qAdmin account (qadmin@sim-rq.local)
  */
 router.get('/config', requireQAdmin(), getSSOConfig);
 

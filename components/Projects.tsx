@@ -429,6 +429,7 @@ export const Projects: React.FC = () => {
       <ProjectTable
         projects={projects}
         canManageProjects={canManageProjects}
+        currentUserId={currentUser.id}
         editingProjectId={editingProjectId}
         editingProjectName={editingProjectName}
         projectMenuId={projectMenuId}

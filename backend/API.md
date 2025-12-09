@@ -1,10 +1,10 @@
-# SimRQ API Documentation
+# Sim RQ API Documentation
 
-This document provides information about the SimRQ API and how to access the interactive documentation.
+This document provides information about the Sim RQ API and how to access the interactive documentation.
 
 ## Interactive API Documentation
 
-SimRQ provides interactive API documentation using Swagger UI (OpenAPI 3.0).
+Sim RQ provides interactive API documentation using Swagger UI (OpenAPI 3.0).
 
 ### Accessing the Documentation
 
@@ -41,7 +41,7 @@ The interactive documentation includes:
 
 ### Authentication
 
-SimRQ uses **session-based authentication** with HTTP-only cookies:
+Sim RQ uses **session-based authentication** with HTTP-only cookies:
 
 1. **Login**: `POST /api/auth/login`
    - Credentials: email + password
@@ -116,7 +116,7 @@ The API implements four user roles:
 - Get/update SSO settings (qAdmin only)
 - Test SSO connection
 
-### User Management (11 endpoints)
+### User Management (14 endpoints)
 
 - ✅ Fully documented
 - List users with management info
@@ -126,6 +126,10 @@ The API implements four user roles:
 - Permanent deletion with archival
 - Deleted user lookups for historical tooltips
 - qAdmin password management
+- **qAdmin account disable/enable** (Entra ID admins only):
+  - `GET /user-management/qadmin-status` - Check qAdmin status
+  - `POST /user-management/qadmin/disable` - Disable local qAdmin login
+  - `POST /user-management/qadmin/enable` - Enable local qAdmin login
 
 ### Audit Logs (3 endpoints)
 
@@ -140,7 +144,7 @@ The API implements four user roles:
 - Get all users
 - Get current user profile
 
-**Total API Coverage**: 70/70 endpoints documented (100%) ✅
+**Total API Coverage**: 73/73 endpoints documented (100%) ✅
 
 ## Downloading the OpenAPI Specification
 
@@ -149,13 +153,13 @@ The complete OpenAPI 3.0 specification can be downloaded in JSON format:
 **Local:**
 
 ```bash
-curl http://localhost:3001/api-docs.json > sim-flow-api.json
+curl http://localhost:3001/api-docs.json > sim-rq-api.json
 ```
 
 **Production:**
 
 ```bash
-curl http://<your-server>:3001/api-docs.json > sim-flow-api.json
+curl http://<your-server>:3001/api-docs.json > sim-rq-api.json
 ```
 
 You can import this specification into:
@@ -184,7 +188,7 @@ You can import this specification into:
 ```bash
 curl -c cookies.txt -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"qadmin@simflow.local","password":"admin123"}'
+  -d '{"email":"qadmin@sim-rq.local","password":"admin123"}'
 ```
 
 **Make authenticated request:**

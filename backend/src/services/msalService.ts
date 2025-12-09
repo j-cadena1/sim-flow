@@ -17,20 +17,70 @@ interface SSOConfig {
 }
 
 /**
- * In-memory store for PKCE code verifiers (maps state -> code_verifier)
- *
- * SECURITY LIMITATION: This in-memory store works for single-instance deployments only.
- * For multi-instance or load-balanced deployments, this will cause SSO failures because
- * the callback may hit a different instance than the one that initiated the auth request.
- *
- * Production alternatives:
- * 1. Redis with TTL (recommended)
- * 2. Database table with automatic cleanup
- * 3. Sticky sessions (not recommended)
- *
- * The store includes automatic cleanup of expired entries (10 minute TTL).
+ * Database-backed PKCE state storage for production multi-instance deployments
+ * Stores code verifiers in PostgreSQL with automatic expiration cleanup
  */
-const pkceStore = new Map<string, string>();
+
+/**
+ * Store PKCE state in database with 10-minute TTL
+ */
+async function storePKCEState(state: string, codeVerifier: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  try {
+    await query(
+      `INSERT INTO pkce_states (state, code_verifier, expires_at)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (state) DO UPDATE
+       SET code_verifier = EXCLUDED.code_verifier,
+           expires_at = EXCLUDED.expires_at`,
+      [state, codeVerifier, expiresAt.toISOString()]
+    );
+  } catch (error) {
+    logger.error('Error storing PKCE state:', error);
+    throw new Error('Failed to store PKCE state');
+  }
+}
+
+/**
+ * Retrieve and delete PKCE code verifier from database
+ */
+async function consumePKCEState(state: string): Promise<string | null> {
+  try {
+    const result = await query(
+      `DELETE FROM pkce_states
+       WHERE state = $1 AND expires_at > NOW()
+       RETURNING code_verifier`,
+      [state]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0].code_verifier;
+  } catch (error) {
+    logger.error('Error consuming PKCE state:', error);
+    return null;
+  }
+}
+
+/**
+ * Cleanup expired PKCE states (called periodically)
+ */
+export async function cleanupExpiredPKCEStates(): Promise<number> {
+  try {
+    const result = await query('SELECT cleanup_expired_pkce_states()');
+    const count = parseInt(result.rows[0].cleanup_expired_pkce_states, 10);
+    if (count > 0) {
+      logger.info(`Cleaned up ${count} expired PKCE states`);
+    }
+    return count;
+  } catch (error) {
+    logger.error('Error cleaning up PKCE states:', error);
+    return 0;
+  }
+}
 
 /**
  * Get SSO configuration from environment variables
@@ -79,17 +129,6 @@ const getSSOConfigFromEnv = (): SSOConfig | null => {
     source: 'environment',
   };
 };
-
-// Clean up old PKCE codes after 10 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of pkceStore.entries()) {
-    const timestamp = parseInt(key.split(':')[1] || '0');
-    if (now - timestamp > 600000) { // 10 minutes
-      pkceStore.delete(key);
-    }
-  }
-}, 60000); // Run every minute
 
 /**
  * Get SSO configuration from database only
@@ -219,9 +258,8 @@ export const getAuthorizationUrl = async (): Promise<string | null> => {
     // Generate PKCE challenge and verifier
     const { verifier, challenge } = await cryptoProvider.generatePkceCodes();
 
-    // Store the verifier with timestamp for later retrieval
-    const storeKey = `${state}:${Date.now()}`;
-    pkceStore.set(storeKey, verifier);
+    // Store the verifier in database for later retrieval
+    await storePKCEState(state, verifier);
 
     const authCodeUrlParameters = {
       scopes: config.scopes?.split(',') || ['openid', 'profile', 'email'],
@@ -267,18 +305,11 @@ export const exchangeCodeForTokens = async (code: string, state: string): Promis
       throw new Error('SSO not configured');
     }
 
-    // Find the code verifier for this state
-    let codeVerifier: string | undefined;
-    for (const [key, value] of pkceStore.entries()) {
-      if (key.startsWith(state + ':')) {
-        codeVerifier = value;
-        pkceStore.delete(key); // Remove after use
-        break;
-      }
-    }
+    // Retrieve and consume the code verifier from database
+    const codeVerifier = await consumePKCEState(state);
 
     if (!codeVerifier) {
-      logger.error('Code verifier not found for state:', state);
+      logger.error('Code verifier not found or expired for state:', state);
       throw new Error('Invalid state parameter or PKCE code expired');
     }
 

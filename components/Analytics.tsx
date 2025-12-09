@@ -4,7 +4,7 @@ import {
   useCompletionAnalysis,
   useAllocationAnalysis,
 } from '../lib/api/hooks';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, BarChart3 } from 'lucide-react';
 import {
   AnalyticsHeader,
   MetricsCards,
@@ -109,6 +109,37 @@ const Analytics: React.FC = () => {
           <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-slate-400">Failed to load analytics data.</p>
           <p className="text-sm text-gray-500 dark:text-slate-500 mt-2">Please try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check for empty data state
+  const hasNoData = dashboardStats &&
+    dashboardStats.overview.totalRequests === 0 &&
+    dashboardStats.overview.totalProjects === 0;
+
+  if (hasNoData) {
+    return (
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        <AnalyticsHeader
+          dateRange={dateRange}
+          activeTab={activeTab}
+          onDateRangeChange={handleDateRangeChange}
+          onClearDateRange={clearDateRange}
+          onTabChange={setActiveTab}
+        />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center max-w-md">
+            <BarChart3 className="w-16 h-16 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              No analytics data yet
+            </h3>
+            <p className="text-gray-600 dark:text-slate-400">
+              Analytics will appear here once you have requests and projects in the system.
+              Start by creating a project and submitting some requests.
+            </p>
+          </div>
         </div>
       </div>
     );

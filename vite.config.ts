@@ -1,6 +1,7 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   server: {
@@ -14,9 +15,14 @@ export default defineConfig({
         target: process.env.VITE_API_URL || 'http://backend:3001',
         changeOrigin: true,
       },
+      '/socket.io': {
+        target: process.env.VITE_API_URL || 'http://backend:3001',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
-  plugins: [react()],
+  plugins: [tailwindcss(), react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),

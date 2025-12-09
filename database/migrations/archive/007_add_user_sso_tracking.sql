@@ -15,4 +15,4 @@ CREATE INDEX IF NOT EXISTS idx_users_auth_source ON users(auth_source);
 CREATE INDEX IF NOT EXISTS idx_users_entra_id ON users(entra_id);
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON users TO simflow_user;
+GRANT ALL PRIVILEGES ON users TO "sim-rq_user";

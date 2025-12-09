@@ -30,6 +30,7 @@ import {
 export const ProjectTable: React.FC<ProjectTableProps> = ({
   projects,
   canManageProjects,
+  currentUserId,
   editingProjectId,
   editingProjectName,
   projectMenuId,
@@ -55,6 +56,9 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({
     p.status === ProjectStatus.ACTIVE
   );
   const pendingProjects = projects.filter(p => p.status === ProjectStatus.PENDING);
+  // Projects created by current user that are pending (for End-Users to see their own submissions)
+  const myPendingProjects = pendingProjects.filter(p => p.createdBy === currentUserId);
+
   const onHoldProjects = projects.filter(p =>
     p.status === ProjectStatus.ON_HOLD ||
     p.status === ProjectStatus.SUSPENDED ||
@@ -109,6 +113,34 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({
                   >
                     Reject
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* My Pending Projects (End-Users see their own submitted projects awaiting approval) */}
+      {!canManageProjects && myPendingProjects.length > 0 && (
+        <div className="bg-yellow-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-yellow-300 dark:border-yellow-800">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Clock size={20} className="text-yellow-600 dark:text-yellow-400" />
+            Awaiting Manager Approval ({myPendingProjects.length})
+          </h2>
+          <div className="space-y-3">
+            {myPendingProjects.map((project) => (
+              <div key={project.id} className="bg-white dark:bg-slate-800/50 p-4 rounded-lg border border-yellow-200 dark:border-slate-700">
+                <div>
+                  <h3 className="text-gray-900 dark:text-white font-semibold">{project.name}</h3>
+                  <p className="text-gray-500 dark:text-slate-400 text-sm">
+                    Code: {project.code} • {project.totalHours} hours requested
+                  </p>
+                  {project.description && (
+                    <p className="text-gray-500 dark:text-slate-500 text-sm mt-1 line-clamp-1">{project.description}</p>
+                  )}
+                  <p className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
+                    Your project has been submitted and is waiting for manager review.
+                  </p>
                 </div>
               </div>
             ))}

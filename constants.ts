@@ -3,7 +3,7 @@ import { RequestStatus } from './types';
 // Storage keys
 // Note: Auth tokens are now handled via HttpOnly cookies (not accessible to JS)
 export const STORAGE_KEYS = {
-  REQUESTS: 'sim-flow-requests',
+  REQUESTS: 'sim-rq-requests',
   THEME: 'theme-mode',
 } as const;
 

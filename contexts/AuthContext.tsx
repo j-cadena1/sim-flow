@@ -55,9 +55,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const state = urlParams.get('state');
 
         if (code && state) {
-          // Handle SSO callback - credentials: include sends cookies
-          const response = await fetch(`/api/auth/sso/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
+          // Handle SSO callback - POST request to prevent code leakage in browser history
+          const response = await fetch('/api/auth/sso/callback', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
             credentials: 'include',
+            body: JSON.stringify({ code, state }),
           });
 
           if (response.ok) {

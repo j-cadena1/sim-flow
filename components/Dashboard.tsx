@@ -214,8 +214,8 @@ export const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Personal Overview */}
-      {(stats.needsAttention > 0 || stats.assignedToMe > 0 || stats.myRequests > 0) && (
+      {/* Personal Overview - Not shown for End-Users */}
+      {currentUser.role !== UserRole.USER && (stats.needsAttention > 0 || stats.assignedToMe > 0 || stats.myRequests > 0) && (
         <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-slate-900/50 dark:to-slate-800/50 border border-orange-200 dark:border-orange-900/30 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="text-orange-600 dark:text-orange-400" size={20} />
@@ -335,9 +335,9 @@ export const Dashboard: React.FC = () => {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 h-[400px] shadow-sm">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Request Status Distribution</h3>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={300}>
             <BarChart data={statusData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <XAxis
                 dataKey="name"

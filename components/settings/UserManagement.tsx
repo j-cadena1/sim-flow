@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Download, RefreshCw, Shield, Edit2, CheckCircle, Trash2 } from 'lucide-react';
+import { Users, Download, RefreshCw, Shield, Edit2, CheckCircle, Trash2, ShieldOff } from 'lucide-react';
 
 interface ManagedUser {
   id: string;
@@ -11,10 +11,12 @@ interface ManagedUser {
   lastSyncAt: string | null;
   createdAt: string;
   deletedAt: string | null;
+  isSystemDisabled?: boolean; // For qAdmin: indicates disabled via system setting
 }
 
 interface UserManagementProps {
   users: ManagedUser[];
+  currentUserId: string;
   isLoadingUsers: boolean;
   isLoadingDirectory: boolean;
   showDeactivated: boolean;
@@ -39,6 +41,7 @@ interface UserManagementProps {
  */
 export const UserManagement: React.FC<UserManagementProps> = ({
   users,
+  currentUserId,
   isLoadingUsers,
   isLoadingDirectory,
   showDeactivated,
@@ -56,6 +59,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   setEditingRole,
   isProtectedUser,
 }) => {
+  // Check if user is the current admin (cannot edit own role)
+  const isCurrentUser = (userId: string) => userId === currentUserId;
   return (
     <div className="space-y-6">
       {/* Header with Import Button */}
@@ -130,7 +135,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
                 {users.map((user) => (
-                  <tr key={user.id} className={`hover:bg-gray-50 dark:hover:bg-slate-950/50 ${user.deletedAt ? 'opacity-60' : ''}`}>
+                  <tr key={user.id} className={`hover:bg-gray-50 dark:hover:bg-slate-950/50 ${user.deletedAt || user.isSystemDisabled ? 'opacity-60' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
                     </td>
@@ -173,7 +178,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                           }`}>
                             {user.role}
                           </span>
-                          {!user.deletedAt && !isProtectedUser(user.email) && (
+                          {!user.deletedAt && !isProtectedUser(user.email) && !isCurrentUser(user.id) && (
                             <button
                               onClick={() => onEditRole(user.id, user.role)}
                               className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
@@ -190,6 +195,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                         <span className="px-2 py-1 text-xs rounded-full bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400">
                           Deactivated
                         </span>
+                      ) : user.isSystemDisabled ? (
+                        <div className="flex items-center gap-1">
+                          <ShieldOff className="w-3 h-3 text-orange-500 dark:text-orange-400" />
+                          <span className="px-2 py-1 text-xs rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400">
+                            Disabled
+                          </span>
+                        </div>
                       ) : (
                         <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
                           Active

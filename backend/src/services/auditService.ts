@@ -29,6 +29,8 @@ export enum AuditAction {
   RESTORE_USER = 'RESTORE_USER',
   UPDATE_USER_ROLE = 'UPDATE_USER_ROLE',
   CHANGE_QADMIN_PASSWORD = 'CHANGE_QADMIN_PASSWORD',
+  DISABLE_QADMIN = 'DISABLE_QADMIN',
+  ENABLE_QADMIN = 'ENABLE_QADMIN',
   SYNC_USER = 'SYNC_USER',
   BULK_IMPORT_USERS = 'BULK_IMPORT_USERS',
 
@@ -63,6 +65,7 @@ export enum EntityType {
   DISCUSSION = 'discussion',
   SSO_CONFIG = 'sso_config',
   AUTH = 'auth',
+  SYSTEM = 'system',
 }
 
 interface AuditLogEntry {

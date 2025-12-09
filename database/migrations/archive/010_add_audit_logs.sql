@@ -28,8 +28,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type_id ON audit_logs(entity_ty
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_timestamp ON audit_logs(user_id, timestamp DESC);
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON audit_logs TO simflow_user;
-GRANT USAGE, SELECT ON SEQUENCE audit_logs_id_seq TO simflow_user;
+GRANT ALL PRIVILEGES ON audit_logs TO "sim-rq_user";
+GRANT USAGE, SELECT ON SEQUENCE audit_logs_id_seq TO "sim-rq_user";
 
 -- Comments for documentation
 COMMENT ON TABLE audit_logs IS 'Comprehensive audit trail of all user actions in the system';

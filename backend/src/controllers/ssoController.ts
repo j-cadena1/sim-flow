@@ -28,12 +28,33 @@ export const getSSOConfig = async (req: Request, res: Response) => {
   try {
     // Check if SSO is configured via environment variables (environment-specific)
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const isEnvConfigured = isDevelopment
-      ? !!(process.env.DEV_ENTRA_SSO_TENANT_ID && process.env.DEV_ENTRA_SSO_CLIENT_ID && process.env.DEV_ENTRA_SSO_CLIENT_SECRET)
-      : !!(process.env.ENTRA_SSO_TENANT_ID && process.env.ENTRA_SSO_CLIENT_ID && process.env.ENTRA_SSO_CLIENT_SECRET);
+    const envTenantId = isDevelopment ? process.env.DEV_ENTRA_SSO_TENANT_ID : process.env.ENTRA_SSO_TENANT_ID;
+    const envClientId = isDevelopment ? process.env.DEV_ENTRA_SSO_CLIENT_ID : process.env.ENTRA_SSO_CLIENT_ID;
+    const envClientSecret = isDevelopment ? process.env.DEV_ENTRA_SSO_CLIENT_SECRET : process.env.ENTRA_SSO_CLIENT_SECRET;
+    const envRedirectUri = isDevelopment ? process.env.DEV_ENTRA_SSO_REDIRECT_URI : process.env.ENTRA_SSO_REDIRECT_URI;
+
+    const isEnvConfigured = !!(envTenantId && envClientId && envClientSecret);
 
     const result = await query('SELECT * FROM sso_configuration LIMIT 1');
 
+    // If SSO is configured via environment variables, return that config
+    if (isEnvConfigured) {
+      logger.info('Returning SSO configuration from environment variables');
+      return res.json({
+        config: {
+          enabled: true,
+          tenantId: envTenantId,
+          clientId: envClientId,
+          clientSecret: '***MASKED***',
+          redirectUri: envRedirectUri || (isDevelopment ? 'http://localhost:5173/api/auth/sso/callback' : null),
+          authority: `https://login.microsoftonline.com/${envTenantId}`,
+          scopes: 'openid,profile,email',
+        },
+        isEnvConfigured: true
+      });
+    }
+
+    // Otherwise, check database configuration
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'SSO configuration not found' });
     }
@@ -46,10 +67,10 @@ export const getSSOConfig = async (req: Request, res: Response) => {
       clientSecret: config.clientSecret ? '***MASKED***' : null,
     };
 
-    logger.info('Retrieved SSO configuration');
+    logger.info('Retrieved SSO configuration from database');
     res.json({
       config: safeConfig,
-      isEnvConfigured // Signal to frontend that SSO is managed via environment variables
+      isEnvConfigured: false
     });
   } catch (error) {
     logger.error('Error fetching SSO configuration:', error);

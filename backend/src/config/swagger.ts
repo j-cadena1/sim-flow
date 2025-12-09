@@ -4,7 +4,7 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'SimRQ API',
+      title: 'Sim RQ API',
       version: '1.1.0',
       description: `Engineering Virtualization Portal API - Manage simulation requests, projects, and users.
 
@@ -18,7 +18,7 @@ const options: swaggerJsdoc.Options = {
 - Audit logging for security compliance
 - Analytics and reporting`,
       contact: {
-        name: 'SimRQ Support',
+        name: 'Sim RQ Support',
       },
     },
     servers: [

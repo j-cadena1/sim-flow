@@ -101,10 +101,10 @@ DECLARE
 
 BEGIN
     -- Get user IDs
-    SELECT id INTO admin_id FROM users WHERE email = 'qadmin@simflow.local';
-    SELECT id INTO alice_id FROM users WHERE email = 'alice@simflow.local';
-    SELECT id INTO bob_id FROM users WHERE email = 'bob@simflow.local';
-    SELECT id INTO charlie_id FROM users WHERE email = 'charlie@simflow.local';
+    SELECT id INTO admin_id FROM users WHERE email = 'qadmin@sim-rq.local';
+    SELECT id INTO alice_id FROM users WHERE email = 'alice@sim-rq.local';
+    SELECT id INTO bob_id FROM users WHERE email = 'bob@sim-rq.local';
+    SELECT id INTO charlie_id FROM users WHERE email = 'charlie@sim-rq.local';
     SELECT id INTO james_id FROM users WHERE email = 'james@cadenalabs.ca';
 
     -- Get project IDs

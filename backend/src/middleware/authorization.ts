@@ -8,7 +8,7 @@ export { authenticate };
 export type UserRole = 'Admin' | 'Manager' | 'Engineer' | 'End-User';
 
 // Only the local qAdmin account can configure SSO
-const QADMIN_EMAIL = 'qadmin@simflow.local';
+const QADMIN_EMAIL = 'qadmin@sim-rq.local';
 
 /**
  * Middleware to require specific user roles for accessing endpoints

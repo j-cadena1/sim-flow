@@ -234,41 +234,60 @@ router.get('/sso/login', ssoLimiter, initiateSSO);
  * @swagger
  * /auth/sso/callback:
  *   get:
- *     summary: Handle SSO callback from identity provider
+ *     summary: Handle SSO callback redirect from identity provider
  *     tags: [SSO]
  *     security: []
+ *     description: |
+ *       OAuth 2.0 callback endpoint. Microsoft Entra ID redirects here after authentication.
+ *       Exchanges authorization code for tokens, creates/updates user, and redirects to frontend.
  *     parameters:
  *       - in: query
  *         name: code
  *         required: true
  *         schema:
  *           type: string
+ *         description: OAuth authorization code from identity provider
  *       - in: query
  *         name: state
  *         required: true
  *         schema:
  *           type: string
+ *         description: PKCE state parameter for verification
  *     responses:
- *       200:
- *         description: SSO login successful, session cookie set
- *         headers:
- *           Set-Cookie:
- *             description: Session cookie (HttpOnly, Secure, SameSite=Strict)
- *             schema:
- *               type: string
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *                 method:
- *                   type: string
- *                   example: sso
+ *       302:
+ *         description: Redirects to frontend with session cookie set
+ *       400:
+ *         description: Invalid callback parameters
+ *   post:
+ *     summary: Handle SSO callback (alternative POST method)
+ *     tags: [SSO]
+ *     security: []
+ *     description: |
+ *       Alternative POST endpoint for SSO callback.
+ *       Accepts code and state in request body.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - state
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: OAuth authorization code from identity provider
+ *               state:
+ *                 type: string
+ *                 description: PKCE state parameter for verification
+ *     responses:
+ *       302:
+ *         description: Redirects to frontend with session cookie set
  *       400:
  *         description: Invalid callback parameters
  */
 router.get('/sso/callback', ssoLimiter, handleSSOCallback);
+router.post('/sso/callback', ssoLimiter, handleSSOCallback);
 
 export default router;

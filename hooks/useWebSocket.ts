@@ -77,7 +77,12 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
 
   useEffect(() => {
     if (enabled && userId) {
-      connect();
+      // Small delay to let Vite's proxy fully initialize during hot reload
+      const timeoutId = setTimeout(connect, 100);
+      return () => {
+        clearTimeout(timeoutId);
+        disconnect();
+      };
     }
 
     return () => {
