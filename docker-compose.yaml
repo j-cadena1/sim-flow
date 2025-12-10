@@ -17,7 +17,7 @@
 # Reverse Proxy Integration:
 #   Only port 8080 is exposed - point your reverse proxy here.
 #   Works with: cloudflared, Nginx Proxy Manager, Traefik, Caddy, etc.
-#   See REVERSE-PROXY.md for detailed configuration examples.
+#   See README.md for configuration examples.
 #
 # Version configuration via environment variables:
 # - NODE_VERSION: Node.js version (default: 20, supports 18-22)
@@ -60,7 +60,7 @@ services:
   # No persistence - rate limits reset on restart (acceptable for short windows)
   redis:
     image: redis:${REDIS_VERSION:-7}-alpine
-    container_name: simflow-redis
+    container_name: sim-rq-redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

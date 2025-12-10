@@ -49,7 +49,7 @@ services:
   # Provides distributed rate limiting and WebSocket pub/sub
   redis:
     image: redis:${REDIS_VERSION:-7}-alpine
-    container_name: simflow-redis-dev
+    container_name: sim-rq-redis-dev
     ports:
       - "6379:6379"
     healthcheck:
@@ -131,6 +131,8 @@ services:
       S3_REGION: ${S3_REGION:-garage}
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-3072}
       ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,png,jpg,jpeg,gif,svg,webp,heic,heif,zip,mp4,mov,avi,webm,mkv,m4v}
+      # Testing: Set DISABLE_RATE_LIMITING=true to bypass rate limits for E2E tests
+      DISABLE_RATE_LIMITING: ${DISABLE_RATE_LIMITING:-}
     ports:
       - "3001:3001"
       - "9229:9229"  # Node.js debugger port

@@ -22,6 +22,15 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      // Health check endpoints for E2E tests and monitoring
+      '/health': {
+        target: process.env.VITE_API_URL || 'http://backend:3001',
+        changeOrigin: true,
+      },
+      '/ready': {
+        target: process.env.VITE_API_URL || 'http://backend:3001',
+        changeOrigin: true,
+      },
     },
   },
   plugins: [tailwindcss(), react()],

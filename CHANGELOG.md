@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- markdownlint-disable MD024 -->
 
+## [0.9.2] - 2025-12-10
+
+### Fixed
+
+- **WebSocket proxy** - Added explicit `/socket.io/` location block in nginx for reliable real-time notifications
+- **Health endpoint routing** - Fixed nginx `/health` endpoint being caught by SPA routing (now uses exact match)
+- **E2E test rate limiting** - Added missing `DISABLE_RATE_LIMITING` env var to dev docker-compose
+
+### Changed
+
+- **Redis container naming** - Renamed from `simflow-redis-*` to `sim-rq-redis-*` for consistency
+- **Health check tests** - Now test backend `/health` and `/ready` endpoints through proxy (works in both dev and prod)
+- **Notification preferences test** - Changed to validate structure instead of hardcoded defaults (fixes flaky test)
+
+### Added
+
+- **Vite health proxies** - Added `/health` and `/ready` proxy routes for dev server monitoring
+- **nginx WebSocket timeouts** - 24-hour timeouts for long-lived WebSocket connections
+
+### Documentation
+
+- Updated CLAUDE.md with user lifecycle, session limits, and test count information
+- Removed dead reference to non-existent REVERSE-PROXY.md
+
 ## [0.9.1] - 2025-12-10
 
 ### Added
@@ -205,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics dashboard tests
 - Navigation and UI tests
 
+[0.9.2]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.2
 [0.9.1]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.1
 [0.9.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.0
 [0.8.1]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.8.1

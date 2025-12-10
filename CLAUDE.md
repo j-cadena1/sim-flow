@@ -61,7 +61,7 @@ docker compose -f docker-compose.dev.yaml exec backend npx tsc --noEmit
 - **Database**: PostgreSQL 16
 - **Storage**: Garage (S3-compatible) for file attachments (port 3900)
 - **Cache**: Redis 7 (optional - for multi-instance deployments)
-- **Auth**: Session cookies (HTTP-only) + Microsoft Entra ID PKCE
+- **Auth**: Session cookies (HTTP-only, max 5 concurrent per user) + Microsoft Entra ID PKCE
 
 ### Data Storage
 
@@ -77,6 +77,7 @@ This directory is auto-created and excluded from git. For backups, copy the enti
 
 - `types.ts` - Shared TypeScript types/enums (UserRole, RequestStatus, ProjectStatus)
 - `backend/src/types/index.ts` - Backend-specific types
+- `backend/src/utils/caseConverter.ts` - `toCamelCase()` utility for DB → API conversion
 - `database/init.sql` - Complete database schema (single source of truth)
 - `database/migrations/` - Incremental migrations for existing databases
 
@@ -107,6 +108,14 @@ Pending → Active → Completed → Archived
 - Only `Active` projects can have hours allocated or new requests created
 - `Archived` is terminal (no transitions out)
 - Transitions to `On Hold`, `Suspended`, `Cancelled`, `Expired` require a reason
+- Project codes must follow format `XXXXXX-XXXX` (6 digits, dash, 4 digits)
+
+### User Lifecycle
+
+- **Soft delete (deactivation)**: Sets `deleted_at` timestamp, blocks login, preserves all data
+- **Hard delete**: Permanently removes user, archives to `deleted_users` table for historical reference
+- Deactivated users are blocked from both local and SSO login
+- Historical records (time entries, comments, requests) show "Deleted User" with tooltip for admins
 
 ### Role-Based Access (4 Roles)
 
@@ -174,9 +183,9 @@ contexts/
 
 ## Testing
 
-- E2E tests in `tests/e2e/` cover auth, roles, requests, lifecycle, analytics
-- Backend unit tests in `backend/src/services/__tests__/`
-- Tests require rate limiting disabled (handled automatically by `make test-e2e`)
+- E2E tests in `tests/e2e/` (~86 tests) cover auth, roles, requests, lifecycle, analytics
+- Backend unit tests in `backend/src/services/__tests__/` (~78 tests)
+- Rate limiting auto-disabled during `make test-e2e`
 - Test reports saved to `./playwright-report/` and `./test-results/`
 
 ## File Attachments

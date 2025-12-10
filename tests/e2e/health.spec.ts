@@ -6,15 +6,26 @@ test.describe('Health Checks', () => {
     expect(response?.status()).toBe(200);
   });
 
-  test('frontend health endpoint should return healthy', async ({ page }) => {
-    const response = await page.goto('/health');
-    expect(response?.status()).toBe(200);
-    const text = await page.textContent('body');
-    expect(text).toContain('healthy');
+  test('backend health endpoint should return healthy', async ({ request, baseURL }) => {
+    // Test the backend health endpoint through the proxy
+    // Works in both dev (Vite proxy) and prod (nginx proxy)
+    const response = await request.get(`${baseURL}/health`);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.status).toBe('healthy');
+  });
+
+  test('backend ready endpoint should confirm database connection', async ({ request, baseURL }) => {
+    // Test the backend ready endpoint which verifies database connectivity
+    const response = await request.get(`${baseURL}/ready`);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.status).toBe('ready');
+    expect(body.database).toBe('connected');
   });
 
   test('API should be accessible through frontend proxy', async ({ request, baseURL }) => {
-    // Test that the API is accessible through the frontend nginx proxy
+    // Test that the API is accessible through the frontend proxy
     // This verifies the reverse proxy setup is working correctly
     const response = await request.post(`${baseURL}/api/auth/login`, {
       data: { email: 'invalid@test.com', password: 'wrong' },
