@@ -27,12 +27,11 @@ export type ProjectStatus =
 export type ProjectPriority = 'Low' | 'Medium' | 'High' | 'Critical';
 
 export type HourTransactionType =
-  | 'allocation'
-  | 'deallocation'
-  | 'adjustment'
-  | 'completion'
-  | 'rollover'
-  | 'extension';
+  | 'ALLOCATION'
+  | 'DEALLOCATION'
+  | 'ADJUSTMENT'
+  | 'TIME_ENTRY'
+  | 'ROLLBACK';
 
 export type MilestoneStatus = 'Pending' | 'In Progress' | 'Completed' | 'Skipped';
 
@@ -96,11 +95,11 @@ export interface ProjectHourTransaction {
   request_id: string | null;
   transaction_type: HourTransactionType;
   hours: number;
-  balance_before: number;
-  balance_after: number;
+  previous_used_hours: number;
+  new_used_hours: number;
   performed_by: string | null;
   performed_by_name: string;
-  notes: string | null;
+  reason: string | null;
   created_at: Date;
 }
 
@@ -175,5 +174,23 @@ export interface ActivityLog {
   user_id: string | null;
   action: string;
   details: Record<string, unknown> | null;
+  created_at: Date;
+}
+
+export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface Attachment {
+  id: string;
+  request_id: string;
+  file_name: string;
+  original_file_name: string;
+  content_type: string;
+  file_size: number;
+  storage_key: string;
+  thumbnail_key: string | null;
+  uploaded_by: string | null;
+  uploaded_by_name: string;
+  processing_status: ProcessingStatus;
+  processing_error: string | null;
   created_at: Date;
 }

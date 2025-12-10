@@ -228,6 +228,25 @@ CREATE TABLE discussion_requests (
     reviewed_at TIMESTAMPTZ
 );
 
+-- File attachments
+CREATE TABLE attachments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    request_id UUID NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    file_size BIGINT NOT NULL CHECK (file_size > 0),
+    storage_key VARCHAR(500) NOT NULL UNIQUE,
+    thumbnail_key VARCHAR(500),
+    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_by_name VARCHAR(255) NOT NULL,
+    processing_status VARCHAR(50) DEFAULT 'pending',
+    processing_error TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE attachments IS 'File attachments for simulation requests stored in S3-compatible storage';
+
 -- =============================================================================
 -- AUTHENTICATION & SECURITY
 -- =============================================================================
@@ -317,6 +336,7 @@ CREATE TABLE notifications (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL CHECK (type IN (
         'REQUEST_ASSIGNED', 'REQUEST_STATUS_CHANGED', 'REQUEST_COMMENT_ADDED',
+        'REQUEST_PENDING_REVIEW', 'PROJECT_PENDING_APPROVAL',
         'APPROVAL_NEEDED', 'APPROVAL_REVIEWED', 'TIME_LOGGED', 'PROJECT_UPDATED',
         'ADMIN_ACTION', 'TITLE_CHANGE_REQUESTED', 'TITLE_CHANGE_REVIEWED',
         'DISCUSSION_REQUESTED', 'DISCUSSION_REVIEWED'
@@ -328,6 +348,7 @@ CREATE TABLE notifications (
     entity_type VARCHAR(50) CHECK (entity_type IN ('Request', 'Project', 'User', 'TitleChange', 'Discussion')),
     entity_id UUID,
     triggered_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    emailed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -395,6 +416,12 @@ CREATE INDEX idx_title_change_requests_status ON title_change_requests(status);
 CREATE INDEX idx_discussion_requests_request_id ON discussion_requests(request_id);
 CREATE INDEX idx_discussion_requests_status ON discussion_requests(status);
 
+-- Attachments
+CREATE INDEX idx_attachments_request_id ON attachments(request_id);
+CREATE INDEX idx_attachments_uploaded_by ON attachments(uploaded_by);
+CREATE INDEX idx_attachments_created_at ON attachments(created_at DESC);
+CREATE INDEX idx_attachments_processing_status ON attachments(processing_status) WHERE processing_status != 'completed';
+
 -- Refresh tokens
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
@@ -417,6 +444,7 @@ CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
 CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_email_pending ON notifications(user_id, created_at) WHERE emailed_at IS NULL;
 
 -- =============================================================================
 -- FUNCTIONS & TRIGGERS

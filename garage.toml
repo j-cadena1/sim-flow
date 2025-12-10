@@ -1,0 +1,32 @@
+# Garage S3-Compatible Storage Configuration (v2.x format)
+# See: https://garagehq.deuxfleurs.fr/documentation/reference-manual/configuration/
+
+# Storage directories
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+
+# Database engine
+db_engine = "lmdb"
+
+# Single-node deployment (no replication needed)
+replication_factor = 1
+
+# RPC configuration (for internal cluster communication)
+# Generate a new secret for production: openssl rand -hex 32
+rpc_secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+rpc_bind_addr = "[::]:3901"
+
+# S3 API endpoint
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
+
+# Web hosting (optional)
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".web.garage.localhost"
+
+# Administration API
+[admin]
+api_bind_addr = "[::]:3903"

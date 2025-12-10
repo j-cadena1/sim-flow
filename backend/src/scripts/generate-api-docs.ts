@@ -6,21 +6,21 @@
  * Run this to get copy-paste ready documentation blocks for undocumented endpoints.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as _fs from 'fs';
+import * as _path from 'path';
 
 interface EndpointDoc {
   method: string;
   path: string;
   summary: string;
   tags: string[];
-  parameters?: any[];
-  requestBody?: any;
-  responses: Record<string, any>;
+  parameters?: unknown[];
+  requestBody?: unknown;
+  responses: Record<string, unknown>;
 }
 
-// Route documentation templates
-const routeTemplates: Record<string, EndpointDoc[]> = {
+// Route documentation templates (for reference)
+const _routeTemplates: Record<string, EndpointDoc[]> = {
   'projects.ts': [
     {
       method: 'get',

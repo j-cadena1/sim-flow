@@ -25,7 +25,6 @@ import {
   canCreateRequests,
   isTerminalStatus,
   VALID_TRANSITIONS,
-  REQUIRES_REASON,
   ACTIVE_STATES,
   ALLOWS_NEW_REQUESTS,
   TERMINAL_STATES,

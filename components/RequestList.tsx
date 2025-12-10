@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSimFlow } from '../contexts/SimFlowContext';
+import { useSimRQ } from '../contexts/SimRQContext';
 import { RequestStatus, UserRole } from '../types';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../constants';
 import { Link, useLocation } from 'react-router-dom';
@@ -9,7 +9,7 @@ type SortOption = 'date-desc' | 'date-asc' | 'priority-desc' | 'priority-asc' | 
 type QuickFilter = 'all' | 'my-requests' | 'assigned-to-me' | 'needs-attention';
 
 export const RequestList: React.FC = () => {
-  const { requests, currentUser } = useSimFlow();
+  const { requests, currentUser } = useSimRQ();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');

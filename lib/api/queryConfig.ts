@@ -107,6 +107,12 @@ export const queryKeys = {
     byRequest: (requestId: string) => ['discussion-requests', requestId] as const,
   },
 
+  // Attachments
+  attachments: {
+    byRequest: (requestId: string) => ['attachments', requestId] as const,
+    storageConfig: ['storage-config'] as const,
+  },
+
   // Audit logs
   auditLogs: {
     all: ['audit-logs'] as const,

@@ -14,6 +14,7 @@ export { RequestActions } from './RequestActions';
 export { RequestSidebar } from './RequestSidebar';
 export { TimeTracking } from './TimeTracking';
 export { TitleChangeRequests } from './TitleChangeRequests';
+export { Attachments } from './Attachments';
 
 export type {
   RequestHeaderProps,

@@ -1,0 +1,23 @@
+# Garage with auto-initialization support
+# Adds shell and curl for the initialization script
+
+FROM dxflrs/garage:v2.1.0 AS garage
+
+FROM alpine:3.19
+
+# Install required tools
+RUN apk add --no-cache curl
+
+# Copy the garage binary from the official image
+COPY --from=garage /garage /garage
+
+# Create directories for data and metadata
+RUN mkdir -p /var/lib/garage/data /var/lib/garage/meta
+
+# Copy the entrypoint script
+COPY scripts/garage-entrypoint.sh /garage-entrypoint.sh
+RUN chmod +x /garage-entrypoint.sh
+
+EXPOSE 3900 3901 3902 3903
+
+ENTRYPOINT ["/bin/sh", "/garage-entrypoint.sh"]

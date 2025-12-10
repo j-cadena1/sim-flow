@@ -94,7 +94,7 @@ export async function recordHourTransaction(
     const transactionResult = await client.query(`
       INSERT INTO project_hour_transactions (
         project_id, request_id, transaction_type, hours,
-        balance_before, balance_after, performed_by, performed_by_name, notes
+        previous_used_hours, new_used_hours, performed_by, performed_by_name, reason
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
@@ -161,7 +161,7 @@ export async function allocateHoursToRequest(
   return recordHourTransaction({
     projectId,
     requestId,
-    transactionType: 'allocation',
+    transactionType: 'ALLOCATION',
     hours,
     performedById,
     performedByName,
@@ -189,7 +189,7 @@ export async function deallocateHoursFromRequest(
   return recordHourTransaction({
     projectId,
     requestId,
-    transactionType: 'deallocation',
+    transactionType: 'DEALLOCATION',
     hours: -hours, // Negative because we're reducing used_hours
     performedById,
     performedByName,
@@ -210,7 +210,7 @@ export async function adjustProjectHours(
 ): Promise<HourTransactionResult> {
   return recordHourTransaction({
     projectId,
-    transactionType: 'adjustment',
+    transactionType: 'ADJUSTMENT',
     hours,
     performedById,
     performedByName,
@@ -240,7 +240,7 @@ export async function finalizeRequestHours(
   return recordHourTransaction({
     projectId,
     requestId,
-    transactionType: 'completion',
+    transactionType: 'ADJUSTMENT',
     hours: -hoursDifference, // Return excess hours (positive diff) or charge extra (negative diff)
     performedById,
     performedByName,
@@ -283,12 +283,12 @@ export async function extendProjectHours(
     await client.query(`
       INSERT INTO project_hour_transactions (
         project_id, transaction_type, hours,
-        balance_before, balance_after, performed_by, performed_by_name, notes
+        previous_used_hours, new_used_hours, performed_by, performed_by_name, reason
       )
       VALUES ($1, $2, $3, $4, $4, $5, $6, $7)
     `, [
       projectId,
-      'extension',
+      'ADJUSTMENT',
       additionalHours,
       updateResult.rows[0].used_hours,
       performedById || null,

@@ -341,7 +341,7 @@ export const getTimeToCompletionAnalysis = async (): Promise<CompletionTimeStats
       MAX(EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400) as max_days,
       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400) as median_days
     FROM requests
-    WHERE status = 'Completed'
+    WHERE status IN ('Completed', 'Accepted')
     GROUP BY priority
     ORDER BY
       CASE priority
@@ -400,7 +400,7 @@ export const getHourAllocationAnalysis = async (): Promise<HourAllocationStats[]
       END as usage_percentage
     FROM requests r
     LEFT JOIN time_entries te ON te.request_id = r.id
-    WHERE r.status = 'Completed'
+    WHERE r.status IN ('Completed', 'Accepted')
     GROUP BY r.id, r.title, r.priority, r.estimated_hours
     ORDER BY COALESCE(SUM(te.hours), 0) DESC
     LIMIT 20

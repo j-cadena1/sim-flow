@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { SimFlowProvider } from './contexts/SimFlowContext';
+import { SimRQProvider } from './contexts/SimRQContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -76,7 +76,7 @@ const AuthenticatedApp: React.FC = () => {
   // Show main app if authenticated
   return (
     <NotificationProvider>
-      <SimFlowProvider>
+      <SimRQProvider>
         <Router>
           <Layout>
             <Suspense fallback={<PageLoader />}>
@@ -94,7 +94,7 @@ const AuthenticatedApp: React.FC = () => {
             </Suspense>
           </Layout>
         </Router>
-      </SimFlowProvider>
+      </SimRQProvider>
     </NotificationProvider>
   );
 };

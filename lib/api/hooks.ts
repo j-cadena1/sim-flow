@@ -26,7 +26,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from './client';
-import { SimRequest, Comment, User, RequestStatus, UserRole, Project, ProjectStatus, TimeEntry, TitleChangeRequest, DiscussionRequest } from '@/types';
+import { SimRequest, Comment, User, RequestStatus, UserRole, Project, ProjectStatus, TimeEntry, TitleChangeRequest, DiscussionRequest, Attachment, StorageConfig } from '@/types';
 import {
   validateResponse,
   RequestsResponseSchema,
@@ -251,6 +251,8 @@ export const useAssignEngineer = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['requests'] });
       queryClient.invalidateQueries({ queryKey: ['requests', variables.id] });
+      // Also invalidate projects since hours are allocated
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
   });
 };
@@ -833,6 +835,114 @@ export const useAdjustProjectHours = () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['projects', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['projects', variables.id, 'hours', 'history'] });
+    },
+  });
+};
+
+// ============================================================================
+// Attachment Hooks
+// ============================================================================
+
+/**
+ * Fetch storage configuration
+ */
+export const useStorageConfig = () => {
+  return useQuery({
+    queryKey: queryKeys.attachments.storageConfig,
+    queryFn: async (): Promise<StorageConfig> => {
+      const { data } = await apiClient.get('/storage/config');
+      return data;
+    },
+    staleTime: STALE_TIMES.USER, // Storage config rarely changes
+  });
+};
+
+/**
+ * Fetch attachments for a request
+ */
+export const useAttachments = (requestId: string) => {
+  return useQuery({
+    queryKey: queryKeys.attachments.byRequest(requestId),
+    queryFn: async (): Promise<Attachment[]> => {
+      const { data } = await apiClient.get(`/requests/${requestId}/attachments`);
+      return data.attachments;
+    },
+    enabled: !!requestId,
+    staleTime: STALE_TIMES.REQUEST_DETAIL,
+  });
+};
+
+/**
+ * Upload an attachment to a request
+ */
+export const useUploadAttachment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ requestId, file }: { requestId: string; file: File }): Promise<Attachment> => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const { data } = await apiClient.post(`/requests/${requestId}/attachments`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return data.attachment;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(variables.requestId) });
+    },
+  });
+};
+
+/**
+ * Get signed download URL for an attachment
+ */
+export const useDownloadAttachment = () => {
+  return useMutation({
+    mutationFn: async ({ requestId, attachmentId }: { requestId: string; attachmentId: string }) => {
+      const { data } = await apiClient.get(`/requests/${requestId}/attachments/${attachmentId}/download`);
+      return data as { downloadUrl: string; fileName: string; contentType: string; expiresIn: number };
+    },
+  });
+};
+
+/**
+ * Delete an attachment
+ */
+export const useDeleteAttachment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ requestId, attachmentId }: { requestId: string; attachmentId: string }) => {
+      const { data } = await apiClient.delete(`/requests/${requestId}/attachments/${attachmentId}`);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(variables.requestId) });
+    },
+  });
+};
+
+/**
+ * Get processing status of an attachment
+ */
+export const useAttachmentProcessingStatus = (attachmentId: string, enabled = true) => {
+  return useQuery({
+    queryKey: ['attachment-status', attachmentId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/attachments/${attachmentId}/status`);
+      return data as { processingStatus: string; processingError?: string };
+    },
+    enabled: !!attachmentId && enabled,
+    refetchInterval: (query) => {
+      // Poll every 2 seconds while processing
+      const data = query.state.data;
+      if (data?.processingStatus === 'pending' || data?.processingStatus === 'processing') {
+        return 2000;
+      }
+      return false;
     },
   });
 };

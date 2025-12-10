@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import * as notificationService from '../services/notificationService';
 import { NotificationType } from '../types/notifications';
+import { logger } from '../middleware/logger';
 
 /**
  * GET /api/notifications
@@ -29,7 +30,7 @@ export async function getNotificationsController(req: Request, res: Response): P
 
     res.json(result);
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    logger.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 }
@@ -45,7 +46,7 @@ export async function getUnreadCountController(req: Request, res: Response): Pro
 
     res.json({ count });
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    logger.error('Error fetching unread count:', error);
     res.status(500).json({ error: 'Failed to fetch unread count' });
   }
 }
@@ -63,7 +64,7 @@ export async function markAsReadController(req: Request, res: Response): Promise
 
     res.json({ message: 'Notification marked as read' });
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    logger.error('Error marking notification as read:', error);
     res.status(500).json({ error: 'Failed to mark notification as read' });
   }
 }
@@ -80,7 +81,7 @@ export async function markAllAsReadController(req: Request, res: Response): Prom
 
     res.json({ message: 'All notifications marked as read' });
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    logger.error('Error marking all notifications as read:', error);
     res.status(500).json({ error: 'Failed to mark all notifications as read' });
   }
 }
@@ -98,7 +99,7 @@ export async function deleteNotificationController(req: Request, res: Response):
 
     res.json({ message: 'Notification deleted' });
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    logger.error('Error deleting notification:', error);
     res.status(500).json({ error: 'Failed to delete notification' });
   }
 }
@@ -115,7 +116,7 @@ export async function deleteAllNotificationsController(req: Request, res: Respon
 
     res.json({ message: 'All notifications deleted' });
   } catch (error) {
-    console.error('Error deleting all notifications:', error);
+    logger.error('Error deleting all notifications:', error);
     res.status(500).json({ error: 'Failed to delete all notifications' });
   }
 }
@@ -130,12 +131,13 @@ export async function getPreferencesController(req: Request, res: Response): Pro
     const preferences = await notificationService.getPreferences(userId);
 
     if (!preferences) {
-      return res.status(404).json({ error: 'Preferences not found' }) as any;
+      res.status(404).json({ error: 'Preferences not found' });
+      return;
     }
 
     res.json(preferences);
   } catch (error) {
-    console.error('Error fetching preferences:', error);
+    logger.error('Error fetching preferences:', error);
     res.status(500).json({ error: 'Failed to fetch preferences' });
   }
 }
@@ -153,9 +155,10 @@ export async function updatePreferencesController(req: Request, res: Response): 
     if (updates.retentionDays !== undefined) {
       const days = parseInt(updates.retentionDays);
       if (isNaN(days) || days < 1 || days > 365) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Retention days must be between 1 and 365',
-        }) as any;
+        });
+        return;
       }
       updates.retentionDays = days;
     }
@@ -164,7 +167,7 @@ export async function updatePreferencesController(req: Request, res: Response): 
 
     res.json(preferences);
   } catch (error) {
-    console.error('Error updating preferences:', error);
+    logger.error('Error updating preferences:', error);
     res.status(500).json({ error: 'Failed to update preferences' });
   }
 }

@@ -25,7 +25,7 @@
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSimFlow } from '../contexts/SimFlowContext';
+import { useSimRQ } from '../contexts/SimRQContext';
 import { useModal } from './Modal';
 import { useToast } from './Toast';
 import {
@@ -45,6 +45,7 @@ import {
   useReviewDiscussionRequest,
   useUpdateRequestRequester,
   useUsers,
+  useAssignEngineer,
 } from '../lib/api/hooks';
 import { RequestStatus, UserRole, TitleChangeRequest, DiscussionRequest } from '../types';
 import { validateComment } from '../utils/validation';
@@ -57,6 +58,7 @@ import {
   RequestSidebar,
   TimeTracking,
   TitleChangeRequests,
+  Attachments,
 } from './request-detail';
 
 /**
@@ -68,8 +70,8 @@ import {
 export const RequestDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser, updateRequestStatus, assignEngineer, addComment, getUsersByRole } =
-    useSimFlow();
+  const { currentUser, updateRequestStatus, addComment, getUsersByRole } =
+    useSimRQ();
   const { showConfirm, showPrompt, showDiscussionRequest } = useModal();
   const { showToast } = useToast();
 
@@ -79,6 +81,7 @@ export const RequestDetail: React.FC = () => {
 
   const { data: project } = useProject(request?.projectId || '');
   const updateProjectHoursMutation = useUpdateProjectHours();
+  const assignEngineerMutation = useAssignEngineer();
   const deleteRequestMutation = useDeleteRequest();
   const { data: timeEntries = [] } = useTimeEntries(id!);
   const addTimeEntryMutation = useAddTimeEntry();
@@ -139,16 +142,16 @@ export const RequestDetail: React.FC = () => {
       return;
     }
 
-    // Deduct hours from project
-    updateProjectHoursMutation.mutate(
-      { id: project.id, hoursToAdd: hours },
+    // Backend handles hour allocation atomically within a transaction
+    assignEngineerMutation.mutate(
+      { id: request.id, engineerId, estimatedHours: hours },
       {
         onSuccess: () => {
-          assignEngineer(request.id, engineerId, hours);
           showToast('Engineer assigned and hours allocated', 'success');
         },
-        onError: () => {
-          showToast('Failed to allocate project hours', 'error');
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : 'Failed to assign engineer';
+          showToast(message, 'error');
         },
       }
     );
@@ -560,6 +563,13 @@ export const RequestDetail: React.FC = () => {
           canReview={canReviewTitleChange()}
           onReview={handleReviewTitleChange}
           isReviewing={reviewTitleChangeMutation.isPending}
+        />
+
+        <Attachments
+          requestId={request.id}
+          currentUser={currentUser}
+          requestCreatedBy={request.createdBy}
+          assignedTo={request.assignedTo}
         />
 
         <RequestComments

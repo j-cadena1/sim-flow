@@ -7,12 +7,18 @@ import {
   createNotification,
   createNotificationForMultipleUsers,
   shouldNotify,
+  shouldEmailNotify,
+  markNotificationsEmailed,
+  getUserEmail,
 } from './notificationService';
 import { notifyUser, notifyMultipleUsers } from './websocketService';
-import { CreateNotificationParams } from '../types/notifications';
+import { sendInstantNotificationEmail, isEmailConfigured } from './emailService';
+import { CreateNotificationParams, Notification } from '../types/notifications';
+import { logger } from '../middleware/logger';
 
 /**
  * Create a notification and deliver it via WebSocket
+ * Also sends instant email if user has that preference enabled
  * Checks user preferences before creating
  */
 export async function sendNotification(params: CreateNotificationParams): Promise<void> {
@@ -27,6 +33,40 @@ export async function sendNotification(params: CreateNotificationParams): Promis
 
   // Send real-time notification via WebSocket
   notifyUser(params.userId, notification);
+
+  // Check if user wants instant email notifications (non-blocking)
+  if (isEmailConfigured()) {
+    sendInstantEmailIfEnabled(params.userId, notification).catch((error) => {
+      logger.error('Error sending instant email notification:', error);
+    });
+  }
+}
+
+/**
+ * Send instant email notification if user has it enabled
+ * This is a helper function that runs asynchronously
+ */
+async function sendInstantEmailIfEnabled(userId: string, notification: Notification): Promise<void> {
+  try {
+    const { shouldEmail, isInstant } = await shouldEmailNotify(userId, notification.type);
+
+    if (!shouldEmail || !isInstant) {
+      return;
+    }
+
+    const email = await getUserEmail(userId);
+    if (!email) {
+      return;
+    }
+
+    const success = await sendInstantNotificationEmail(email, notification);
+
+    if (success) {
+      await markNotificationsEmailed([notification.id]);
+    }
+  } catch (error) {
+    logger.error(`Failed to send instant email for notification ${notification.id}:`, error);
+  }
 }
 
 /**

@@ -49,21 +49,31 @@ interface DeletedUserInfo {
  * Get all users with their auth source
  * Admin only - includes both active and deactivated users
  * Also includes system-level disable status for qAdmin
+ * Supports pagination via limit/offset query params (default: 100 users)
  */
 export const getAllUsersManagement = async (req: Request, res: Response) => {
   try {
     const includeDeactivated = req.query.includeDeactivated === 'true';
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500); // Max 500
+    const offset = parseInt(req.query.offset as string) || 0;
 
-    let sql = `SELECT id, name, email, role, avatar_url, auth_source, entra_id, last_sync_at, created_at, deleted_at
-       FROM users`;
+    const whereClause = includeDeactivated ? '' : 'WHERE deleted_at IS NULL';
 
-    if (!includeDeactivated) {
-      sql += ` WHERE deleted_at IS NULL`;
-    }
+    // Get total count for pagination metadata
+    const countResult = await query(
+      `SELECT COUNT(*) FROM users ${whereClause}`
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
 
-    sql += ` ORDER BY deleted_at NULLS FIRST, created_at DESC`;
-
-    const result = await query(sql);
+    // Get paginated users
+    const result = await query(
+      `SELECT id, name, email, role, avatar_url, auth_source, entra_id, last_sync_at, created_at, deleted_at
+       FROM users
+       ${whereClause}
+       ORDER BY deleted_at NULLS FIRST, created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
 
     const users = toCamelCase<User[]>(result.rows);
 
@@ -81,8 +91,16 @@ export const getAllUsersManagement = async (req: Request, res: Response) => {
       ? usersWithStatus
       : usersWithStatus.filter(user => !user.isSystemDisabled);
 
-    logger.info(`Retrieved ${filteredUsers.length} users for management (includeDeactivated: ${includeDeactivated})`);
-    res.json({ users: filteredUsers });
+    logger.info(`Retrieved ${filteredUsers.length} users for management (page: ${Math.floor(offset / limit) + 1}, includeDeactivated: ${includeDeactivated})`);
+    res.json({
+      users: filteredUsers,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
   } catch (error) {
     logger.error('Error fetching users for management:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -327,7 +345,7 @@ export const bulkImportUsers = async (req: Request, res: Response) => {
           [
             name,
             email.toLowerCase(),
-            '', // No password for SSO users
+            null, // No password for SSO users
             role,
             `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
             'entra_id',

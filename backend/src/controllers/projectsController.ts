@@ -204,6 +204,26 @@ export const createProject = async (req: Request, res: Response) => {
       { name, code, totalHours, status: projectStatus }
     );
 
+    // Notify managers if project needs approval (Pending status)
+    if (projectStatus === 'Pending') {
+      const managersResult = await query(
+        "SELECT id FROM users WHERE role = 'Manager' AND deleted_at IS NULL"
+      );
+
+      for (const manager of managersResult.rows) {
+        await sendNotification({
+          userId: manager.id,
+          type: 'PROJECT_PENDING_APPROVAL',
+          title: 'New Project Pending Approval',
+          message: `New project "${name}" (${code}) from ${createdByName} requires approval`,
+          link: `/projects`,
+          entityType: 'Project',
+          entityId: project.id,
+          triggeredBy: createdBy,
+        }).catch(err => logger.error('Failed to send project approval notification:', err));
+      }
+    }
+
     res.status(201).json({ project });
   } catch (error) {
     logger.error('Error creating project:', error);
@@ -326,13 +346,33 @@ export const updateProjectStatus = async (req: Request, res: Response) => {
     if (projectData && ['Active', 'Suspended', 'Completed', 'Cancelled'].includes(status)) {
       const notifications = [];
       const ownerId = projectData.owner_id as string | undefined;
+      const createdById = projectData.created_by as string | undefined;
       const projectName = projectData.name as string;
+      const notifiedUsers = new Set<string>();
 
-      // Notify project owner
+      // Notify project owner (if set)
       if (ownerId && ownerId !== userId) {
+        notifiedUsers.add(ownerId);
         notifications.push(
           sendNotification({
             userId: ownerId,
+            type: 'PROJECT_UPDATED',
+            title: `Project Status Changed`,
+            message: `Project "${projectName}" status changed to ${status}`,
+            link: `/projects`,
+            entityType: 'Project',
+            entityId: id,
+            triggeredBy: userId,
+          })
+        );
+      }
+
+      // Notify project creator (if different from owner and the person making the change)
+      if (createdById && createdById !== userId && !notifiedUsers.has(createdById)) {
+        notifiedUsers.add(createdById);
+        notifications.push(
+          sendNotification({
+            userId: createdById,
             type: 'PROJECT_UPDATED',
             title: `Project Status Changed`,
             message: `Project "${projectName}" status changed to ${status}`,
@@ -353,7 +393,8 @@ export const updateProjectStatus = async (req: Request, res: Response) => {
       );
 
       engineersResult.rows.forEach(row => {
-        if (row.assigned_to && row.assigned_to !== userId && row.assigned_to !== ownerId) {
+        if (row.assigned_to && row.assigned_to !== userId && !notifiedUsers.has(row.assigned_to)) {
+          notifiedUsers.add(row.assigned_to);
           notifications.push(
             sendNotification({
               userId: row.assigned_to,

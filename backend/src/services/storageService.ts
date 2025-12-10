@@ -1,0 +1,384 @@
+/**
+ * Storage Service
+ *
+ * Provides optional S3-compatible storage for file attachments.
+ * Uses Garage (https://garagehq.deuxfleurs.fr/) as the storage backend.
+ *
+ * If S3_ACCESS_KEY_ID is not set, file uploads are disabled.
+ * Supports multipart uploads for large files (3GB+).
+ */
+
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Readable } from 'stream';
+import { logger } from '../middleware/logger';
+
+let s3Client: S3Client | null = null;
+let publicS3Client: S3Client | null = null; // Client with public endpoint for browser-accessible signed URLs
+let isConnected = false;
+let connectionAttempted = false;
+
+const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'sim-rq-attachments';
+const SIGNED_URL_EXPIRES_IN = 3600; // 1 hour
+
+// Configurable limits
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE_MB || '3072', 10) * 1024 * 1024;
+const ALLOWED_FILE_TYPES = (
+  process.env.ALLOWED_FILE_TYPES ||
+  'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,png,jpg,jpeg,gif,svg,webp,heic,heif,zip,mp4,mov,avi,webm,mkv,m4v'
+).split(',');
+
+// Image types that support thumbnails
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+
+// Video types that need compression and thumbnail extraction
+const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska', 'video/x-m4v'];
+
+export interface UploadResult {
+  key: string;
+  bucket: string;
+  contentType: string;
+  size: number;
+}
+
+export interface StorageConfig {
+  maxFileSize: number;
+  allowedFileTypes: string[];
+  bucket: string;
+  enabled: boolean;
+}
+
+/**
+ * Check if storage is configured via environment variables
+ */
+export function isStorageEnabled(): boolean {
+  return !!process.env.S3_ACCESS_KEY_ID && !!process.env.S3_ENDPOINT;
+}
+
+/**
+ * Check if storage is currently connected
+ */
+export function isStorageConnected(): boolean {
+  return isConnected;
+}
+
+/**
+ * Get storage configuration
+ */
+export function getStorageConfig(): StorageConfig {
+  return {
+    maxFileSize: MAX_FILE_SIZE,
+    allowedFileTypes: ALLOWED_FILE_TYPES,
+    bucket: BUCKET_NAME,
+    enabled: isStorageConnected(),
+  };
+}
+
+/**
+ * Check if a content type is an image
+ */
+export function isImageType(contentType: string): boolean {
+  return IMAGE_TYPES.includes(contentType.toLowerCase());
+}
+
+/**
+ * Check if a content type is a video
+ */
+export function isVideoType(contentType: string): boolean {
+  return VIDEO_TYPES.includes(contentType.toLowerCase());
+}
+
+/**
+ * Check if a content type is a media file that needs processing
+ */
+export function isMediaType(contentType: string): boolean {
+  return isImageType(contentType) || isVideoType(contentType);
+}
+
+/**
+ * Initialize S3 connection and ensure bucket exists
+ */
+export async function initializeStorage(): Promise<void> {
+  if (connectionAttempted) {
+    return;
+  }
+  connectionAttempted = true;
+
+  if (!isStorageEnabled()) {
+    logger.info('Storage not configured (S3_ACCESS_KEY_ID not set) - file uploads disabled');
+    return;
+  }
+
+  const endpoint = process.env.S3_ENDPOINT;
+  const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT || endpoint; // For browser-accessible signed URLs
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  const region = process.env.S3_REGION || 'garage';
+
+  try {
+    // Main client for internal operations (uploads, deletes, etc.)
+    s3Client = new S3Client({
+      endpoint,
+      region,
+      credentials: {
+        accessKeyId: accessKeyId!,
+        secretAccessKey: secretAccessKey!,
+      },
+      forcePathStyle: true, // Required for Garage/MinIO
+    });
+
+    // Public client for generating browser-accessible signed URLs
+    // Uses public endpoint (e.g., http://localhost:3900) instead of internal Docker hostname
+    publicS3Client = new S3Client({
+      endpoint: publicEndpoint,
+      region,
+      credentials: {
+        accessKeyId: accessKeyId!,
+        secretAccessKey: secretAccessKey!,
+      },
+      forcePathStyle: true,
+    });
+
+    // Check if bucket exists
+    try {
+      await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET_NAME }));
+      logger.info(`Storage bucket '${BUCKET_NAME}' verified`);
+    } catch (bucketError: unknown) {
+      // Bucket doesn't exist - try to create it
+      const error = bucketError as { name?: string };
+      if (error.name === 'NotFound' || error.name === '404') {
+        logger.info(`Bucket '${BUCKET_NAME}' not found, attempting to create...`);
+        try {
+          await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET_NAME }));
+          logger.info(`Storage bucket '${BUCKET_NAME}' created successfully`);
+        } catch (createError) {
+          logger.warn(`Could not create bucket '${BUCKET_NAME}':`, createError);
+          throw createError;
+        }
+      } else {
+        throw bucketError;
+      }
+    }
+
+    isConnected = true;
+    logger.info(`Storage connected to ${endpoint}, bucket: ${BUCKET_NAME}`);
+    if (publicEndpoint !== endpoint) {
+      logger.info(`Storage public endpoint: ${publicEndpoint}`);
+    }
+  } catch (error) {
+    logger.warn('Failed to connect to storage - file uploads disabled:', error);
+    s3Client = null;
+    isConnected = false;
+  }
+}
+
+/**
+ * Validate file before upload
+ */
+export function validateFile(
+  fileName: string,
+  contentType: string,
+  size: number
+): { valid: boolean; error?: string } {
+  if (!isStorageConnected()) {
+    return { valid: false, error: 'File storage is not available' };
+  }
+
+  if (size > MAX_FILE_SIZE) {
+    const maxSizeMB = Math.round(MAX_FILE_SIZE / 1024 / 1024);
+    return { valid: false, error: `File size exceeds maximum of ${maxSizeMB}MB` };
+  }
+
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (!ext || !ALLOWED_FILE_TYPES.includes(ext)) {
+    return { valid: false, error: `File type .${ext} is not allowed` };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Generate a unique storage key for a file
+ */
+export function generateStorageKey(requestId: string, fileName: string): string {
+  const timestamp = Date.now();
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `requests/${requestId}/${timestamp}-${sanitizedFileName}`;
+}
+
+/**
+ * Generate a storage key for a thumbnail
+ */
+export function generateThumbnailKey(requestId: string, originalFileName: string): string {
+  const timestamp = Date.now();
+  const baseName = originalFileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `requests/${requestId}/thumbnails/${timestamp}-${baseName}.webp`;
+}
+
+/**
+ * Upload a file to storage
+ * Uses multipart upload for files larger than 5MB
+ */
+export async function uploadFile(
+  key: string,
+  body: Buffer | Readable,
+  contentType: string,
+  size: number
+): Promise<UploadResult> {
+  if (!s3Client || !isConnected) {
+    throw new Error('Storage is not connected');
+  }
+
+  // Use multipart upload for files larger than 5MB
+  if (size > 5 * 1024 * 1024) {
+    const upload = new Upload({
+      client: s3Client,
+      params: {
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      },
+      queueSize: 4,
+      partSize: 5 * 1024 * 1024, // 5MB parts
+    });
+
+    await upload.done();
+  } else {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        ContentLength: size,
+      })
+    );
+  }
+
+  return {
+    key,
+    bucket: BUCKET_NAME,
+    contentType,
+    size,
+  };
+}
+
+/**
+ * Generate a signed URL for downloading a file
+ * Uses the public S3 client to generate browser-accessible URLs
+ */
+export async function getSignedDownloadUrl(key: string, fileName?: string): Promise<string> {
+  if (!publicS3Client || !isConnected) {
+    throw new Error('Storage is not connected');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    ResponseContentDisposition: fileName ? `attachment; filename="${fileName}"` : undefined,
+  });
+
+  return getSignedUrl(publicS3Client, command, { expiresIn: SIGNED_URL_EXPIRES_IN });
+}
+
+/**
+ * Delete a file from storage
+ */
+export async function deleteFile(key: string): Promise<void> {
+  if (!s3Client || !isConnected) {
+    throw new Error('Storage is not connected');
+  }
+
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    })
+  );
+}
+
+/**
+ * Delete multiple files from storage
+ */
+export async function deleteFiles(keys: string[]): Promise<void> {
+  for (const key of keys) {
+    try {
+      await deleteFile(key);
+    } catch (error) {
+      logger.warn(`Failed to delete file ${key}:`, error);
+    }
+  }
+}
+
+/**
+ * List files in a prefix
+ */
+export async function listFiles(prefix: string): Promise<string[]> {
+  if (!s3Client || !isConnected) {
+    return [];
+  }
+
+  try {
+    const result = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET_NAME,
+        Prefix: prefix,
+      })
+    );
+    return result.Contents?.map((obj) => obj.Key || '') || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get storage status for health checks
+ */
+export function getStorageStatus(): {
+  enabled: boolean;
+  connected: boolean;
+  bucket?: string;
+  endpoint?: string;
+} {
+  return {
+    enabled: isStorageEnabled(),
+    connected: isConnected,
+    bucket: isStorageEnabled() ? BUCKET_NAME : undefined,
+    endpoint: isStorageEnabled() ? process.env.S3_ENDPOINT : undefined,
+  };
+}
+
+/**
+ * Gracefully shutdown storage connection
+ */
+export async function shutdownStorage(): Promise<void> {
+  if (s3Client) {
+    s3Client.destroy();
+    s3Client = null;
+  }
+  if (publicS3Client) {
+    publicS3Client.destroy();
+    publicS3Client = null;
+  }
+  if (isConnected) {
+    isConnected = false;
+    logger.info('Storage connection closed');
+  }
+}
+
+/**
+ * Get the S3 client (for advanced operations)
+ */
+export function getS3Client(): S3Client | null {
+  return isConnected ? s3Client : null;
+}

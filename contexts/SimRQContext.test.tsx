@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { SimFlowProvider, useSimFlow } from './SimFlowContext';
+import { SimRQProvider, useSimRQ } from './SimRQContext';
 import { UserRole, type User } from '../types';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -61,23 +61,23 @@ vi.mock('../lib/api/hooks', () => ({
   }),
 }));
 
-describe('SimFlowContext', () => {
+describe('SimRQContext', () => {
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <SimFlowProvider>{children}</SimFlowProvider>
+      <SimRQProvider>{children}</SimRQProvider>
     </QueryClientProvider>
   );
 
-  describe('useSimFlow hook', () => {
+  describe('useSimRQ hook', () => {
     it('should throw error when used outside provider', () => {
       expect(() => {
-        renderHook(() => useSimFlow());
-      }).toThrow('useSimFlow must be used within a SimFlowProvider');
+        renderHook(() => useSimRQ());
+      }).toThrow('useSimRQ must be used within a SimRQProvider');
     });
 
     it('should provide context when used within provider', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
       expect(result.current).toBeDefined();
       expect(result.current.currentUser).toBeDefined();
       expect(result.current.requests).toEqual([]);
@@ -86,7 +86,7 @@ describe('SimFlowContext', () => {
 
   describe('currentUser', () => {
     it('should use authenticated user from AuthContext', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
       expect(result.current.currentUser.role).toBe(UserRole.USER);
       expect(result.current.currentUser.id).toBe('test-user-id');
     });
@@ -94,29 +94,29 @@ describe('SimFlowContext', () => {
 
   describe('API integration methods', () => {
     it('should have addRequest method', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
       expect(typeof result.current.addRequest).toBe('function');
     });
 
     it('should have updateRequestStatus method', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
       expect(typeof result.current.updateRequestStatus).toBe('function');
     });
 
     it('should have assignEngineer method', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
       expect(typeof result.current.assignEngineer).toBe('function');
     });
 
     it('should have addComment method', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
       expect(typeof result.current.addComment).toBe('function');
     });
   });
 
   describe('getUsersByRole', () => {
     it('should filter users by role', () => {
-      const { result } = renderHook(() => useSimFlow(), { wrapper });
+      const { result } = renderHook(() => useSimRQ(), { wrapper });
 
       const engineers = result.current.getUsersByRole(UserRole.ENGINEER);
       expect(engineers.every(u => u.role === UserRole.ENGINEER)).toBe(true);

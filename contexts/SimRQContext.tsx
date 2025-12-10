@@ -1,5 +1,5 @@
 /**
- * @fileoverview SimFlow Context
+ * @fileoverview Sim RQ Context
  *
  * Provides application-wide state and actions for request management.
  * Acts as a facade over the API hooks, providing a simplified interface
@@ -13,7 +13,7 @@
  * Note: This context requires AuthContext to be present in the component tree.
  * It will return null if no user is authenticated.
  *
- * @module contexts/SimFlowContext
+ * @module contexts/SimRQContext
  */
 
 import React, { createContext, useContext, ReactNode } from 'react';
@@ -29,40 +29,41 @@ import {
 } from '../lib/api/hooks';
 
 /**
- * Context value interface for SimFlow
+ * Context value interface for Sim RQ
  */
-interface SimFlowContextType {
+interface SimRQContextType {
   currentUser: User;
   requests: SimRequest[];
   isLoadingRequests: boolean;
   addRequest: (title: string, description: string, vendor: string, priority: 'Low' | 'Medium' | 'High', projectId: string, onBehalfOfUserId?: string) => void;
+  addRequestAsync: (title: string, description: string, vendor: string, priority: 'Low' | 'Medium' | 'High', projectId: string, onBehalfOfUserId?: string) => Promise<SimRequest | null>;
   updateRequestStatus: (id: string, status: RequestStatus) => void;
   assignEngineer: (id: string, engineerId: string, hours: number) => void;
   addComment: (requestId: string, content: string, visibleToRequester?: boolean) => void;
   getUsersByRole: (role: UserRole) => User[];
 }
 
-const SimFlowContext = createContext<SimFlowContextType | undefined>(undefined);
+const SimRQContext = createContext<SimRQContextType | undefined>(undefined);
 
 /**
- * Hook to access SimFlow context
+ * Hook to access Sim RQ context
  *
- * @throws Error if used outside of SimFlowProvider
- * @returns SimFlowContextType with user, requests, and actions
+ * @throws Error if used outside of SimRQProvider
+ * @returns SimRQContextType with user, requests, and actions
  */
-export const useSimFlow = () => {
-  const context = useContext(SimFlowContext);
-  if (!context) throw new Error('useSimFlow must be used within a SimFlowProvider');
+export const useSimRQ = () => {
+  const context = useContext(SimRQContext);
+  if (!context) throw new Error('useSimRQ must be used within a SimRQProvider');
   return context;
 };
 
 /**
- * Provider component for SimFlow context
+ * Provider component for Sim RQ context
  *
  * Wraps children with request management capabilities.
  * Requires AuthContext to be present (returns null if not authenticated).
  */
-export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const SimRQProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user: authUser } = useAuth();
 
   // API hooks
@@ -91,6 +92,21 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
     createRequestMutation.mutate({ title, description, vendor, priority, projectId, onBehalfOfUserId });
   };
 
+  const addRequestAsync = async (
+    title: string,
+    description: string,
+    vendor: string,
+    priority: 'Low' | 'Medium' | 'High',
+    projectId: string,
+    onBehalfOfUserId?: string
+  ): Promise<SimRequest | null> => {
+    try {
+      return await createRequestMutation.mutateAsync({ title, description, vendor, priority, projectId, onBehalfOfUserId });
+    } catch {
+      return null;
+    }
+  };
+
   const updateRequestStatus = (id: string, status: RequestStatus) => {
     updateStatusMutation.mutate({ id, status });
   };
@@ -113,12 +129,13 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   return (
-    <SimFlowContext.Provider
+    <SimRQContext.Provider
       value={{
         currentUser,
         requests,
         isLoadingRequests,
         addRequest,
+        addRequestAsync,
         updateRequestStatus,
         assignEngineer,
         addComment,
@@ -126,6 +143,6 @@ export const SimFlowProvider: React.FC<{ children: ReactNode }> = ({ children })
       }}
     >
       {children}
-    </SimFlowContext.Provider>
+    </SimRQContext.Provider>
   );
 };

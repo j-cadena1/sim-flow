@@ -30,19 +30,19 @@ import {
   NotFoundError,
   ValidationError,
   AuthorizationError,
-  InternalError,
-  ErrorCode,
 } from '../utils/errors';
 import { asyncHandler } from '../middleware/errorHandler';
 import { sendNotification, sendNotificationToMultipleUsers } from '../services/notificationHelpers';
 
 /** Maximum number of requests that can be returned in a single query */
 const MAX_LIMIT = 1000;
+/** Default limit when none is specified */
+const DEFAULT_LIMIT = 100;
 
 /**
  * Get all simulation requests with optional pagination and filtering
  *
- * @param req.query.limit - Maximum number of requests to return (default: all, max: 1000)
+ * @param req.query.limit - Maximum number of requests to return (default: 100, max: 1000)
  * @param req.query.offset - Number of requests to skip for pagination (default: 0)
  * @param req.query.status - Filter by request status (e.g., 'Submitted', 'In Progress')
  * @returns {Object} requests - Array of requests with project info
@@ -50,8 +50,8 @@ const MAX_LIMIT = 1000;
  */
 export const getAllRequests = async (req: Request, res: Response) => {
   try {
-    const rawLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
-    const limit = rawLimit ? Math.min(Math.max(1, rawLimit), MAX_LIMIT) : undefined;
+    const rawLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : DEFAULT_LIMIT;
+    const limit = Math.min(Math.max(1, rawLimit), MAX_LIMIT);
     const offset = req.query.offset ? Math.max(0, parseInt(req.query.offset as string, 10)) : 0;
     const status = req.query.status as string | undefined;
 
@@ -76,11 +76,9 @@ export const getAllRequests = async (req: Request, res: Response) => {
 
     queryText += ' ORDER BY r.created_at DESC';
 
-    // Add pagination if limit is specified
-    if (limit) {
-      queryText += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-      params.push(limit, offset);
-    }
+    // Add pagination
+    queryText += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
 
     const result = await query(queryText, params.length > 0 ? params : undefined);
 
@@ -98,9 +96,9 @@ export const getAllRequests = async (req: Request, res: Response) => {
       requests: toCamelCase(result.rows),
       pagination: {
         total,
-        limit: limit || total,
+        limit,
         offset,
-        hasMore: limit ? offset + result.rows.length < total : false,
+        hasMore: offset + result.rows.length < total,
       },
     });
   } catch (error) {
@@ -234,6 +232,25 @@ export const createRequest = async (req: Request, res: Response) => {
         createdBy: onBehalfOfUserId ? userName : undefined,
       }
     );
+
+    // Notify all managers about new request pending review
+    const requestData = result.rows[0];
+    const managersResult = await query(
+      "SELECT id FROM users WHERE role = 'Manager' AND deleted_at IS NULL"
+    );
+
+    for (const manager of managersResult.rows) {
+      await sendNotification({
+        userId: manager.id,
+        type: 'REQUEST_PENDING_REVIEW',
+        title: 'New Request Pending Review',
+        message: `New request "${title}" from ${effectiveUserName} requires manager review`,
+        link: `/requests/${requestData.id}`,
+        entityType: 'Request',
+        entityId: requestData.id,
+        triggeredBy: effectiveUserId,
+      }).catch(err => logger.error('Failed to send manager notification:', err));
+    }
 
     res.status(201).json({ request: toCamelCase(result.rows[0]) });
   } catch (error) {
@@ -928,6 +945,20 @@ export const assignEngineer = asyncHandler(async (req: Request, res: Response) =
     triggeredBy: userId,
   }).catch(err => logger.error('Failed to send assignment notification:', err));
 
+  // Notify requester that their request has moved to Engineering Review
+  if (requestData.created_by && requestData.created_by !== userId) {
+    await sendNotification({
+      userId: requestData.created_by,
+      type: 'REQUEST_STATUS_CHANGED',
+      title: 'Request Status Updated',
+      message: `Your request "${requestData.title}" has been approved and assigned to engineering`,
+      link: `/requests/${id}`,
+      entityType: 'Request',
+      entityId: id,
+      triggeredBy: userId,
+    }).catch(err => logger.error('Failed to send requester notification:', err));
+  }
+
   res.json({ request: toCamelCase(result.rows[0]) });
 });
 
@@ -1098,8 +1129,8 @@ export const addTimeEntry = async (req: Request, res: Response) => {
     }
 
     const result = await query(`
-      INSERT INTO time_entries (request_id, engineer_id, engineer_name, hours, description)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO time_entries (request_id, user_id, user_name, hours, description, date)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
       RETURNING *
     `, [id, userId || null, userName, hours, description || '']);
 

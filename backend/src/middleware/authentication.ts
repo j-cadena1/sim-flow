@@ -47,12 +47,16 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 /**
  * Optional authentication - doesn't fail if no session cookie provided
  * Useful for endpoints that work both authenticated and unauthenticated
+ *
+ * SECURITY: Fails closed on database/unexpected errors to prevent
+ * accidental unauthenticated access during outages
  */
 export const optionalAuthenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
 
     if (!sessionId) {
+      // No session cookie is expected for unauthenticated users - continue
       return next();
     }
 
@@ -62,10 +66,13 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
       req.user = user;
       req.sessionId = sessionId;
     }
+    // If user is null, session was invalid/expired - continue without auth
+    // This is expected behavior, not an error
 
     next();
   } catch (error) {
-    // Silently fail and continue without authentication
-    next();
+    // Database or unexpected errors should fail closed, not allow unauthenticated access
+    logger.error('Optional authentication error (failing closed):', error);
+    res.status(500).json({ error: 'Authentication service unavailable' });
   }
 };

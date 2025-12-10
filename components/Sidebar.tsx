@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, PlusCircle, List, Cpu, FolderOpen, LogOut, Settings, BarChart, Menu, X, Sun, Moon, Monitor } from 'lucide-react';
-import { useSimFlow } from '../contexts/SimFlowContext';
+import { useSimRQ } from '../contexts/SimRQContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { UserRole } from '../types';
 
 export const Sidebar: React.FC = () => {
-  const { currentUser } = useSimFlow();
+  const { currentUser } = useSimRQ();
   const { logout } = useAuth();
   const { mode, setMode } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

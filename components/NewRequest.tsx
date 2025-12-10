@@ -1,23 +1,72 @@
-import React, { useState } from 'react';
-import { useSimFlow } from '../contexts/SimFlowContext';
+import React, { useState, useRef, useCallback } from 'react';
+import { useSimRQ } from '../contexts/SimRQContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './Toast';
-import { useProjects } from '../lib/api/hooks';
+import { useProjects, useStorageConfig } from '../lib/api/hooks';
 import { validateNewRequest } from '../utils/validation';
-import { Send, AlertCircle, FolderOpen, UserCircle } from 'lucide-react';
-import { ProjectStatus } from '../types';
+import { Send, AlertCircle, FolderOpen, UserCircle, Upload, X, File, FileText, FileSpreadsheet, FileImage, FileVideo, FileArchive, Paperclip, Loader2 } from 'lucide-react';
+import { ProjectStatus, StorageConfig } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api/client';
 
+/**
+ * Format file size for display
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
+ * Get icon component for a file type
+ */
+function getFileIcon(contentType: string): React.ReactNode {
+  if (contentType.startsWith('image/')) return <FileImage className="text-green-500" size={16} />;
+  if (contentType.startsWith('video/')) return <FileVideo className="text-purple-500" size={16} />;
+  if (contentType.includes('pdf')) return <FileText className="text-red-500" size={16} />;
+  if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('csv'))
+    return <FileSpreadsheet className="text-emerald-500" size={16} />;
+  if (contentType.includes('zip') || contentType.includes('archive'))
+    return <FileArchive className="text-amber-500" size={16} />;
+  if (contentType.includes('document') || contentType.includes('word'))
+    return <FileText className="text-blue-500" size={16} />;
+  return <File className="text-gray-500" size={16} />;
+}
+
+/**
+ * Validate file before upload
+ */
+function validateFile(
+  file: File,
+  config: StorageConfig
+): { valid: boolean; error?: string } {
+  const maxBytes = config.maxFileSizeMB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    return { valid: false, error: `File "${file.name}" exceeds maximum size of ${config.maxFileSizeMB}MB` };
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (!ext || !config.allowedFileTypes.includes(ext)) {
+    return { valid: false, error: `File type .${ext} is not allowed` };
+  }
+
+  return { valid: true };
+}
+
 export const NewRequest: React.FC = () => {
-  const { addRequest } = useSimFlow();
+  const { addRequestAsync } = useSimRQ();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { data: allProjects = [], isLoading: projectsLoading } = useProjects();
+  const { data: storageConfig } = useStorageConfig();
 
   const approvedProjects = allProjects.filter(p => p.status === ProjectStatus.ACTIVE && p.totalHours > p.usedHours);
   const isAdmin = user?.role === 'Admin';
+  const storageEnabled = storageConfig?.enabled ?? false;
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -28,6 +77,13 @@ export const NewRequest: React.FC = () => {
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  // File attachment state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch users when component mounts (only for admins)
   React.useEffect(() => {
@@ -44,7 +100,68 @@ export const NewRequest: React.FC = () => {
     }
   }, [isAdmin]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // File handling functions
+  const handleAddFiles = useCallback((files: FileList | null) => {
+    if (!files || !storageConfig) return;
+
+    const newFiles: File[] = [];
+    const validationErrors: string[] = [];
+
+    for (const file of Array.from(files)) {
+      const validation = validateFile(file, storageConfig);
+      if (!validation.valid) {
+        validationErrors.push(validation.error || 'Invalid file');
+      } else {
+        // Check if file is already in list
+        const isDuplicate = pendingFiles.some(
+          f => f.name === file.name && f.size === file.size
+        );
+        if (!isDuplicate) {
+          newFiles.push(file);
+        }
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      showToast(validationErrors[0], 'error');
+    }
+
+    if (newFiles.length > 0) {
+      setPendingFiles(prev => [...prev, ...newFiles]);
+    }
+  }, [storageConfig, pendingFiles, showToast]);
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (storageEnabled) {
+      handleAddFiles(e.dataTransfer.files);
+    }
+  }, [storageEnabled, handleAddFiles]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleAddFiles(e.target.files);
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [handleAddFiles]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
@@ -60,9 +177,41 @@ export const NewRequest: React.FC = () => {
       return;
     }
 
-    addRequest(title, description, vendor, priority, projectId, onBehalfOfUserId || undefined);
-    showToast('Request submitted successfully', 'success');
-    navigate('/requests');
+    setIsSubmitting(true);
+
+    try {
+      // Create the request first
+      const newRequest = await addRequestAsync(title, description, vendor, priority, projectId, onBehalfOfUserId || undefined);
+
+      // Upload attachments if any
+      if (pendingFiles.length > 0 && newRequest?.id) {
+        setUploadProgress(`Uploading attachments (0/${pendingFiles.length})...`);
+
+        for (let i = 0; i < pendingFiles.length; i++) {
+          const file = pendingFiles[i];
+          setUploadProgress(`Uploading attachments (${i + 1}/${pendingFiles.length})...`);
+
+          const formData = new FormData();
+          formData.append('file', file);
+
+          try {
+            await apiClient.post(`/requests/${newRequest.id}/attachments`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          } catch (uploadError) {
+            // Log but continue with other files
+            console.error(`Failed to upload ${file.name}:`, uploadError);
+          }
+        }
+      }
+
+      showToast('Request submitted successfully', 'success');
+      navigate('/requests');
+    } catch (error) {
+      showToast('Failed to submit request', 'error');
+      setIsSubmitting(false);
+      setUploadProgress(null);
+    }
   };
 
   return (
@@ -226,13 +375,113 @@ export const NewRequest: React.FC = () => {
             )}
           </div>
 
+          {/* File Attachments Section */}
+          {storageEnabled && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <Paperclip size={16} />
+                Attachments (Optional)
+              </label>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                accept={storageConfig?.allowedFileTypes.map((t) => `.${t}`).join(',')}
+              />
+
+              {/* Drag & Drop Zone */}
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+                  isDragOver
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-300 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-600'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="flex flex-col items-center justify-center py-2">
+                  <Upload
+                    className={`mb-2 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`}
+                    size={24}
+                  />
+                  <p className="text-sm text-gray-600 dark:text-slate-400 text-center">
+                    {isDragOver ? (
+                      'Drop files here'
+                    ) : (
+                      <>
+                        Drag and drop files here, or{' '}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          browse
+                        </button>
+                      </>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                    Max {storageConfig?.maxFileSizeMB}MB per file
+                  </p>
+                </div>
+              </div>
+
+              {/* Pending Files List */}
+              {pendingFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {pendingFiles.map((file, index) => (
+                    <div
+                      key={`${file.name}-${file.size}-${index}`}
+                      className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-slate-950 rounded-lg border border-gray-200 dark:border-slate-800"
+                    >
+                      <div className="flex-shrink-0">
+                        {getFileIcon(file.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(index)}
+                        className="flex-shrink-0 p-1 text-gray-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 rounded hover:bg-gray-200 dark:hover:bg-slate-800"
+                        title="Remove file"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="pt-4 border-t border-gray-200 dark:border-slate-800 flex justify-end">
             <button
               type="submit"
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+              disabled={isSubmitting}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
             >
-              <Send size={18} />
-              <span>Submit Request</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>{uploadProgress || 'Submitting...'}</span>
+                </>
+              ) : (
+                <>
+                  <Send size={18} />
+                  <span>Submit Request</span>
+                </>
+              )}
             </button>
           </div>
         </form>

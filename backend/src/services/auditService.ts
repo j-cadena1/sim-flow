@@ -37,6 +37,10 @@ export enum AuditAction {
   // Comment operations
   ADD_COMMENT = 'ADD_COMMENT',
 
+  // Attachment operations
+  ADD_ATTACHMENT = 'ADD_ATTACHMENT',
+  DELETE_ATTACHMENT = 'DELETE_ATTACHMENT',
+
   // Time tracking
   ADD_TIME_ENTRY = 'ADD_TIME_ENTRY',
   UPDATE_PROJECT_HOURS = 'UPDATE_PROJECT_HOURS',
@@ -66,6 +70,7 @@ export enum EntityType {
   SSO_CONFIG = 'sso_config',
   AUTH = 'auth',
   SYSTEM = 'system',
+  ATTACHMENT = 'attachment',
 }
 
 interface AuditLogEntry {

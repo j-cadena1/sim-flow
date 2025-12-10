@@ -1,7 +1,7 @@
 # Sim RQ
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.8.0--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
+[![Version](https://img.shields.io/badge/version-0.9.1--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
 [![Docker](https://img.shields.io/badge/Docker-First-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
@@ -41,6 +41,7 @@ Everything you need is managed by Docker Compose. Just install Docker and you're
 
 - **Role-Based Access**: Admin, Manager, Engineer, End-User
 - **Request Lifecycle**: Full tracking from submission to completion with enforced workflow stages
+- **File Attachments**: S3-compatible storage (Garage) with drag-and-drop uploads up to 3GB
 - **Project Hour Tracking**: Budget allocation and monitoring
 - **Real-time Notifications**: WebSocket-based in-app notifications with user preferences
 - **SSO**: Microsoft Entra ID (Azure AD) PKCE authentication with production-ready multi-instance support
@@ -192,11 +193,27 @@ Restart containers: `make prod-down && make prod`
 
 ## Architecture
 
-- **Frontend**: React + TypeScript + Vite + TailwindCSS
+- **Frontend**: React + TypeScript + Vite + TailwindCSS v4
 - **Backend**: Node.js + Express + TypeScript + Socket.IO
 - **Database**: PostgreSQL 16
+- **Storage**: Garage (S3-compatible) for file attachments
+- **Cache**: Redis 7 (optional - for multi-instance deployments)
 - **Auth**: Session cookies + Microsoft Entra ID PKCE
 - **Deployment**: Docker + Docker Compose
+
+## Data Storage
+
+All persistent data is stored in the `./data/` directory (bind mounts):
+
+```text
+./data/
+├── postgres/     # PostgreSQL database files
+└── garage/       # S3-compatible file storage
+    ├── data/     # File blobs
+    └── meta/     # Garage metadata
+```
+
+This makes backups simple - just copy the `./data/` directory. The directory is automatically created on first startup and excluded from git.
 
 ## Database Management
 

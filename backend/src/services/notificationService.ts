@@ -87,7 +87,7 @@ export async function getNotifications(
   const { userId, unreadOnly = false, limit = 50, offset = 0, type } = queryParams;
 
   let whereClause = 'WHERE n.user_id = $1';
-  const params: any[] = [userId];
+  const params: (string | number | boolean)[] = [userId];
   let paramCount = 1;
 
   if (unreadOnly) {
@@ -123,7 +123,7 @@ export async function getNotifications(
     params
   );
 
-  const notifications = result.rows.map((row: any) => toCamelCase(row)) as Notification[];
+  const notifications = result.rows.map((row: Record<string, unknown>) => toCamelCase(row)) as Notification[];
 
   return { notifications, total };
 }
@@ -222,7 +222,7 @@ export async function updatePreferences(
   // Ensure preferences exist
   await createDefaultPreferences(userId);
 
-  const snakeCaseUpdates = toSnakeCase(updates) as Record<string, any>;
+  const snakeCaseUpdates = toSnakeCase(updates) as Record<string, unknown>;
   const keys = Object.keys(snakeCaseUpdates);
   const values = Object.values(snakeCaseUpdates);
 
@@ -293,4 +293,126 @@ export async function cleanupOldNotifications(): Promise<number> {
   );
 
   return result.rowCount || 0;
+}
+
+// =============================================================================
+// EMAIL NOTIFICATION FUNCTIONS
+// =============================================================================
+
+/**
+ * Get unsent notifications for a user (for email digests)
+ * Returns notifications that have not been emailed yet
+ */
+export async function getUnsentNotifications(
+  userId: string,
+  since?: Date
+): Promise<Notification[]> {
+  let queryText = `
+    SELECT n.*, u.name as triggered_by_name
+    FROM notifications n
+    LEFT JOIN users u ON n.triggered_by = u.id
+    WHERE n.user_id = $1 AND n.emailed_at IS NULL
+  `;
+  const params: (string | Date)[] = [userId];
+
+  if (since) {
+    queryText += ' AND n.created_at >= $2';
+    params.push(since);
+  }
+
+  queryText += ' ORDER BY n.created_at ASC';
+
+  const result = await pool.query(queryText, params);
+  return result.rows.map((row: Record<string, unknown>) => toCamelCase(row)) as Notification[];
+}
+
+/**
+ * Mark notifications as emailed
+ */
+export async function markNotificationsEmailed(notificationIds: string[]): Promise<void> {
+  if (notificationIds.length === 0) return;
+
+  const placeholders = notificationIds.map((_, i) => `$${i + 1}`).join(', ');
+  await pool.query(
+    `UPDATE notifications SET emailed_at = NOW() WHERE id IN (${placeholders})`,
+    notificationIds
+  );
+}
+
+/**
+ * Get users who have pending notifications for a specific digest frequency
+ * Used by digest email cron jobs
+ */
+export async function getUsersWithPendingDigest(
+  frequency: 'hourly' | 'daily' | 'weekly'
+): Promise<Array<{ userId: string; email: string }>> {
+  const result = await pool.query(
+    `SELECT DISTINCT u.id as user_id, u.email
+    FROM users u
+    JOIN notification_preferences np ON u.id = np.user_id
+    JOIN notifications n ON u.id = n.user_id
+    WHERE np.email_enabled = true
+    AND np.email_digest_frequency = $1
+    AND n.emailed_at IS NULL
+    AND u.deleted_at IS NULL`,
+    [frequency]
+  );
+
+  return result.rows.map((row: { user_id: string; email: string }) => ({
+    userId: row.user_id,
+    email: row.email,
+  }));
+}
+
+/**
+ * Check if user should receive email for this notification type
+ */
+export async function shouldEmailNotify(
+  userId: string,
+  type: NotificationType
+): Promise<{ shouldEmail: boolean; isInstant: boolean }> {
+  const prefs = await getPreferences(userId);
+
+  if (!prefs || !prefs.emailEnabled) {
+    return { shouldEmail: false, isInstant: false };
+  }
+
+  // Map notification type to preference field (same as shouldNotify)
+  const typeMap: Record<string, keyof NotificationPreferences> = {
+    REQUEST_ASSIGNED: 'requestAssigned',
+    REQUEST_STATUS_CHANGED: 'requestStatusChanged',
+    REQUEST_COMMENT_ADDED: 'requestCommentAdded',
+    APPROVAL_NEEDED: 'approvalNeeded',
+    APPROVAL_REVIEWED: 'approvalNeeded',
+    TIME_LOGGED: 'timeLogged',
+    PROJECT_UPDATED: 'projectUpdated',
+    ADMIN_ACTION: 'adminAction',
+    TITLE_CHANGE_REQUESTED: 'approvalNeeded',
+    TITLE_CHANGE_REVIEWED: 'approvalNeeded',
+    DISCUSSION_REQUESTED: 'approvalNeeded',
+    DISCUSSION_REVIEWED: 'approvalNeeded',
+  };
+
+  const prefField = typeMap[type];
+  const typeEnabled = prefField ? (prefs[prefField] as boolean) : true;
+
+  if (!typeEnabled) {
+    return { shouldEmail: false, isInstant: false };
+  }
+
+  return {
+    shouldEmail: true,
+    isInstant: prefs.emailDigestFrequency === 'instant',
+  };
+}
+
+/**
+ * Get user email by ID (for sending notifications)
+ */
+export async function getUserEmail(userId: string): Promise<string | null> {
+  const result = await pool.query(
+    'SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL',
+    [userId]
+  );
+  return result.rows.length > 0 ? result.rows[0].email : null;
 }

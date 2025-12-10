@@ -23,5 +23,10 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "strict": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "backend",
+    "dist"
+  ]
 }

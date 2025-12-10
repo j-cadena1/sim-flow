@@ -13,8 +13,12 @@ import { cleanupExpiredSessions } from './services/sessionService';
 import { cleanupOldLoginAttempts } from './services/loginAttemptService';
 import { cleanupExpiredPKCEStates } from './services/msalService';
 import { recordHttpRequest, generatePrometheusMetrics } from './services/metricsService';
-import { initializeWebSocket } from './services/websocketService';
+import { initializeWebSocket, shutdownWebSocket } from './services/websocketService';
 import { initializeNotificationCleanup, stopNotificationCleanup } from './services/notificationCleanupService';
+import { initializeEmailService, shutdownEmailService } from './services/emailService';
+import { initializeEmailDigestService, stopEmailDigestService } from './services/emailDigestService';
+import { initializeRedis, shutdownRedis, getRedisStatus } from './services/redisService';
+import { initializeStorage, shutdownStorage, getStorageStatus } from './services/storageService';
 import { swaggerSpec } from './config/swagger';
 import authRouter from './routes/auth';
 import requestsRouter from './routes/requests';
@@ -25,6 +29,7 @@ import userManagementRouter from './routes/userManagement';
 import auditLogsRouter from './routes/auditLogs';
 import analyticsRouter from './routes/analytics';
 import notificationsRouter from './routes/notifications';
+import attachmentsRouter from './routes/attachments';
 import pool from './db';
 
 // Load environment variables
@@ -124,13 +129,17 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 
-// Readiness check - verifies database connectivity
-app.get('/ready', async (req, res) => {
+// Readiness check - verifies database connectivity and optional service status
+app.get('/ready', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
+    const redisStatus = getRedisStatus();
+    const storageStatus = getStorageStatus();
     res.status(200).json({
       status: 'ready',
-      database: 'connected'
+      database: 'connected',
+      redis: redisStatus,
+      storage: storageStatus,
     });
   } catch (error) {
     logger.error('Readiness check failed:', error);
@@ -175,6 +184,7 @@ app.use('/api/sso', ssoRouter);
 app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api', attachmentsRouter);
 
 // 404 handler - must be before error handler
 app.use(notFoundHandler);
@@ -185,14 +195,35 @@ app.use(errorHandler);
 // Create HTTP server and attach Express app
 const httpServer = http.createServer(app);
 
-// Initialize WebSocket for real-time notifications
-initializeWebSocket(httpServer);
+/**
+ * Initialize services and start server
+ * Redis is initialized first (if configured), then WebSocket can use Redis adapter
+ */
+async function startServer(): Promise<void> {
+  // Initialize Redis first (if configured) - rate limiting and WebSocket depend on it
+  await initializeRedis();
+
+  // Initialize S3-compatible storage (if configured) - for file attachments
+  await initializeStorage();
+
+  // Initialize WebSocket for real-time notifications (uses Redis if available)
+  await initializeWebSocket(httpServer);
+
+  // Start HTTP server
+  httpServer.listen(PORT, () => {
+    logger.info(`Sim RQ API server running on port ${PORT}`);
+    logger.info(`WebSocket server initialized`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+    const redisStatus = getRedisStatus();
+    if (redisStatus.enabled) {
+      logger.info(`Redis: ${redisStatus.connected ? 'connected' : 'not connected'} (${redisStatus.host})`);
+    }
+  });
+}
 
 // Start server
-const server = httpServer.listen(PORT, () => {
-  logger.info(`🚀 Sim RQ API server running on port ${PORT}`);
-  logger.info(`📡 WebSocket server initialized`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+startServer().then(() => {
 
   // Schedule periodic cleanup of expired sessions, login attempts, and PKCE states (every hour)
   setInterval(async () => {
@@ -205,25 +236,39 @@ const server = httpServer.listen(PORT, () => {
     }
   }, 60 * 60 * 1000); // 1 hour
 
-  // Run initial cleanup on startup
-  Promise.all([
+  // Run initial cleanup on startup (use allSettled to handle partial failures)
+  Promise.allSettled([
     cleanupExpiredSessions(),
     cleanupOldLoginAttempts(),
     cleanupExpiredPKCEStates(),
-  ]).catch((error) => {
-    logger.error('Error during initial cleanup:', error);
+  ]).then((results) => {
+    const cleanupNames = ['sessions', 'login attempts', 'PKCE states'];
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        logger.error(`Initial cleanup failed for ${cleanupNames[index]}:`, result.reason);
+      }
+    });
   });
 
   // Initialize notification cleanup job
   initializeNotificationCleanup();
+
+  // Initialize email services
+  initializeEmailService();
+  initializeEmailDigestService();
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM signal received: closing HTTP server');
-  server.close(async () => {
+  httpServer.close(async () => {
     logger.info('HTTP server closed');
     stopNotificationCleanup();
+    stopEmailDigestService();
+    shutdownEmailService();
+    await shutdownWebSocket();
+    await shutdownStorage();
+    await shutdownRedis();
     await pool.end();
     logger.info('Database pool closed');
     process.exit(0);

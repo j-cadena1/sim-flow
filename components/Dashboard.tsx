@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useSimFlow } from '../contexts/SimFlowContext';
+import { useSimRQ } from '../contexts/SimRQContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { RequestStatus, UserRole } from '../types';
 import { CHART_COLORS, STATUS_INDICATOR_COLORS } from '../constants';
@@ -9,7 +9,7 @@ import { Activity, Clock, CheckCircle, AlertOctagon, Plus, BarChart3, FolderKanb
 import { useProjectsWithMetrics, useProjectsNearDeadline } from '../lib/api/hooks';
 
 export const Dashboard: React.FC = () => {
-  const { requests, currentUser } = useSimFlow();
+  const { requests, currentUser } = useSimRQ();
   const { theme } = useTheme();
   const { data: projectMetrics = [] } = useProjectsWithMetrics();
   const { data: nearDeadlineProjects = [] } = useProjectsNearDeadline(7);

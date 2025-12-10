@@ -236,6 +236,28 @@ export interface SimRequest {
   comments: Comment[];
 }
 
+// Attachment Types
+export interface Attachment {
+  id: string;
+  requestId: string;
+  fileName: string;
+  originalFileName: string;
+  contentType: string;
+  fileSize: number;
+  thumbnailUrl?: string | null; // Signed URL for thumbnail (images/videos only)
+  uploadedBy?: string | null;
+  uploadedByName: string;
+  processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  processingError?: string | null;
+  createdAt: string;
+}
+
+export interface StorageConfig {
+  enabled: boolean;
+  maxFileSizeMB: number;
+  allowedFileTypes: string[];
+}
+
 // Notification Types
 export enum NotificationType {
   REQUEST_ASSIGNED = 'REQUEST_ASSIGNED',

@@ -460,7 +460,7 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
         [
           userInfo.name,
           userInfo.email.toLowerCase(),
-          '', // No password for SSO users
+          null, // No password for SSO users
           'End-User',
           avatarUrl,
           'entra_id',

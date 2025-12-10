@@ -71,37 +71,43 @@ export async function storeSession(
 
 /**
  * Validate a session and return user data if valid
+ *
+ * @throws Error on database/unexpected errors (callers should handle)
+ * @returns SessionUser if valid, null if session not found/expired/revoked
  */
 export async function validateSession(sessionId: string): Promise<SessionUser | null> {
   const sessionHash = hashSessionId(sessionId);
 
-  try {
-    const result = await query(
-      `SELECT u.id, u.email, u.name, u.role
-       FROM refresh_tokens rt
-       JOIN users u ON rt.user_id = u.id
-       WHERE rt.token_hash = $1
-       AND rt.expires_at > NOW()
-       AND rt.revoked_at IS NULL`,
-      [sessionHash]
-    );
+  // Let database errors propagate - callers should handle them appropriately
+  // This allows proper "fail closed" behavior in security-sensitive contexts
+  const result = await query(
+    `SELECT u.id, u.email, u.name, u.role, u.deleted_at
+     FROM refresh_tokens rt
+     JOIN users u ON rt.user_id = u.id
+     WHERE rt.token_hash = $1
+     AND rt.expires_at > NOW()
+     AND rt.revoked_at IS NULL`,
+    [sessionHash]
+  );
 
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    const userId = result.rows[0].id;
-    return {
-      id: userId,
-      userId: userId, // Alias for backward compatibility
-      email: result.rows[0].email,
-      name: result.rows[0].name,
-      role: result.rows[0].role,
-    };
-  } catch (error) {
-    logger.error('Error validating session:', error);
+  if (result.rows.length === 0) {
     return null;
   }
+
+  // Check if user is deactivated (soft-deleted)
+  if (result.rows[0].deleted_at) {
+    logger.info(`Session validation rejected: User ${result.rows[0].id} is deactivated`);
+    return null;
+  }
+
+  const userId = result.rows[0].id;
+  return {
+    id: userId,
+    userId: userId, // Alias for backward compatibility
+    email: result.rows[0].email,
+    name: result.rows[0].name,
+    role: result.rows[0].role,
+  };
 }
 
 /**

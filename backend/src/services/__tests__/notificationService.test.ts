@@ -17,8 +17,8 @@ vi.mock('../../db', () => ({
 
 // Mock the case converter utilities
 vi.mock('../../utils/caseConverter', () => ({
-  toCamelCase: vi.fn((obj: any) => obj),
-  toSnakeCase: vi.fn((obj: any) => obj),
+  toCamelCase: vi.fn(<T>(obj: T): T => obj),
+  toSnakeCase: vi.fn(<T>(obj: T): T => obj),
 }));
 
 import pool from '../../db';
@@ -44,7 +44,7 @@ describe('NotificationService', () => {
         triggered_by: 'manager-123',
       };
 
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [mockNotification],
       });
 
@@ -87,7 +87,7 @@ describe('NotificationService', () => {
         created_at: new Date(),
       };
 
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [mockNotification],
       });
 
@@ -106,7 +106,7 @@ describe('NotificationService', () => {
     test('should create notifications for multiple users', async () => {
       const userIds = ['user-1', 'user-2', 'user-3'];
 
-      (pool.query as any).mockResolvedValue({ rows: [] });
+      vi.mocked(pool.query).mockResolvedValue({ rows: [] });
 
       await notificationService.createNotificationForMultipleUsers(userIds, {
         type: 'PROJECT_UPDATED',
@@ -175,7 +175,7 @@ describe('NotificationService', () => {
         },
       ];
 
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [{ count: '1' }] })
         .mockResolvedValueOnce({ rows: mockNotifications });
 
@@ -188,7 +188,7 @@ describe('NotificationService', () => {
     });
 
     test('should filter by unread only', async () => {
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [{ count: '5' }] })
         .mockResolvedValueOnce({ rows: [] });
 
@@ -204,7 +204,7 @@ describe('NotificationService', () => {
     });
 
     test('should filter by notification type', async () => {
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [{ count: '3' }] })
         .mockResolvedValueOnce({ rows: [] });
 
@@ -220,7 +220,7 @@ describe('NotificationService', () => {
     });
 
     test('should support pagination', async () => {
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [{ count: '100' }] })
         .mockResolvedValueOnce({ rows: [] });
 
@@ -239,7 +239,7 @@ describe('NotificationService', () => {
 
   describe('getUnreadCount', () => {
     test('should return unread count', async () => {
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [{ count: '7' }],
       });
 
@@ -255,7 +255,7 @@ describe('NotificationService', () => {
 
   describe('markAsRead', () => {
     test('should mark notification as read', async () => {
-      (pool.query as any).mockResolvedValue({ rows: [] });
+      vi.mocked(pool.query).mockResolvedValue({ rows: [] });
 
       await notificationService.markAsRead('notif-123', 'user-123');
 
@@ -268,7 +268,7 @@ describe('NotificationService', () => {
 
   describe('markAllAsRead', () => {
     test('should mark all notifications as read for user', async () => {
-      (pool.query as any).mockResolvedValue({ rows: [] });
+      vi.mocked(pool.query).mockResolvedValue({ rows: [] });
 
       await notificationService.markAllAsRead('user-123');
 
@@ -281,7 +281,7 @@ describe('NotificationService', () => {
 
   describe('deleteNotification', () => {
     test('should delete a specific notification', async () => {
-      (pool.query as any).mockResolvedValue({ rows: [] });
+      vi.mocked(pool.query).mockResolvedValue({ rows: [] });
 
       await notificationService.deleteNotification('notif-123', 'user-123');
 
@@ -294,7 +294,7 @@ describe('NotificationService', () => {
 
   describe('deleteAllNotifications', () => {
     test('should delete all notifications for user', async () => {
-      (pool.query as any).mockResolvedValue({ rows: [] });
+      vi.mocked(pool.query).mockResolvedValue({ rows: [] });
 
       await notificationService.deleteAllNotifications('user-123');
 
@@ -324,7 +324,7 @@ describe('NotificationService', () => {
         updated_at: new Date(),
       };
 
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [mockPrefs],
       });
 
@@ -341,7 +341,7 @@ describe('NotificationService', () => {
         retention_days: 30,
       };
 
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [mockDefaultPrefs] });
 
@@ -364,7 +364,7 @@ describe('NotificationService', () => {
         retention_days: 60,
       };
 
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [{}] })
         .mockResolvedValueOnce({ rows: [mockUpdatedPrefs] });
 
@@ -383,7 +383,7 @@ describe('NotificationService', () => {
         in_app_enabled: true,
       };
 
-      (pool.query as any)
+      vi.mocked(pool.query)
         .mockResolvedValueOnce({ rows: [{}] })
         .mockResolvedValueOnce({ rows: [mockPrefs] });
 
@@ -397,7 +397,7 @@ describe('NotificationService', () => {
     test('should return false if in-app notifications disabled', async () => {
       // Mock getPreferences returning disabled in_app
       // The mock toCamelCase returns the object as-is, so we need camelCase keys
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [{ inAppEnabled: false }],
       });
 
@@ -415,7 +415,7 @@ describe('NotificationService', () => {
         requestStatusChanged: false,
       };
 
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [mockPrefs],
       });
 
@@ -423,7 +423,7 @@ describe('NotificationService', () => {
       expect(result1).toBe(true);
 
       // Reset mock for second call
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [mockPrefs],
       });
 
@@ -433,11 +433,15 @@ describe('NotificationService', () => {
 
     test('should default to true for unmapped notification types', async () => {
       // Provide camelCase since mock toCamelCase returns object as-is
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rows: [{ inAppEnabled: true }],
       });
 
-      const result = await notificationService.shouldNotify('user-123', 'UNMAPPED_TYPE' as any);
+      // Cast through unknown to test behavior with an unmapped notification type
+      const result = await notificationService.shouldNotify(
+        'user-123',
+        'UNMAPPED_TYPE' as unknown as Parameters<typeof notificationService.shouldNotify>[1]
+      );
 
       expect(result).toBe(true);
     });
@@ -445,7 +449,7 @@ describe('NotificationService', () => {
 
   describe('cleanupOldNotifications', () => {
     test('should delete old read notifications based on retention policy', async () => {
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rowCount: 15,
       });
 
@@ -459,7 +463,7 @@ describe('NotificationService', () => {
     });
 
     test('should return 0 if no notifications deleted', async () => {
-      (pool.query as any).mockResolvedValue({
+      vi.mocked(pool.query).mockResolvedValue({
         rowCount: 0,
       });
 

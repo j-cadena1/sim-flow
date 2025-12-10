@@ -39,7 +39,7 @@ If applicable, add screenshots to help explain your problem.
 
 ## Logs
 
-```
+```text
 Paste relevant logs here (use `make prod-logs` or `make dev-logs`)
 ```
 

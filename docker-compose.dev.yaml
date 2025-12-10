@@ -1,12 +1,66 @@
 # Development Docker Compose Configuration
 # Hot-reload enabled, source mounted as volumes, debugging ports exposed
 #
+# Data Storage:
+#   All persistent data is stored in ./data/ directory (bind mounts)
+#   - ./data/postgres/  - PostgreSQL database files
+#   - ./data/garage/    - S3-compatible file storage
+#
 # Usage:
 #   make dev        # Start dev environment with hot reload
 #   make dev-logs   # View logs
 #   make dev-down   # Stop dev environment
 
 services:
+  # Garage S3-Compatible Storage (optional - for file attachments)
+  # Provides S3-compatible object storage for file uploads
+  # Auto-initializes on first startup with default dev credentials
+  garage:
+    build:
+      context: .
+      dockerfile: Dockerfile.garage
+    image: sim-rq-garage:dev
+    container_name: sim-rq-storage-dev
+    ports:
+      - "3900:3900"  # S3 API
+      - "3903:3903"  # Admin API
+    environment:
+      GARAGE_ALLOW_WORLD_READABLE_SECRETS: "true"
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-GK0000000000000000deadbeef}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sim-rq-attachments}
+      GARAGE_ZONE: dc1
+      GARAGE_CAPACITY: 10G
+    volumes:
+      - ./data/garage/data:/var/lib/garage/data
+      - ./data/garage/meta:/var/lib/garage/meta
+      - ./garage.toml:/etc/garage.toml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3903/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - sim-rq-dev
+
+  # Redis (optional - for multi-instance deployments)
+  # Provides distributed rate limiting and WebSocket pub/sub
+  redis:
+    image: redis:${REDIS_VERSION:-7}-alpine
+    container_name: simflow-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - sim-rq-dev
+
   # PostgreSQL Database
   postgres:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
@@ -19,7 +73,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations:ro
     healthcheck:
@@ -59,6 +113,24 @@ services:
       DEV_ENTRA_SSO_AUTHORITY: ${DEV_ENTRA_SSO_AUTHORITY:-}
       DEV_ENTRA_SSO_SCOPES: ${DEV_ENTRA_SSO_SCOPES:-}
       ENTRA_SSO_ENCRYPTION_KEY: ${ENTRA_SSO_ENCRYPTION_KEY:-}
+      # Redis configuration (for multi-instance deployments)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # Email configuration (uses Mailhog in dev)
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@sim-rq.local}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-SimRQ Notifications}
+      # S3-compatible storage configuration (auto-configured with Garage)
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://garage:3900}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:3900}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-GK0000000000000000deadbeef}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sim-rq-attachments}
+      S3_REGION: ${S3_REGION:-garage}
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-3072}
+      ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,png,jpg,jpeg,gif,svg,webp,heic,heif,zip,mp4,mov,avi,webm,mkv,m4v}
     ports:
       - "3001:3001"
       - "9229:9229"  # Node.js debugger port
@@ -70,6 +142,8 @@ services:
       - backend_node_modules:/app/node_modules
     depends_on:
       postgres:
+        condition: service_healthy
+      garage:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001/ready"]
@@ -123,6 +197,19 @@ services:
       - sim-rq-dev
     command: npm run dev -- --host 0.0.0.0
 
+  # Mailhog - Email testing server
+  # Web UI: http://localhost:8025
+  # SMTP: localhost:1025
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: sim-rq-mailhog
+    ports:
+      - "8025:8025"  # Web UI
+      - "1025:1025"  # SMTP
+    networks:
+      - sim-rq-dev
+    restart: unless-stopped
+
   # Playwright E2E Tests (on-demand)
   # Run with: make test-e2e
   playwright:
@@ -135,8 +222,8 @@ services:
       # Point to frontend container via Docker network
       BASE_URL: http://frontend:5173
     volumes:
-      # Mount test files for development
-      - ./tests:/app/tests:ro
+      # Mount test files for development (not read-only - global setup writes auth state)
+      - ./tests:/app/tests
       - ./playwright.config.ts:/app/playwright.config.ts:ro
       - ./types.ts:/app/types.ts:ro
       - ./constants.ts:/app/constants.ts:ro
@@ -158,9 +245,9 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_dev_data:
-    driver: local
+  # Named volumes only for node_modules (avoids host/container conflicts)
   backend_node_modules:
     driver: local
   frontend_node_modules:
     driver: local
+  # Data storage uses bind mounts in ./data/ directory (see header comment)

@@ -265,36 +265,34 @@ export async function getProjectStatusHistory(
 /**
  * Check and update expired projects.
  * Projects past their deadline that are still Active become Expired.
+ * Uses a CTE to capture the previous status before updating.
  */
 export async function checkAndExpireProjects(): Promise<{ expired: number; projects: string[] }> {
   try {
-    // Find projects that should be expired
+    // Use CTE to capture previous status before updating, then batch insert history
     const result = await query(`
-      UPDATE projects
-      SET status = 'Expired', updated_at = CURRENT_TIMESTAMP
-      WHERE status IN ('Active', 'On Hold')
-        AND deadline IS NOT NULL
-        AND deadline < CURRENT_DATE
-      RETURNING id, name, code
+      WITH expired AS (
+        UPDATE projects
+        SET status = 'Expired', updated_at = CURRENT_TIMESTAMP
+        WHERE status IN ('Active', 'On Hold')
+          AND deadline IS NOT NULL
+          AND deadline < CURRENT_DATE
+        RETURNING id, name, code
+      ),
+      history_insert AS (
+        INSERT INTO project_status_history (
+          project_id, from_status, to_status, changed_by_name, reason
+        )
+        SELECT id, 'Active', 'Expired', 'System', 'Project deadline has passed'
+        FROM expired
+      )
+      SELECT id, name, code FROM expired
     `);
 
     const expiredProjects = result.rows;
 
-    // Log history for each expired project
+    // Log each expired project
     for (const project of expiredProjects) {
-      await query(`
-        INSERT INTO project_status_history (
-          project_id, from_status, to_status, changed_by_name, reason
-        )
-        SELECT
-          id,
-          status,
-          'Expired',
-          'System',
-          'Project deadline has passed'
-        FROM projects WHERE id = $1
-      `, [project.id]);
-
       logger.info(`Project ${project.code} (${project.name}) automatically expired due to deadline`);
     }
 

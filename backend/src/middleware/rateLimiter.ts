@@ -1,5 +1,7 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { Store } from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
 import { logger } from './logger';
+import { getRedisClient, isRedisConnected } from '../services/redisService';
 
 /**
  * Rate Limiting Configuration
@@ -7,17 +9,67 @@ import { logger } from './logger';
  * More permissive in development/test environments for E2E testing
  *
  * DISABLE_RATE_LIMITING=true can be set for E2E tests to bypass rate limits entirely
+ *
+ * If Redis is available, uses RedisStore for distributed rate limiting across instances.
+ * Falls back to in-memory store for single-instance deployments.
  */
 
 const isProduction = process.env.NODE_ENV === 'production';
-const disableRateLimiting = process.env.DISABLE_RATE_LIMITING === 'true';
+const disableRateLimitingEnv = process.env.DISABLE_RATE_LIMITING === 'true';
+
+// Only allow disabling rate limiting in non-production environments
+const disableRateLimiting = disableRateLimitingEnv && !isProduction;
+
+// Log a warning if someone tries to disable rate limiting in production
+if (disableRateLimitingEnv && isProduction) {
+  logger.warn(
+    'SECURITY: DISABLE_RATE_LIMITING is set but ignored in production environment. ' +
+    'Rate limiting remains active to protect against brute force attacks.'
+  );
+}
+
+/**
+ * Create a rate limit store - uses Redis if available, otherwise in-memory
+ */
+function createStore(prefix: string): Store | undefined {
+  const redisClient = getRedisClient();
+
+  if (redisClient && isRedisConnected()) {
+    logger.info(`Rate limiter "${prefix}" using Redis store`);
+    return new RedisStore({
+      // Use sendCommand for redis v4 compatibility
+      sendCommand: (...args: string[]) => redisClient.sendCommand(args),
+      prefix: `rl:${prefix}:`,
+    });
+  }
+
+  // Return undefined to use default MemoryStore
+  return undefined;
+}
+
+// Track whether we've logged the store type
+let storeTypeLogged = false;
+
+/**
+ * Log which store type is being used (once at startup)
+ */
+function logStoreType(): void {
+  if (storeTypeLogged) return;
+  storeTypeLogged = true;
+
+  if (isRedisConnected()) {
+    logger.info('Rate limiting: Using Redis store for distributed rate limiting');
+  } else {
+    logger.info('Rate limiting: Using in-memory store (single instance only)');
+  }
+}
 
 /**
  * Get max requests based on environment
- * Uses very high limit when DISABLE_RATE_LIMITING is set for E2E tests
+ * Uses very high limit when DISABLE_RATE_LIMITING is set for E2E tests (non-production only)
  */
 function getMaxRequests(productionLimit: number, devLimit: number): number {
-  if (disableRateLimiting) return 100000; // Effectively unlimited for tests
+  if (disableRateLimiting) return 100000; // Effectively unlimited for tests (never in production)
   return isProduction ? productionLimit : devLimit;
 }
 
@@ -35,7 +87,9 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore('auth'),
   handler: (req, res, next, options) => {
+    logStoreType();
     logger.warn(`Rate limit exceeded for auth endpoint`, {
       ip: req.ip,
       path: req.path,
@@ -57,7 +111,9 @@ export const ssoLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore('sso'),
   handler: (req, res, next, options) => {
+    logStoreType();
     logger.warn(`Rate limit exceeded for SSO endpoint`, {
       ip: req.ip,
       path: req.path,
@@ -80,6 +136,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore('api'),
 });
 
 /**
@@ -95,7 +152,9 @@ export const sensitiveOpLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createStore('sensitive'),
   handler: (req, res, next, options) => {
+    logStoreType();
     logger.warn(`Rate limit exceeded for sensitive operation`, {
       ip: req.ip,
       path: req.path,

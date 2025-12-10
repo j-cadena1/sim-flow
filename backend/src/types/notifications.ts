@@ -6,6 +6,8 @@ export type NotificationType =
   | 'REQUEST_ASSIGNED'
   | 'REQUEST_STATUS_CHANGED'
   | 'REQUEST_COMMENT_ADDED'
+  | 'REQUEST_PENDING_REVIEW'
+  | 'PROJECT_PENDING_APPROVAL'
   | 'APPROVAL_NEEDED'
   | 'APPROVAL_REVIEWED'
   | 'TIME_LOGGED'
@@ -29,6 +31,7 @@ export interface Notification {
   link?: string;
   read: boolean;
   createdAt: Date;
+  emailedAt?: Date | null;
   entityType?: EntityType;
   entityId?: string;
   triggeredBy?: string;

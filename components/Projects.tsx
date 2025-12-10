@@ -20,7 +20,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useSimFlow } from '../contexts/SimFlowContext';
+import { useSimRQ } from '../contexts/SimRQContext';
 import {
   useProjects,
   useCreateProject,
@@ -48,7 +48,7 @@ import {
 } from './projects/index';
 
 export const Projects: React.FC = () => {
-  const { currentUser } = useSimFlow();
+  const { currentUser } = useSimRQ();
   const { data: projects = [], isLoading } = useProjects();
   const { data: projectMetrics = [] } = useProjectsWithMetrics();
   const { data: nearDeadlineProjects = [] } = useProjectsNearDeadline(14);

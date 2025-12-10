@@ -35,6 +35,9 @@ nginx/ssl/*.crt
 *.sqlite3
 database/backups/
 
+# Docker data directories (bind mounts)
+data/
+
 # Testing
 coverage/
 .nyc_output/

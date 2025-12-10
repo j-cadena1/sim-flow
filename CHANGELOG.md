@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- markdownlint-disable MD024 -->
 
+## [0.9.1] - 2025-12-10
+
+### Added
+
+- **File attachments** - S3-compatible storage for request attachments
+  - Garage storage backend auto-configured in Docker
+  - Drag-and-drop upload on New Request form
+  - Add attachments to existing requests via Request Detail page
+  - Support for documents, images, videos, archives (up to 3GB)
+  - Multipart upload for large files (> 5MB)
+  - Signed download URLs for secure access
+  - `attachments` database table with full metadata tracking
+- **Bind mounts for data storage** - All persistent data now stored in `./data/` directory
+  - `./data/postgres/` for database files
+  - `./data/garage/` for S3 file storage
+  - Easier backups - just copy the `./data/` directory
+  - Survives container recreation
+- **Dual S3 endpoint configuration** - Separate internal and public endpoints
+  - `S3_ENDPOINT` for backend operations (Docker internal)
+  - `S3_PUBLIC_ENDPOINT` for browser-accessible download URLs
+- **Email testing with Mailhog** - Development email server at `http://localhost:8025`
+
+### Changed
+
+- **Data storage architecture** - Switched from Docker named volumes to bind mounts
+- **Analytics queries** - Now include "Accepted" status in completion and allocation analysis
+
+### Fixed
+
+- **Time entry logging** - Fixed column name mismatch (`user_id` vs `engineer_id`) in time_entries table
+- **File download URLs** - Fixed signed URLs using internal Docker hostname instead of browser-accessible endpoint
+- **Analytics empty state** - Completion Time and Hour Allocation now show data for accepted requests
+
+### Documentation
+
+- Updated README with file attachments feature and data storage section
+- Updated CLAUDE.md with storage service and file attachment documentation
+- Updated .env.example with complete S3/Garage configuration
+
 ## [0.9.0] - 2025-12-08
 
 ### Added
@@ -166,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics dashboard tests
 - Navigation and UI tests
 
+[0.9.1]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.1
 [0.9.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.0
 [0.8.1]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.8.1
 [0.8.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.8.0

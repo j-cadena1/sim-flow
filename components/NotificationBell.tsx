@@ -49,8 +49,12 @@ export const NotificationBell: React.FC = () => {
       await markAsRead(notification.id);
     }
 
-    // Navigate to notification center with this notification highlighted
-    navigate(`/notifications?id=${notification.id}`);
+    // Navigate directly to the linked page, or to notification center if no link
+    if (notification.link) {
+      navigate(notification.link);
+    } else {
+      navigate(`/notifications?id=${notification.id}`);
+    }
     setIsOpen(false);
   };
 
@@ -200,16 +204,14 @@ export const NotificationBell: React.FC = () => {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700">
-              <button
-                onClick={handleViewAll}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline w-full text-center"
-              >
-                View all notifications
-              </button>
-            </div>
-          )}
+          <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700">
+            <button
+              onClick={handleViewAll}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline w-full text-center"
+            >
+              View all notifications
+            </button>
+          </div>
         </div>
       )}
     </div>

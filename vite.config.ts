@@ -8,6 +8,8 @@ export default defineConfig({
     // Port 5173 matches docker-compose.dev.yaml frontend port mapping
     port: 5173,
     host: '0.0.0.0',
+    // Allow Docker service name for E2E tests
+    allowedHosts: ['localhost', 'frontend'],
     // Proxy API requests to backend in development
     // Uses 'backend' service name when running in Docker, localhost for local dev
     proxy: {

@@ -5,10 +5,11 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { ScheduledTask } from 'node-cron';
 
 // Mock node-cron
 vi.mock('node-cron', () => ({
-  schedule: vi.fn((cronExpr, callback) => ({
+  schedule: vi.fn((_cronExpr, _callback) => ({
     stop: vi.fn(),
     start: vi.fn(),
   })),
@@ -59,7 +60,7 @@ describe('NotificationCleanupService', () => {
     test('should schedule initial cleanup after 5 seconds', async () => {
       vi.useFakeTimers();
 
-      (cleanupOldNotifications as any).mockResolvedValue(0);
+      vi.mocked(cleanupOldNotifications).mockResolvedValue(0);
 
       initializeNotificationCleanup();
 
@@ -77,7 +78,7 @@ describe('NotificationCleanupService', () => {
         stop: vi.fn(),
       };
 
-      (cron.schedule as any).mockReturnValue(mockJob);
+      vi.mocked(cron.schedule).mockReturnValue(mockJob as unknown as ScheduledTask);
 
       initializeNotificationCleanup();
       stopNotificationCleanup();
@@ -111,7 +112,7 @@ describe('NotificationCleanupService', () => {
 
   describe('manualCleanup', () => {
     test('should trigger cleanup and return count', async () => {
-      (cleanupOldNotifications as any).mockResolvedValue(25);
+      vi.mocked(cleanupOldNotifications).mockResolvedValue(25);
 
       const result = await manualCleanup();
 
@@ -122,7 +123,7 @@ describe('NotificationCleanupService', () => {
     });
 
     test('should handle cleanup with no deletions', async () => {
-      (cleanupOldNotifications as any).mockResolvedValue(0);
+      vi.mocked(cleanupOldNotifications).mockResolvedValue(0);
 
       const result = await manualCleanup();
 
@@ -134,19 +135,19 @@ describe('NotificationCleanupService', () => {
   describe('scheduled cleanup execution', () => {
     test('should execute cleanup on schedule', async () => {
       vi.useFakeTimers();
-      let cronCallback: any;
+      let cronCallback: (() => Promise<void>) | null = null;
 
-      (cron.schedule as any).mockImplementation((expr: string, callback: any) => {
-        cronCallback = callback;
-        return { stop: vi.fn() };
+      vi.mocked(cron.schedule).mockImplementation((_expr: string, callback: () => void) => {
+        cronCallback = callback as () => Promise<void>;
+        return { stop: vi.fn() } as unknown as ScheduledTask;
       });
 
-      (cleanupOldNotifications as any).mockResolvedValue(10);
+      vi.mocked(cleanupOldNotifications).mockResolvedValue(10);
 
       initializeNotificationCleanup();
 
       // Execute the cron callback
-      await cronCallback();
+      await cronCallback!();
 
       expect(logger.info).toHaveBeenCalledWith('Starting notification cleanup job');
       expect(cleanupOldNotifications).toHaveBeenCalled();
@@ -157,20 +158,20 @@ describe('NotificationCleanupService', () => {
 
     test('should handle errors during scheduled cleanup', async () => {
       vi.useFakeTimers();
-      let cronCallback: any;
+      let cronCallback: (() => Promise<void>) | null = null;
 
-      (cron.schedule as any).mockImplementation((expr: string, callback: any) => {
-        cronCallback = callback;
-        return { stop: vi.fn() };
+      vi.mocked(cron.schedule).mockImplementation((_expr: string, callback: () => void) => {
+        cronCallback = callback as () => Promise<void>;
+        return { stop: vi.fn() } as unknown as ScheduledTask;
       });
 
       const mockError = new Error('Database connection failed');
-      (cleanupOldNotifications as any).mockRejectedValue(mockError);
+      vi.mocked(cleanupOldNotifications).mockRejectedValue(mockError);
 
       initializeNotificationCleanup();
 
       // Execute the cron callback
-      await cronCallback();
+      await cronCallback!();
 
       expect(logger.error).toHaveBeenCalledWith('Error during notification cleanup:', mockError);
     });
@@ -180,7 +181,7 @@ describe('NotificationCleanupService', () => {
     test('should run initial cleanup after 5 seconds', async () => {
       vi.useFakeTimers();
 
-      (cleanupOldNotifications as any).mockResolvedValue(5);
+      vi.mocked(cleanupOldNotifications).mockResolvedValue(5);
 
       initializeNotificationCleanup();
 
@@ -196,7 +197,7 @@ describe('NotificationCleanupService', () => {
       vi.useFakeTimers();
 
       const mockError = new Error('Initial cleanup failed');
-      (cleanupOldNotifications as any).mockRejectedValue(mockError);
+      vi.mocked(cleanupOldNotifications).mockRejectedValue(mockError);
 
       initializeNotificationCleanup();
 

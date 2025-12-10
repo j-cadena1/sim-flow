@@ -1,6 +1,11 @@
 # Production Docker Compose Configuration
 # Optimized builds, no source mounts, production-ready settings
 #
+# Data Storage:
+#   All persistent data is stored in ./data/ directory (bind mounts)
+#   - ./data/postgres/  - PostgreSQL database files
+#   - ./data/garage/    - S3-compatible file storage
+#
 # Quick Start:
 #   make prod        # Start production environment
 #   make prod-logs   # View logs
@@ -20,6 +25,51 @@
 # - NGINX_VERSION: Nginx version (default: alpine)
 
 services:
+  # Garage S3-Compatible Storage (optional - for file attachments)
+  # Provides S3-compatible object storage for file uploads
+  # Auto-initializes on first startup - no manual setup required
+  garage:
+    build:
+      context: .
+      dockerfile: Dockerfile.garage
+    image: sim-rq-garage:latest
+    container_name: sim-rq-storage
+    environment:
+      GARAGE_ALLOW_WORLD_READABLE_SECRETS: "true"
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sim-rq-attachments}
+      GARAGE_ZONE: ${GARAGE_ZONE:-dc1}
+      GARAGE_CAPACITY: ${GARAGE_CAPACITY:-100G}
+    volumes:
+      - ./data/garage/data:/var/lib/garage/data
+      - ./data/garage/meta:/var/lib/garage/meta
+      - ./garage.toml:/etc/garage.toml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3903/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - sim-rq-network
+
+  # Redis (optional - for multi-instance deployments)
+  # Provides distributed rate limiting and WebSocket pub/sub
+  # No persistence - rate limits reset on restart (acceptable for short windows)
+  redis:
+    image: redis:${REDIS_VERSION:-7}-alpine
+    container_name: simflow-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - sim-rq-network
+
   # PostgreSQL Database
   postgres:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
@@ -32,7 +82,7 @@ services:
     # Database port not exposed to host in production - only accessible within Docker network
     # Use docker-compose.dev.yaml for development with exposed ports
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations:ro
     healthcheck:
@@ -72,6 +122,18 @@ services:
       ENTRA_SSO_REDIRECT_URI: ${ENTRA_SSO_REDIRECT_URI:-}
       ENTRA_SSO_AUTHORITY: ${ENTRA_SSO_AUTHORITY:-}
       ENTRA_SSO_SCOPES: ${ENTRA_SSO_SCOPES:-}
+      # Redis configuration (optional - for multi-instance deployments)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # S3-compatible storage configuration (optional - for file attachments)
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://garage:3900}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sim-rq-attachments}
+      S3_REGION: ${S3_REGION:-garage}
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-3072}
+      ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,png,jpg,jpeg,gif,svg,webp,heic,heif,zip,mp4,mov,avi,webm,mkv,m4v}
       # Testing: Set DISABLE_RATE_LIMITING=true to bypass rate limits for E2E tests
       DISABLE_RATE_LIMITING: ${DISABLE_RATE_LIMITING:-}
     # Backend only accessible within Docker network - frontend proxies API requests
@@ -79,6 +141,8 @@ services:
       - "3001"
     depends_on:
       postgres:
+        condition: service_healthy
+      garage:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001/ready"]
@@ -154,5 +218,5 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
-    driver: local
+  # Data storage uses bind mounts in ./data/ directory (see header comment)
+  # No named volumes needed for production data
