@@ -119,7 +119,8 @@ export async function initializeStorage(): Promise<void> {
   }
 
   const endpoint = process.env.S3_ENDPOINT;
-  const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT || endpoint; // For browser-accessible signed URLs
+  // For browser-accessible signed URLs: S3_PUBLIC_ENDPOINT > CORS_ORIGIN > S3_ENDPOINT
+  const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT || process.env.CORS_ORIGIN || endpoint;
   const accessKeyId = process.env.S3_ACCESS_KEY_ID;
   const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
   const region = process.env.S3_REGION || 'garage';

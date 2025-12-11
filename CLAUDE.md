@@ -221,7 +221,7 @@ E2E test files by feature area:
 Key environment variables:
 
 - `S3_ENDPOINT` - Internal Docker endpoint (default: `http://garage:3900`)
-- `S3_PUBLIC_ENDPOINT` - Browser-accessible endpoint for downloads (default: `http://localhost:3900`)
+- `S3_PUBLIC_ENDPOINT` - Browser-accessible endpoint for downloads (defaults to `CORS_ORIGIN`)
 
 ## Notifications
 
