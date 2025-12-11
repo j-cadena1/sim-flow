@@ -217,6 +217,5 @@ networks:
   sim-rq-network:
     driver: bridge
 
-volumes:
-  # Data storage uses bind mounts in ./data/ directory (see header comment)
-  # No named volumes needed for production data
+# Data storage uses bind mounts in ./data/ directory (see header comment)
+# No named volumes needed - all persistent data is in ./data/
