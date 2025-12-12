@@ -970,15 +970,22 @@ interface InitUploadResponse {
 /**
  * Direct S3 upload hook for large files
  *
- * Bypasses backend for file transfer using presigned URLs:
+ * Attempts direct browser-to-S3 upload using presigned URLs.
+ * Automatically falls back to backend-proxied upload if direct upload fails
+ * (e.g., when behind Cloudflare Tunnel without proper S3_PUBLIC_ENDPOINT config).
+ *
+ * Flow:
  * 1. Init: Get presigned PUT URL from backend
  * 2. Upload: PUT file directly to S3 (with progress tracking)
  * 3. Complete: Notify backend to create attachment record
  *
+ * Fallback (if step 2 fails):
+ * - Uses legacy multipart upload through backend
+ *
  * Benefits:
- * - No nginx/backend timeout issues for large files
+ * - No nginx/backend timeout issues for large files (when direct works)
  * - Real upload progress from XHR
- * - Reduced backend memory usage
+ * - Automatic fallback ensures uploads always work
  *
  * @example
  * const { uploadFile, cancelUpload, isUploading } = useDirectUpload();
@@ -996,7 +1003,41 @@ export const useDirectUpload = () => {
   let activeRequestId: string | null = null;
 
   /**
+   * Fallback: Upload via backend (legacy method)
+   */
+  const uploadViaBackend = async (
+    requestId: string,
+    file: File,
+    onProgress?: (progress: DirectUploadProgress) => void
+  ): Promise<Attachment> => {
+    onProgress?.({ phase: 'uploading', percent: 0 });
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data } = await apiClient.post(`/requests/${requestId}/attachments`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+          onProgress?.({ phase: 'uploading', percent });
+        }
+      },
+    });
+
+    onProgress?.({ phase: 'completing', percent: 100 });
+
+    // Invalidate attachments query to show new file
+    queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(requestId) });
+
+    return data.attachment;
+  };
+
+  /**
    * Upload a file directly to S3 using presigned URL
+   * Falls back to backend upload if direct upload fails
    */
   const uploadFile = async (
     requestId: string,
@@ -1008,14 +1049,22 @@ export const useDirectUpload = () => {
     // Phase 1: Initialize upload - get presigned URL
     onProgress?.({ phase: 'init', percent: 0 });
 
-    const { data: initData } = await apiClient.post<InitUploadResponse>(
-      `/requests/${requestId}/attachments/init`,
-      {
-        fileName: file.name,
-        contentType: file.type || 'application/octet-stream',
-        fileSize: file.size,
-      }
-    );
+    let initData: InitUploadResponse;
+    try {
+      const response = await apiClient.post<InitUploadResponse>(
+        `/requests/${requestId}/attachments/init`,
+        {
+          fileName: file.name,
+          contentType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+        }
+      );
+      initData = response.data;
+    } catch (initError) {
+      // If init fails, fall back to legacy upload
+      console.warn('[Upload] Direct upload init failed, using backend upload:', initError);
+      return uploadViaBackend(requestId, file, onProgress);
+    }
 
     activeUploadId = initData.uploadId;
     const { uploadUrl } = initData;
@@ -1024,40 +1073,63 @@ export const useDirectUpload = () => {
     // Using XHR instead of fetch because fetch doesn't support upload progress
     onProgress?.({ phase: 'uploading', percent: 0 });
 
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      activeXhr = xhr;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        activeXhr = xhr;
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          onProgress?.({ phase: 'uploading', percent });
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            onProgress?.({ phase: 'uploading', percent });
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          activeXhr = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          activeXhr = null;
+          reject(new Error('Upload failed - network error'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          activeXhr = null;
+          reject(new Error('Upload cancelled'));
+        });
+
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.send(file);
+      });
+    } catch (uploadError) {
+      // If it was cancelled, re-throw
+      if (uploadError instanceof Error && uploadError.message === 'Upload cancelled') {
+        throw uploadError;
+      }
+
+      // Cancel the pending upload record
+      if (activeUploadId) {
+        try {
+          await apiClient.delete(`/requests/${requestId}/attachments/cancel`, {
+            data: { uploadId: activeUploadId },
+          });
+        } catch {
+          // Ignore cleanup errors
         }
-      });
+        activeUploadId = null;
+      }
 
-      xhr.addEventListener('load', () => {
-        activeXhr = null;
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        activeXhr = null;
-        reject(new Error('Upload failed - network error'));
-      });
-
-      xhr.addEventListener('abort', () => {
-        activeXhr = null;
-        reject(new Error('Upload cancelled'));
-      });
-
-      xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-      xhr.send(file);
-    });
+      // Fall back to legacy upload
+      console.warn('[Upload] Direct S3 upload failed, using backend upload:', uploadError);
+      return uploadViaBackend(requestId, file, onProgress);
+    }
 
     // Phase 3: Complete upload - create attachment record
     onProgress?.({ phase: 'completing', percent: 100 });
