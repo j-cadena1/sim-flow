@@ -148,6 +148,12 @@ export async function initializeStorage(): Promise<void> {
         secretAccessKey: secretAccessKey!,
       },
       forcePathStyle: true,
+      // Disable automatic checksum calculation for presigned URLs
+      // S3-compatible services like Garage don't handle AWS SDK v3's checksum headers
+      // Without this, the SDK includes x-amz-checksum-crc32 in signed headers,
+      // which browsers can't provide when uploading via presigned URLs
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
 
     // Check if bucket exists
@@ -316,12 +322,7 @@ export async function createPresignedUploadUrl(
     ContentLength: contentLength,
   });
 
-  // Disable automatic checksum headers - S3-compatible services like Garage
-  // don't handle AWS SDK v3's x-amz-checksum-* headers correctly
-  const uploadUrl = await getSignedUrl(publicS3Client, command, {
-    expiresIn,
-    unhoistableHeaders: new Set(['x-amz-checksum-crc32']),
-  });
+  const uploadUrl = await getSignedUrl(publicS3Client, command, { expiresIn });
 
   return { uploadUrl, expiresAt };
 }
