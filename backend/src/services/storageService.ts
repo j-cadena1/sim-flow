@@ -270,6 +270,7 @@ export async function validateFileContent(
   }
 
   // Dynamic import for ESM-only module
+  // @ts-expect-error - ESM module imported dynamically in CommonJS context
   const { fileTypeFromBuffer } = await import('file-type');
   const detected = await fileTypeFromBuffer(buffer);
   if (!detected) {
