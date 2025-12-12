@@ -1018,7 +1018,8 @@ export const useDirectUpload = () => {
   let activeRequestId: string | null = null;
 
   /**
-   * Fallback: Upload via backend (legacy method)
+   * Fallback: Upload via backend using XHR for reliable progress tracking
+   * Uses XHR instead of axios to avoid timeout issues with large files
    */
   const uploadViaBackend = async (
     requestId: string,
@@ -1030,24 +1031,54 @@ export const useDirectUpload = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const { data } = await apiClient.post(`/requests/${requestId}/attachments`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.total) {
-          const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+    return new Promise<Attachment>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      activeXhr = xhr;
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
           onProgress?.({ phase: 'uploading', percent });
         }
-      },
+      });
+
+      xhr.addEventListener('load', () => {
+        activeXhr = null;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            onProgress?.({ phase: 'completing', percent: 100 });
+            queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(requestId) });
+            resolve(response.attachment);
+          } catch {
+            reject(new Error('Invalid response from server'));
+          }
+        } else {
+          try {
+            const errorResponse = JSON.parse(xhr.responseText);
+            reject(new Error(errorResponse.error || errorResponse.message || `Upload failed: ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        activeXhr = null;
+        reject(new Error('Upload failed - network error'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        activeXhr = null;
+        reject(new Error('Upload cancelled'));
+      });
+
+      // Use relative URL - will go through nginx proxy
+      xhr.open('POST', `/api/requests/${requestId}/attachments`);
+      xhr.withCredentials = true; // Include cookies for auth
+      // Don't set Content-Type - browser will set it with boundary for FormData
+      xhr.send(formData);
     });
-
-    onProgress?.({ phase: 'completing', percent: 100 });
-
-    // Invalidate attachments query to show new file
-    queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(requestId) });
-
-    return data.attachment;
   };
 
   /**
