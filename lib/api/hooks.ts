@@ -1133,6 +1133,7 @@ export const useDirectUpload = () => {
         // Track progress to detect stalled uploads (e.g., Cloudflare buffering)
         let lastProgressTime = Date.now();
         let lastProgressPercent = 0;
+        let stallAborted = false; // Flag to distinguish stall abort from user cancel
         const PROGRESS_TIMEOUT_MS = 15000; // 15 seconds without progress = stalled
 
         // Check for stalled upload every 5 seconds
@@ -1140,8 +1141,9 @@ export const useDirectUpload = () => {
           const timeSinceProgress = Date.now() - lastProgressTime;
           if (timeSinceProgress > PROGRESS_TIMEOUT_MS && lastProgressPercent < 100) {
             clearInterval(progressCheckInterval);
+            stallAborted = true;
             xhr.abort();
-            reject(new Error('Upload stalled - no progress for 15 seconds (possible proxy buffering)'));
+            // Note: abort handler will fire and reject with appropriate message
           }
         }, 5000);
 
@@ -1173,7 +1175,8 @@ export const useDirectUpload = () => {
         xhr.addEventListener('abort', () => {
           clearInterval(progressCheckInterval);
           activeXhr = null;
-          reject(new Error('Upload cancelled'));
+          // Use different message for stall vs user cancel so catch block can differentiate
+          reject(new Error(stallAborted ? 'Upload stalled - no progress (proxy buffering)' : 'Upload cancelled'));
         });
 
         xhr.open('PUT', uploadUrl);
@@ -1181,7 +1184,7 @@ export const useDirectUpload = () => {
         xhr.send(file);
       });
     } catch (uploadError) {
-      // If it was user-cancelled, re-throw (don't fall back)
+      // If it was explicitly user-cancelled (not stall-aborted), re-throw (don't fall back)
       if (uploadError instanceof Error && uploadError.message === 'Upload cancelled') {
         throw uploadError;
       }
