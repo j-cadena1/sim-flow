@@ -348,6 +348,35 @@ export async function verifyUploadedFile(
 }
 
 /**
+ * Get a file stream for proxied downloads
+ * Uses the internal S3 client (not public) for server-to-server access
+ */
+export async function getFileStream(
+  key: string
+): Promise<{ stream: Readable; contentType: string; contentLength: number }> {
+  if (!s3Client || !isConnected) {
+    throw new Error('Storage is not connected');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+
+  if (!response.Body) {
+    throw new Error('No file body returned from storage');
+  }
+
+  return {
+    stream: response.Body as Readable,
+    contentType: response.ContentType || 'application/octet-stream',
+    contentLength: response.ContentLength || 0,
+  };
+}
+
+/**
  * Delete a file from storage
  */
 export async function deleteFile(key: string): Promise<void> {

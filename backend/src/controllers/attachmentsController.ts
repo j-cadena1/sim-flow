@@ -33,6 +33,7 @@ import {
   generateStorageKey,
   uploadFile,
   getSignedDownloadUrl,
+  getFileStream,
   deleteFiles,
   deleteFile,
   getStorageConfig,
@@ -316,6 +317,74 @@ export const getDownloadUrl = asyncHandler(async (req: Request, res: Response) =
     contentType: attachment.content_type,
     expiresIn: 3600, // seconds
   });
+});
+
+/**
+ * Stream download an attachment through the backend
+ * Fallback for when presigned URLs don't work (e.g., behind reverse proxy)
+ *
+ * @param req.params.requestId - The request UUID
+ * @param req.params.attachmentId - The attachment UUID
+ */
+export const streamDownload = asyncHandler(async (req: Request, res: Response) => {
+  const { requestId, attachmentId } = req.params;
+  const userId = req.user?.userId || '';
+  const userRole = req.user?.role;
+
+  // Verify attachment exists and belongs to request
+  const result = await query(
+    `SELECT a.*, r.created_by, r.assigned_to
+     FROM attachments a
+     JOIN requests r ON a.request_id = r.id
+     WHERE a.id = $1 AND a.request_id = $2`,
+    [attachmentId, requestId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new NotFoundError('Attachment', attachmentId);
+  }
+
+  const attachment = result.rows[0];
+
+  // Authorization check: creator, assigned engineer, managers, admins
+  const canDownload =
+    userRole === 'Admin' ||
+    userRole === 'Manager' ||
+    attachment.created_by === userId ||
+    attachment.assigned_to === userId;
+
+  if (!canDownload) {
+    throw new AuthorizationError('You do not have permission to download this file');
+  }
+
+  // Get file stream from S3
+  const { stream, contentType, contentLength } = await getFileStream(attachment.storage_key);
+
+  // Set headers for download
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Length', contentLength);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${encodeURIComponent(attachment.original_file_name)}"`
+  );
+
+  // Audit log for file download
+  await logRequestAudit(
+    req,
+    AuditAction.DOWNLOAD_ATTACHMENT,
+    EntityType.ATTACHMENT,
+    attachmentId,
+    {
+      requestId,
+      fileName: attachment.original_file_name,
+      fileSize: attachment.file_size,
+      contentType: attachment.content_type,
+      method: 'stream',
+    }
+  );
+
+  // Pipe the stream to response
+  stream.pipe(res);
 });
 
 /**

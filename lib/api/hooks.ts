@@ -897,13 +897,28 @@ export const useUploadAttachment = () => {
 };
 
 /**
- * Get signed download URL for an attachment
+ * Download an attachment via streaming endpoint
+ * Uses backend-proxied download which works reliably behind reverse proxies
  */
 export const useDownloadAttachment = () => {
   return useMutation({
     mutationFn: async ({ requestId, attachmentId }: { requestId: string; attachmentId: string }) => {
-      const { data } = await apiClient.get(`/requests/${requestId}/attachments/${attachmentId}/download`);
-      return data as { downloadUrl: string; fileName: string; contentType: string; expiresIn: number };
+      // Use the stream endpoint which proxies through the backend
+      // This works reliably behind reverse proxies where presigned URLs may fail
+      const streamUrl = `/api/requests/${requestId}/attachments/${attachmentId}/stream`;
+
+      // Get attachment info for the filename
+      const { data: attachments } = await apiClient.get(`/requests/${requestId}/attachments`);
+      const attachment = (attachments.attachments as Attachment[]).find((a) => a.id === attachmentId);
+      const fileName = attachment?.originalFileName || 'download';
+      const contentType = attachment?.contentType || 'application/octet-stream';
+
+      return {
+        downloadUrl: streamUrl,
+        fileName,
+        contentType,
+        expiresIn: 0, // Stream doesn't expire
+      };
     },
   });
 };

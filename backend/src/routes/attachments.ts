@@ -12,6 +12,7 @@ import {
   getAttachments,
   uploadAttachment,
   getDownloadUrl,
+  streamDownload,
   deleteAttachment,
   getStorageInfo,
   getProcessingStatus,
@@ -266,6 +267,55 @@ router.get(
   '/requests/:requestId/attachments/:attachmentId/download',
   authenticate,
   getDownloadUrl
+);
+
+/**
+ * @swagger
+ * /requests/{requestId}/attachments/{attachmentId}/stream:
+ *   get:
+ *     summary: Stream download an attachment
+ *     description: |
+ *       Download a file attachment by streaming it through the backend.
+ *       Use this when presigned URLs don't work (e.g., behind reverse proxy).
+ *
+ *       **Permissions:** Request creator, assigned engineer, Manager, Admin
+ *     tags: [Attachments]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The request UUID
+ *       - in: path
+ *         name: attachmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The attachment UUID
+ *     responses:
+ *       200:
+ *         description: File content streamed
+ *         content:
+ *           application/octet-stream:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized to download this file
+ *       404:
+ *         description: Attachment not found
+ */
+router.get(
+  '/requests/:requestId/attachments/:attachmentId/stream',
+  authenticate,
+  streamDownload
 );
 
 /**
