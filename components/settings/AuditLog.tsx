@@ -97,6 +97,8 @@ export const AuditLog: React.FC = () => {
     if (action.includes('LOGIN') || action.includes('LOGOUT')) return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
     if (action.includes('APPROVE')) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
     if (action.includes('REJECT') || action.includes('DENY')) return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
+    if (action.includes('DOWNLOAD')) return 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20';
+    if (action.includes('ADD_ATTACHMENT')) return 'text-violet-400 bg-violet-400/10 border-violet-400/20';
     return 'text-slate-400 bg-slate-400/10 border-slate-400/20';
   };
 
@@ -109,6 +111,8 @@ export const AuditLog: React.FC = () => {
     if (action.includes('LOGOUT')) return '🚪';
     if (action.includes('APPROVE')) return '✅';
     if (action.includes('REJECT') || action.includes('DENY')) return '❌';
+    if (action.includes('DOWNLOAD')) return '⬇️';
+    if (action.includes('ADD_ATTACHMENT')) return '📎';
     return '📋';
   };
 
@@ -275,6 +279,9 @@ export const AuditLog: React.FC = () => {
               <option value="UPDATE_REQUEST_STATUS">Update Status</option>
               <option value="ASSIGN_ENGINEER">Assign Engineer</option>
               <option value="DELETE_REQUEST">Delete Request</option>
+              <option value="ADD_ATTACHMENT">Add Attachment</option>
+              <option value="DELETE_ATTACHMENT">Delete Attachment</option>
+              <option value="DOWNLOAD_ATTACHMENT">Download Attachment</option>
               <option value="UPDATE_USER_ROLE">Update User Role</option>
               <option value="DEACTIVATE_USER">Deactivate User</option>
               <option value="RESTORE_USER">Restore User</option>
@@ -343,7 +350,7 @@ export const AuditLog: React.FC = () => {
         ) : (
           <>
             {/* Table Header */}
-            <div className="hidden md:grid md:grid-cols-[220px_1fr_180px_32px] gap-4 px-4 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+            <div className="hidden md:grid md:grid-cols-[200px_1fr_200px_32px] gap-4 px-4 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
               <div>Action</div>
               <div>Details</div>
               <div className="text-right">Timestamp</div>
@@ -357,7 +364,7 @@ export const AuditLog: React.FC = () => {
                     onClick={() => toggleExpand(log.id)}
                     className="w-full px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors text-left"
                   >
-                    <div className="grid md:grid-cols-[220px_1fr_180px_32px] gap-4 items-center">
+                    <div className="grid md:grid-cols-[200px_1fr_200px_32px] gap-4 items-center">
                       {/* Action Badge - Fixed Width Column */}
                       <div className="flex items-center">
                         <span
@@ -397,9 +404,11 @@ export const AuditLog: React.FC = () => {
                       </div>
 
                       {/* Timestamp & IP - Fixed Width Column */}
-                      <div className="text-right hidden md:block">
+                      <div className="text-right hidden md:block min-w-0">
                         <div className="text-sm text-gray-700 dark:text-slate-300">{formatTimestamp(log.timestamp)}</div>
-                        <div className="text-xs font-mono text-gray-400 dark:text-slate-500">{log.ip_address || '-'}</div>
+                        <div className="text-xs font-mono text-gray-400 dark:text-slate-500 truncate" title={log.ip_address || '-'}>
+                          {log.ip_address || '-'}
+                        </div>
                       </div>
 
                       {/* Expand Indicator */}
@@ -423,87 +432,85 @@ export const AuditLog: React.FC = () => {
                   {/* Expanded Details Panel */}
                   {expandedLogIds.has(log.id) && (
                     <div className="px-4 pb-4 bg-gray-50 dark:bg-slate-800/30 border-t border-gray-100 dark:border-slate-800">
-                      {/* Event Details Card - Full Width at Top */}
-                      {log.details && Object.keys(log.details).length > 0 && (
-                        <div className="mt-4 bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
-                          <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Event Details</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-                            {Object.entries(log.details).map(([key, value]) => (
-                              <div key={key} className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800 last:border-0">
-                                <span className="text-sm text-gray-500 dark:text-slate-400">{formatDetailKey(key)}</span>
-                                <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 text-right">
-                                  {formatDetailValue(key, value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
                         {/* User Info Card */}
                         <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
                           <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">User Information</h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">Name</span>
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">{log.user_name}</span>
+                          <dl className="space-y-3">
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">Name</dt>
+                              <dd className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">{log.user_name}</dd>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">Email</span>
-                              <span className="text-sm text-gray-700 dark:text-slate-300">{log.user_email}</span>
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">Email</dt>
+                              <dd className="text-sm text-gray-700 dark:text-slate-300 mt-0.5 break-all">{log.user_email}</dd>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">User ID</span>
-                              <span className="text-xs font-mono text-gray-500 dark:text-slate-400">{log.user_id?.slice(0, 8)}...</span>
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">User ID</dt>
+                              <dd className="text-xs font-mono text-gray-500 dark:text-slate-400 mt-0.5 break-all">{log.user_id || '-'}</dd>
                             </div>
-                          </div>
+                          </dl>
                         </div>
 
                         {/* Event Info Card */}
                         <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
                           <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Event Information</h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">Action</span>
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">{formatActionName(log.action)}</span>
+                          <dl className="space-y-3">
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">Action</dt>
+                              <dd className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">{formatActionName(log.action)}</dd>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">Entity Type</span>
-                              <span className="text-sm text-gray-700 dark:text-slate-300 capitalize">{log.entity_type}</span>
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">Entity Type</dt>
+                              <dd className="text-sm text-gray-700 dark:text-slate-300 capitalize mt-0.5">{log.entity_type}</dd>
                             </div>
                             {log.entity_id && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-gray-500 dark:text-slate-400">Entity ID</span>
-                                <span className="text-xs font-mono text-gray-500 dark:text-slate-400">{log.entity_id}</span>
+                              <div>
+                                <dt className="text-xs text-gray-500 dark:text-slate-400">Entity ID</dt>
+                                <dd className="text-xs font-mono text-gray-500 dark:text-slate-400 mt-0.5 break-all">{log.entity_id}</dd>
                               </div>
                             )}
-                          </div>
+                          </dl>
                         </div>
 
                         {/* Connection Info Card */}
                         <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
                           <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Connection</h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">IP Address</span>
-                              <span className="text-sm font-mono text-gray-700 dark:text-slate-300">{log.ip_address || '-'}</span>
+                          <dl className="space-y-3">
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">IP Address</dt>
+                              <dd className="text-sm font-mono text-gray-700 dark:text-slate-300 mt-0.5 break-all">{log.ip_address || '-'}</dd>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-500 dark:text-slate-400">Timestamp</span>
-                              <span className="text-sm text-gray-700 dark:text-slate-300">{formatTimestamp(log.timestamp)}</span>
+                            <div>
+                              <dt className="text-xs text-gray-500 dark:text-slate-400">Timestamp</dt>
+                              <dd className="text-sm text-gray-700 dark:text-slate-300 mt-0.5">{formatTimestamp(log.timestamp)}</dd>
                             </div>
                             {log.user_agent && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-gray-500 dark:text-slate-400">User Agent</span>
-                                <span className="text-xs text-gray-500 dark:text-slate-400 truncate max-w-[150px]" title={log.user_agent}>
-                                  {log.user_agent.split('/')[0]}
-                                </span>
+                              <div>
+                                <dt className="text-xs text-gray-500 dark:text-slate-400">User Agent</dt>
+                                <dd className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 break-all">{log.user_agent}</dd>
                               </div>
                             )}
-                          </div>
+                          </dl>
                         </div>
                       </div>
+
+                      {/* Event Details Card - Full Width at Bottom */}
+                      {log.details && Object.keys(log.details).length > 0 && (
+                        <div className="mt-4 bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                          <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Event Details</h4>
+                          <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {Object.entries(log.details).map(([key, value]) => (
+                              <div key={key}>
+                                <dt className="text-xs text-gray-500 dark:text-slate-400">{formatDetailKey(key)}</dt>
+                                <dd className="text-sm font-medium text-gray-900 dark:text-white mt-0.5 break-all">
+                                  {formatDetailValue(key, value)}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

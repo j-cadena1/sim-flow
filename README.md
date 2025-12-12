@@ -1,7 +1,7 @@
 # Sim RQ
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.9.1--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
+[![Version](https://img.shields.io/badge/version-0.9.4--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
 [![Docker](https://img.shields.io/badge/Docker-First-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)

@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- markdownlint-disable MD024 -->
 
+## [0.9.5] - 2025-12-12
+
+### Added
+
+- **Direct S3 uploads** - Large file uploads now bypass nginx/backend entirely
+  - Browser uploads directly to S3 using presigned URLs
+  - Eliminates timeout issues for large files on slow connections
+  - Real-time upload progress indicator with percentage
+  - Automatic cleanup of expired pending uploads (hourly)
+- **Processing status notifications** - WebSocket events notify when media processing completes
+  - UI automatically refreshes thumbnails without manual page reload
+  - Works behind Cloudflare Tunnel and other reverse proxies
+- **Upload cancellation** - Cancel in-progress uploads with proper cleanup
+- **New API endpoints** for direct upload workflow:
+  - `POST /api/requests/:id/attachments/init` - Get presigned upload URL
+  - `POST /api/requests/:id/attachments/complete` - Finalize upload after S3 PUT
+  - `DELETE /api/requests/:id/attachments/cancel` - Cancel pending upload
+
+### Security
+
+- **Authorization check on attachments endpoint** - `GET /api/requests/:id/attachments` now verifies user has permission to view the request (creator, assigned engineer, Manager, or Admin)
+- **CSP documentation** - Added security comment explaining why `unsafe-inline` is required for styles and the mitigating controls in place
+
+### Changed
+
+- **nginx API timeouts reduced** - `/api/` proxy timeouts reduced from 3600s to 120s (uploads no longer pass through)
+- **nginx CORS for storage** - Added CORS preflight handling for direct browser-to-S3 uploads
+
+### Technical
+
+- New `pending_uploads` database table to track in-progress direct uploads
+- `useDirectUpload` hook in frontend with XHR for upload progress tracking
+- `emitToUser` WebSocket function for per-user event delivery
+- Cleanup service runs hourly to remove expired pending uploads and orphaned S3 files
+
+## [0.9.4] - 2025-12-12
+
+### Added
+
+- **HEIC/HEIF image support** - Apple device photos now supported for file attachments
+
+### Fixed
+
+- **S3 presigned URL signature mismatch** - Fixed file downloads failing behind reverse proxy by using path-style URLs
+- **Large file uploads** - Increased nginx proxy timeouts to 1 hour (supports 3GB uploads on slow connections) and removed hardcoded body size limit
+- **Docker build performance** - Excluded `data/` directory from build context via `.dockerignore`
+- **TypeScript build** - Excluded test files from production build, fixed ESLint tsconfig for type-aware linting
+- **Docker Compose validation** - Removed invalid empty `volumes` key
+
 ## [0.9.3] - 2025-12-10
 
 ### Added
@@ -245,6 +294,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics dashboard tests
 - Navigation and UI tests
 
+[0.9.4]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.4
+[0.9.3]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.3
 [0.9.2]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.2
 [0.9.1]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.1
 [0.9.0]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.0

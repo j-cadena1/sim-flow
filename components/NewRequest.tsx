@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useSimRQ } from '../contexts/SimRQContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './Toast';
-import { useProjects, useStorageConfig } from '../lib/api/hooks';
+import { useProjects, useStorageConfig, useDirectUpload, DirectUploadProgress } from '../lib/api/hooks';
 import { validateNewRequest } from '../utils/validation';
 import { Send, AlertCircle, FolderOpen, UserCircle, Upload, X, File, FileText, FileSpreadsheet, FileImage, FileVideo, FileArchive, Paperclip, Loader2 } from 'lucide-react';
 import { ProjectStatus, StorageConfig } from '../types';
@@ -63,6 +63,7 @@ export const NewRequest: React.FC = () => {
   const { showToast } = useToast();
   const { data: allProjects = [], isLoading: projectsLoading } = useProjects();
   const { data: storageConfig } = useStorageConfig();
+  const { uploadFile } = useDirectUpload();
 
   const approvedProjects = allProjects.filter(p => p.status === ProjectStatus.ACTIVE && p.totalHours > p.usedHours);
   const isAdmin = user?.role === 'Admin';
@@ -83,6 +84,7 @@ export const NewRequest: React.FC = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [currentUploadProgress, setCurrentUploadProgress] = useState<DirectUploadProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch users when component mounts (only for admins)
@@ -183,26 +185,22 @@ export const NewRequest: React.FC = () => {
       // Create the request first
       const newRequest = await addRequestAsync(title, description, vendor, priority, projectId, onBehalfOfUserId || undefined);
 
-      // Upload attachments if any
+      // Upload attachments using direct S3 upload
       if (pendingFiles.length > 0 && newRequest?.id) {
-        setUploadProgress(`Uploading attachments (0/${pendingFiles.length})...`);
-
         for (let i = 0; i < pendingFiles.length; i++) {
           const file = pendingFiles[i];
-          setUploadProgress(`Uploading attachments (${i + 1}/${pendingFiles.length})...`);
-
-          const formData = new FormData();
-          formData.append('file', file);
+          setUploadProgress(`Uploading ${file.name} (${i + 1}/${pendingFiles.length})`);
 
           try {
-            await apiClient.post(`/requests/${newRequest.id}/attachments`, formData, {
-              headers: { 'Content-Type': 'multipart/form-data' },
+            await uploadFile(newRequest.id, file, (progress) => {
+              setCurrentUploadProgress(progress);
             });
           } catch (uploadError) {
             // Log but continue with other files
             console.error(`Failed to upload ${file.name}:`, uploadError);
           }
         }
+        setCurrentUploadProgress(null);
       }
 
       showToast('Request submitted successfully', 'success');
@@ -211,6 +209,7 @@ export const NewRequest: React.FC = () => {
       showToast('Failed to submit request', 'error');
       setIsSubmitting(false);
       setUploadProgress(null);
+      setCurrentUploadProgress(null);
     }
   };
 
@@ -465,24 +464,51 @@ export const NewRequest: React.FC = () => {
             </div>
           )}
 
-          <div className="pt-4 border-t border-gray-200 dark:border-slate-800 flex justify-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>{uploadProgress || 'Submitting...'}</span>
-                </>
-              ) : (
-                <>
-                  <Send size={18} />
-                  <span>Submit Request</span>
-                </>
-              )}
-            </button>
+          <div className="pt-4 border-t border-gray-200 dark:border-slate-800">
+            {/* Upload Progress Bar */}
+            {isSubmitting && currentUploadProgress && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Loader2 className="animate-spin text-blue-500 mr-2" size={16} />
+                    <span className="text-sm text-blue-700 dark:text-blue-400">
+                      {currentUploadProgress.phase === 'init' && 'Initializing upload...'}
+                      {currentUploadProgress.phase === 'uploading' && uploadProgress}
+                      {currentUploadProgress.phase === 'completing' && 'Finalizing upload...'}
+                    </span>
+                  </div>
+                  <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                    {currentUploadProgress.percent}%
+                  </span>
+                </div>
+                <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${currentUploadProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>{uploadProgress || 'Submitting...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={18} />
+                    <span>Submit Request</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

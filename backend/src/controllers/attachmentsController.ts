@@ -34,8 +34,11 @@ import {
   uploadFile,
   getSignedDownloadUrl,
   deleteFiles,
+  deleteFile,
   getStorageConfig,
   isMediaType,
+  createPresignedUploadUrl,
+  verifyUploadedFile,
 } from '../services/storageService';
 import { processMediaAsync } from '../services/mediaProcessingService';
 
@@ -60,11 +63,39 @@ interface AttachmentResponse {
 /**
  * Get all attachments for a request
  *
+ * Security: Verifies user has permission to view the request before returning attachments.
+ * Authorized users: Request creator, assigned engineer, Manager, Admin
+ *
  * @param req.params.requestId - The request UUID
  * @returns attachments - Array of attachment objects with signed thumbnail URLs
  */
 export const getAttachments = asyncHandler(async (req: Request, res: Response) => {
   const { requestId } = req.params;
+  const userId = req.user?.userId || '';
+  const userRole = req.user?.role;
+
+  // Verify request exists and user has permission to view it
+  const requestResult = await query(
+    'SELECT created_by, assigned_to FROM requests WHERE id = $1',
+    [requestId]
+  );
+
+  if (requestResult.rows.length === 0) {
+    throw new NotFoundError('Request', requestId);
+  }
+
+  const request = requestResult.rows[0];
+
+  // Authorization check: creator, assigned engineer, managers, admins
+  const canView =
+    userRole === 'Admin' ||
+    userRole === 'Manager' ||
+    request.created_by === userId ||
+    request.assigned_to === userId;
+
+  if (!canView) {
+    throw new AuthorizationError('You do not have permission to view attachments for this request');
+  }
 
   const result = await query(
     `SELECT * FROM attachments
@@ -265,6 +296,20 @@ export const getDownloadUrl = asyncHandler(async (req: Request, res: Response) =
     attachment.original_file_name
   );
 
+  // Audit log for file download
+  await logRequestAudit(
+    req,
+    AuditAction.DOWNLOAD_ATTACHMENT,
+    EntityType.ATTACHMENT,
+    attachmentId,
+    {
+      requestId,
+      fileName: attachment.original_file_name,
+      fileSize: attachment.file_size,
+      contentType: attachment.content_type,
+    }
+  );
+
   res.json({
     downloadUrl: signedUrl,
     fileName: attachment.original_file_name,
@@ -372,3 +417,276 @@ export const getProcessingStatus = asyncHandler(async (req: Request, res: Respon
     processingError: result.rows[0].processing_error,
   });
 });
+
+// =============================================================================
+// DIRECT S3 UPLOAD HANDLERS
+// =============================================================================
+
+/**
+ * Initialize a direct upload to S3
+ * Returns a presigned URL for the browser to upload directly to S3
+ *
+ * @param req.params.requestId - The request UUID
+ * @param req.body.fileName - Original file name
+ * @param req.body.contentType - MIME type
+ * @param req.body.fileSize - File size in bytes
+ * @returns uploadId, uploadUrl, storageKey, expiresAt
+ */
+export const initUpload = asyncHandler(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const { fileName, contentType, fileSize } = req.body;
+  const userId = req.user?.userId || '';
+  const userName = req.user?.name || 'Unknown';
+  const userRole = req.user?.role;
+
+  if (!isStorageConnected()) {
+    throw new ValidationError('File storage is not available');
+  }
+
+  // Validate request body
+  if (!fileName || !contentType || !fileSize) {
+    throw new ValidationError('fileName, contentType, and fileSize are required');
+  }
+
+  // Verify request exists and user has permission
+  const requestResult = await query(
+    'SELECT created_by, assigned_to FROM requests WHERE id = $1',
+    [requestId]
+  );
+
+  if (requestResult.rows.length === 0) {
+    throw new NotFoundError('Request', requestId);
+  }
+
+  const request = requestResult.rows[0];
+
+  // Permission check: creator, assigned engineer, managers, admins
+  const canUpload =
+    userRole === 'Admin' ||
+    userRole === 'Manager' ||
+    request.created_by === userId ||
+    request.assigned_to === userId;
+
+  if (!canUpload) {
+    throw new AuthorizationError('You do not have permission to upload files to this request');
+  }
+
+  // Validate file
+  const validation = validateFile(fileName, contentType, fileSize);
+  if (!validation.valid) {
+    throw new ValidationError(validation.error || 'Invalid file');
+  }
+
+  // Generate storage key and presigned URL
+  const storageKey = generateStorageKey(requestId, fileName);
+  const { uploadUrl, expiresAt } = await createPresignedUploadUrl(storageKey, contentType, fileSize);
+
+  // Sanitize filename
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+  // Create pending upload record
+  const result = await query(
+    `INSERT INTO pending_uploads (
+      request_id, storage_key, file_name, original_file_name, content_type,
+      file_size, uploaded_by, uploaded_by_name, expires_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING id`,
+    [requestId, storageKey, sanitizedFileName, fileName, contentType, fileSize, userId, userName, expiresAt]
+  );
+
+  res.json({
+    uploadId: result.rows[0].id,
+    uploadUrl,
+    storageKey,
+    expiresAt: expiresAt.toISOString(),
+  });
+});
+
+/**
+ * Complete a direct upload - verify file exists in S3 and create attachment record
+ *
+ * @param req.params.requestId - The request UUID
+ * @param req.body.uploadId - The pending upload UUID from initUpload
+ * @returns attachment - The created attachment object
+ */
+export const completeUpload = asyncHandler(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const { uploadId } = req.body;
+  const userId = req.user?.userId || '';
+  const userName = req.user?.name || 'Unknown';
+
+  if (!uploadId) {
+    throw new ValidationError('uploadId is required');
+  }
+
+  // Get pending upload record
+  const pendingResult = await query(
+    `SELECT * FROM pending_uploads WHERE id = $1 AND request_id = $2`,
+    [uploadId, requestId]
+  );
+
+  if (pendingResult.rows.length === 0) {
+    throw new NotFoundError('Upload', uploadId);
+  }
+
+  const pending = pendingResult.rows[0];
+
+  // Check if expired
+  if (new Date(pending.expires_at) < new Date()) {
+    await query('DELETE FROM pending_uploads WHERE id = $1', [uploadId]);
+    throw new ValidationError('Upload expired. Please try uploading again.');
+  }
+
+  // Verify file exists in S3 with correct size
+  const verification = await verifyUploadedFile(pending.storage_key, pending.file_size);
+
+  if (!verification.exists) {
+    throw new ValidationError('File not found in storage. Upload may have failed.');
+  }
+
+  if (!verification.matches) {
+    throw new ValidationError(
+      `File size mismatch: expected ${pending.file_size} bytes, got ${verification.size} bytes`
+    );
+  }
+
+  // Create attachment record
+  const attachmentResult = await query(
+    `INSERT INTO attachments (
+      request_id, file_name, original_file_name, content_type,
+      file_size, storage_key, uploaded_by, uploaded_by_name, processing_status
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *`,
+    [
+      requestId,
+      pending.file_name,
+      pending.original_file_name,
+      pending.content_type,
+      pending.file_size,
+      pending.storage_key,
+      pending.uploaded_by,
+      pending.uploaded_by_name,
+      isMediaType(pending.content_type) ? 'pending' : 'completed',
+    ]
+  );
+
+  const attachment = attachmentResult.rows[0];
+
+  // Delete pending upload record
+  await query('DELETE FROM pending_uploads WHERE id = $1', [uploadId]);
+
+  // Start async media processing if needed (fetch from S3)
+  if (isMediaType(pending.content_type)) {
+    // We need to fetch the file from S3 for processing since we don't have the buffer
+    processMediaFromS3(attachment.id, requestId, pending.storage_key, pending.original_file_name, pending.content_type);
+  }
+
+  // Get request info for notifications
+  const requestInfo = await query('SELECT title, created_by, assigned_to FROM requests WHERE id = $1', [requestId]);
+  const request = requestInfo.rows[0];
+
+  // Audit log
+  await logRequestAudit(
+    req,
+    AuditAction.ADD_ATTACHMENT,
+    EntityType.ATTACHMENT,
+    attachment.id,
+    {
+      requestId,
+      fileName: pending.original_file_name,
+      fileSize: pending.file_size,
+      contentType: pending.content_type,
+      uploadMethod: 'direct',
+    }
+  );
+
+  // Notify relevant users
+  const notifyUsers = new Set<string>();
+  if (request.created_by && request.created_by !== userId) {
+    notifyUsers.add(request.created_by);
+  }
+  if (request.assigned_to && request.assigned_to !== userId) {
+    notifyUsers.add(request.assigned_to);
+  }
+
+  for (const notifyUserId of notifyUsers) {
+    sendNotification({
+      userId: notifyUserId,
+      type: 'REQUEST_COMMENT_ADDED',
+      title: 'New File Attached',
+      message: `${userName} attached "${pending.original_file_name}" to request "${request.title}"`,
+      link: `/requests/${requestId}`,
+      entityType: 'Request',
+      entityId: requestId,
+      triggeredBy: userId,
+    }).catch((err) => logger.error('Failed to send attachment notification:', err));
+  }
+
+  res.status(201).json({ attachment: toCamelCase(attachment) });
+});
+
+/**
+ * Cancel an in-progress upload
+ *
+ * @param req.params.requestId - The request UUID
+ * @param req.body.uploadId - The pending upload UUID from initUpload
+ * @returns success
+ */
+export const cancelUpload = asyncHandler(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const { uploadId } = req.body;
+
+  if (!uploadId) {
+    throw new ValidationError('uploadId is required');
+  }
+
+  // Get and delete pending upload
+  const result = await query(
+    `DELETE FROM pending_uploads WHERE id = $1 AND request_id = $2 RETURNING storage_key`,
+    [uploadId, requestId]
+  );
+
+  if (result.rows.length > 0) {
+    // Try to delete file from S3 if it was uploaded
+    try {
+      await deleteFile(result.rows[0].storage_key);
+    } catch {
+      // File may not exist yet, that's OK
+    }
+  }
+
+  res.json({ success: true });
+});
+
+/**
+ * Helper: Process media from S3 (for direct uploads where we don't have the buffer)
+ */
+async function processMediaFromS3(
+  attachmentId: string,
+  requestId: string,
+  storageKey: string,
+  originalFileName: string,
+  contentType: string
+): Promise<void> {
+  // Import dynamically to avoid circular dependencies
+  const { getSignedDownloadUrl } = await import('../services/storageService');
+
+  try {
+    // Get a signed URL and fetch the file
+    const signedUrl = await getSignedDownloadUrl(storageKey);
+    const response = await fetch(signedUrl);
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    // Process the media
+    processMediaAsync(attachmentId, requestId, buffer, originalFileName, contentType, storageKey);
+  } catch (error) {
+    logger.error(`Failed to fetch file from S3 for media processing: ${storageKey}`, error);
+    // Update attachment status to failed
+    await query(
+      `UPDATE attachments SET processing_status = 'failed', processing_error = $1 WHERE id = $2`,
+      ['Failed to fetch file for processing', attachmentId]
+    );
+  }
+}

@@ -25,6 +25,7 @@ import {
   isImageType,
   isVideoType,
 } from './storageService';
+import { emitToUser } from './websocketService';
 
 // Thumbnail dimensions
 const THUMBNAIL_WIDTH = 200;
@@ -39,6 +40,37 @@ interface ProcessingResult {
   thumbnailKey?: string;
   compressedKey?: string;
   error?: string;
+}
+
+/**
+ * Notify the uploader that media processing has completed
+ * This triggers a UI refresh in the frontend Attachments component
+ */
+async function notifyProcessingComplete(
+  attachmentId: string,
+  requestId: string,
+  status: 'completed' | 'failed'
+): Promise<void> {
+  try {
+    // Get the uploader's user ID
+    const result = await query(
+      'SELECT uploaded_by FROM attachments WHERE id = $1',
+      [attachmentId]
+    );
+
+    if (result.rows.length > 0 && result.rows[0].uploaded_by) {
+      const uploadedBy = result.rows[0].uploaded_by;
+      emitToUser(uploadedBy, 'attachment:processed', {
+        attachmentId,
+        requestId,
+        status,
+      });
+      logger.debug(`Notified user ${uploadedBy} of attachment processing ${status}`);
+    }
+  } catch (error) {
+    // Don't fail the overall processing if notification fails
+    logger.warn('Failed to send attachment processing notification:', error);
+  }
 }
 
 /**
@@ -148,6 +180,10 @@ export async function processImage(
     );
 
     logger.info(`Image processing completed for attachment ${attachmentId}`);
+
+    // Notify the uploader via WebSocket
+    await notifyProcessingComplete(attachmentId, requestId, 'completed');
+
     return { thumbnailKey };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -157,6 +193,9 @@ export async function processImage(
       "UPDATE attachments SET processing_status = 'failed', processing_error = $1 WHERE id = $2",
       [errorMessage, attachmentId]
     );
+
+    // Notify the uploader of failure
+    await notifyProcessingComplete(attachmentId, requestId, 'failed');
 
     return { error: errorMessage };
   }
@@ -226,6 +265,10 @@ export async function processVideo(
     );
 
     logger.info(`Video processing completed for attachment ${attachmentId}`);
+
+    // Notify the uploader via WebSocket
+    await notifyProcessingComplete(attachmentId, requestId, 'completed');
+
     return { thumbnailKey, compressedKey: storageKey };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -235,6 +278,9 @@ export async function processVideo(
       "UPDATE attachments SET processing_status = 'failed', processing_error = $1 WHERE id = $2",
       [errorMessage, attachmentId]
     );
+
+    // Notify the uploader of failure
+    await notifyProcessingComplete(attachmentId, requestId, 'failed');
 
     return { error: errorMessage };
   } finally {

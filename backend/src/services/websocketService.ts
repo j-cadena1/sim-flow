@@ -165,6 +165,19 @@ export function broadcast(event: string, data: Record<string, unknown>): void {
 }
 
 /**
+ * Emit a custom event to a specific user
+ * Used for real-time updates like attachment processing completion
+ */
+export function emitToUser(userId: string, event: string, data: Record<string, unknown>): void {
+  if (!io) {
+    logger.warn('WebSocket not initialized, cannot emit event');
+    return;
+  }
+
+  io.to(`user:${userId}`).emit(event, data);
+}
+
+/**
  * Get Socket.IO instance for advanced usage
  */
 export function getIO(): SocketIOServer | null {

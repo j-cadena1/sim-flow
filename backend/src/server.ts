@@ -19,6 +19,7 @@ import { initializeEmailService, shutdownEmailService } from './services/emailSe
 import { initializeEmailDigestService, stopEmailDigestService } from './services/emailDigestService';
 import { initializeRedis, shutdownRedis, getRedisStatus } from './services/redisService';
 import { initializeStorage, shutdownStorage, getStorageStatus } from './services/storageService';
+import { startCleanupInterval as startPendingUploadsCleanup, stopCleanupInterval as stopPendingUploadsCleanup } from './services/cleanupService';
 import { swaggerSpec } from './config/swagger';
 import authRouter from './routes/auth';
 import requestsRouter from './routes/requests';
@@ -56,7 +57,12 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"], // Required for inline styles in UI components
+      // SECURITY NOTE: 'unsafe-inline' for styles is required by TailwindCSS and React UI libraries
+      // that inject dynamic styles. This is a known limitation - nonce-based CSP for styles would
+      // require changes to the build pipeline and all UI component libraries.
+      // Risk is mitigated by: strict scriptSrc (no unsafe-inline/unsafe-eval), DOMPurify input
+      // sanitization, and HttpOnly cookies preventing session hijacking even if XSS occurs.
+      styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https://api.dicebear.com", "blob:"], // Allow avatars and data URIs
       fontSrc: ["'self'"],
       connectSrc: ["'self'", "wss:", "ws:"], // Allow WebSocket connections
@@ -206,6 +212,9 @@ async function startServer(): Promise<void> {
   // Initialize S3-compatible storage (if configured) - for file attachments
   await initializeStorage();
 
+  // Start cleanup for expired pending uploads (direct S3 upload tracking)
+  startPendingUploadsCleanup();
+
   // Initialize WebSocket for real-time notifications (uses Redis if available)
   await initializeWebSocket(httpServer);
 
@@ -264,6 +273,7 @@ process.on('SIGTERM', () => {
   httpServer.close(async () => {
     logger.info('HTTP server closed');
     stopNotificationCleanup();
+    stopPendingUploadsCleanup();
     stopEmailDigestService();
     shutdownEmailService();
     await shutdownWebSocket();

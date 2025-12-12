@@ -16,6 +16,7 @@ import {
   HeadBucketCommand,
   CreateBucketCommand,
   ListObjectsV2Command,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -290,6 +291,60 @@ export async function getSignedDownloadUrl(key: string, fileName?: string): Prom
   });
 
   return getSignedUrl(publicS3Client, command, { expiresIn: SIGNED_URL_EXPIRES_IN });
+}
+
+/**
+ * Create a presigned URL for direct browser upload to S3
+ * Uses publicS3Client so the URL is accessible from the browser
+ */
+export async function createPresignedUploadUrl(
+  key: string,
+  contentType: string,
+  contentLength: number
+): Promise<{ uploadUrl: string; expiresAt: Date }> {
+  if (!publicS3Client || !isConnected) {
+    throw new Error('Storage is not connected');
+  }
+
+  const expiresIn = SIGNED_URL_EXPIRES_IN; // 1 hour
+  const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: contentLength,
+  });
+
+  const uploadUrl = await getSignedUrl(publicS3Client, command, { expiresIn });
+
+  return { uploadUrl, expiresAt };
+}
+
+/**
+ * Verify a file exists in S3 and matches expected size
+ * Used after direct upload to confirm success before creating attachment record
+ */
+export async function verifyUploadedFile(
+  key: string,
+  expectedSize: number
+): Promise<{ exists: boolean; size?: number; matches: boolean }> {
+  if (!s3Client || !isConnected) {
+    return { exists: false, matches: false };
+  }
+
+  try {
+    const command = new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: key });
+    const response = await s3Client.send(command);
+    const size = response.ContentLength || 0;
+    return {
+      exists: true,
+      size,
+      matches: size === expectedSize,
+    };
+  } catch {
+    return { exists: false, matches: false };
+  }
 }
 
 /**

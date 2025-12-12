@@ -7,6 +7,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
+import type { Socket } from 'socket.io-client';
 import type { Notification, NotificationPreferences } from '../types';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuth } from './AuthContext';
@@ -21,6 +22,8 @@ interface NotificationContextValue {
   loading: boolean;
   error: string | null;
   isConnected: boolean;
+  /** Socket.IO instance for custom event listeners */
+  socket: Socket | null;
 
   // Actions
   fetchNotifications: (params?: { unreadOnly?: boolean; limit?: number; offset?: number }) => Promise<any>;
@@ -54,7 +57,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   // Initialize WebSocket connection
-  const { isConnected } = useWebSocket({
+  const { isConnected, socket } = useWebSocket({
     userId: user?.id,
     onNotification: handleNewNotification,
     enabled: !!user?.id,
@@ -231,6 +234,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     loading,
     error,
     isConnected,
+    socket,
 
     // Actions
     fetchNotifications,

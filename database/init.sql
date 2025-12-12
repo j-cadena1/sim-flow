@@ -315,6 +315,23 @@ CREATE TABLE system_settings (
     updated_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Pending uploads (for direct S3 upload tracking)
+CREATE TABLE pending_uploads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    request_id UUID NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    storage_key VARCHAR(512) NOT NULL UNIQUE,
+    file_name VARCHAR(255) NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    file_size BIGINT NOT NULL,
+    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_by_name VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE pending_uploads IS 'Tracks in-progress direct uploads to S3. Records expire after 1 hour.';
+
 -- =============================================================================
 -- AUDIT & NOTIFICATIONS
 -- =============================================================================
@@ -440,6 +457,10 @@ CREATE INDEX idx_login_attempts_time ON login_attempts(attempted_at);
 
 -- PKCE states
 CREATE INDEX idx_pkce_states_expires_at ON pkce_states(expires_at);
+
+-- Pending uploads
+CREATE INDEX idx_pending_uploads_expires_at ON pending_uploads(expires_at);
+CREATE INDEX idx_pending_uploads_request_id ON pending_uploads(request_id);
 
 -- Audit logs
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);

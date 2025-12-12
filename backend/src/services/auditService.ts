@@ -40,6 +40,7 @@ export enum AuditAction {
   // Attachment operations
   ADD_ATTACHMENT = 'ADD_ATTACHMENT',
   DELETE_ATTACHMENT = 'DELETE_ATTACHMENT',
+  DOWNLOAD_ATTACHMENT = 'DOWNLOAD_ATTACHMENT',
 
   // Time tracking
   ADD_TIME_ENTRY = 'ADD_TIME_ENTRY',

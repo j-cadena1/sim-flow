@@ -15,6 +15,9 @@ import {
   deleteAttachment,
   getStorageInfo,
   getProcessingStatus,
+  initUpload,
+  completeUpload,
+  cancelUpload,
 } from '../controllers/attachmentsController';
 import { authenticate } from '../middleware/authentication';
 
@@ -101,7 +104,11 @@ const upload = multer({
  * /requests/{requestId}/attachments:
  *   get:
  *     summary: Get all attachments for a request
- *     description: Returns a list of all file attachments associated with a simulation request. Includes signed thumbnail URLs for images and videos.
+ *     description: |
+ *       Returns a list of all file attachments associated with a simulation request.
+ *       Includes signed thumbnail URLs for images and videos.
+ *
+ *       **Permissions:** Request creator, assigned engineer, Manager, Admin
  *     tags: [Attachments]
  *     security:
  *       - cookieAuth: []
@@ -127,6 +134,8 @@ const upload = multer({
  *                     $ref: '#/components/schemas/Attachment'
  *       401:
  *         description: Not authenticated
+ *       403:
+ *         description: Not authorized to view attachments for this request
  *       404:
  *         description: Request not found
  */
@@ -371,5 +380,200 @@ router.get('/storage/config', authenticate, getStorageInfo);
  *         description: Attachment not found
  */
 router.get('/attachments/:attachmentId/status', authenticate, getProcessingStatus);
+
+// =============================================================================
+// DIRECT S3 UPLOAD ROUTES
+// =============================================================================
+
+/**
+ * @swagger
+ * /requests/{requestId}/attachments/init:
+ *   post:
+ *     summary: Initialize a direct upload to S3
+ *     description: |
+ *       Get a presigned URL for direct browser-to-S3 upload.
+ *       This bypasses the backend for the actual file transfer, eliminating timeout issues for large files.
+ *
+ *       **Flow:**
+ *       1. Call this endpoint with file metadata
+ *       2. Upload file directly to S3 using the returned `uploadUrl`
+ *       3. Call `/attachments/complete` with the `uploadId` to finalize
+ *
+ *       **Permissions:** Request creator, assigned engineer, Manager, Admin
+ *     tags: [Attachments]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The request UUID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fileName
+ *               - contentType
+ *               - fileSize
+ *             properties:
+ *               fileName:
+ *                 type: string
+ *                 description: Original filename
+ *                 example: report.pdf
+ *               contentType:
+ *                 type: string
+ *                 description: MIME type
+ *                 example: application/pdf
+ *               fileSize:
+ *                 type: integer
+ *                 description: File size in bytes
+ *                 example: 1048576
+ *     responses:
+ *       200:
+ *         description: Upload initialized - use uploadUrl to upload directly to S3
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 uploadId:
+ *                   type: string
+ *                   format: uuid
+ *                   description: Unique identifier for this upload session
+ *                 uploadUrl:
+ *                   type: string
+ *                   format: uri
+ *                   description: Presigned URL for direct S3 upload (PUT request)
+ *                 storageKey:
+ *                   type: string
+ *                   description: S3 object key
+ *                 expiresAt:
+ *                   type: string
+ *                   format: date-time
+ *                   description: When the presigned URL expires (1 hour)
+ *       400:
+ *         description: Invalid file type, size, or missing parameters
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized to upload to this request
+ *       404:
+ *         description: Request not found
+ *       503:
+ *         description: File storage is not available
+ */
+router.post('/requests/:requestId/attachments/init', authenticate, initUpload);
+
+/**
+ * @swagger
+ * /requests/{requestId}/attachments/complete:
+ *   post:
+ *     summary: Complete a direct upload
+ *     description: |
+ *       Verify the file was uploaded to S3 and create the attachment record.
+ *       Must be called after successfully uploading to the presigned URL from `/init`.
+ *
+ *       **Verification:**
+ *       - Checks file exists in S3
+ *       - Verifies file size matches expected
+ *       - Triggers media processing for images/videos
+ *     tags: [Attachments]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The request UUID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - uploadId
+ *             properties:
+ *               uploadId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Upload session ID from /init response
+ *     responses:
+ *       201:
+ *         description: Attachment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 attachment:
+ *                   $ref: '#/components/schemas/Attachment'
+ *       400:
+ *         description: File not found in storage, size mismatch, or upload expired
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Upload session not found
+ *       410:
+ *         description: Upload expired - must re-initialize
+ */
+router.post('/requests/:requestId/attachments/complete', authenticate, completeUpload);
+
+/**
+ * @swagger
+ * /requests/{requestId}/attachments/cancel:
+ *   delete:
+ *     summary: Cancel an in-progress upload
+ *     description: |
+ *       Cancel a pending direct upload and clean up any partially uploaded files.
+ *       Useful when user cancels upload or navigates away.
+ *     tags: [Attachments]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The request UUID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - uploadId
+ *             properties:
+ *               uploadId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Upload session ID from /init response
+ *     responses:
+ *       200:
+ *         description: Upload cancelled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: Not authenticated
+ */
+router.delete('/requests/:requestId/attachments/cancel', authenticate, cancelUpload);
 
 export default router;

@@ -91,9 +91,13 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
   }, [userId, enabled, connect, disconnect]);
 
   return {
+    /** The Socket.IO socket instance, can be used to listen for custom events */
     socket: socketRef.current,
     isConnected: socketRef.current?.connected ?? false,
     reconnect: connect,
     disconnect,
   };
 }
+
+/** Type export for socket instance */
+export type { Socket };

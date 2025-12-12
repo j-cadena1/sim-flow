@@ -946,3 +946,168 @@ export const useAttachmentProcessingStatus = (attachmentId: string, enabled = tr
     },
   });
 };
+
+// ============================================================================
+// Direct S3 Upload Hook
+// ============================================================================
+
+/** Progress state for direct S3 uploads */
+export interface DirectUploadProgress {
+  /** Current phase of the upload */
+  phase: 'init' | 'uploading' | 'completing';
+  /** Upload progress percentage (0-100) */
+  percent: number;
+}
+
+/** Response from upload initialization */
+interface InitUploadResponse {
+  uploadId: string;
+  uploadUrl: string;
+  storageKey: string;
+  expiresAt: string;
+}
+
+/**
+ * Direct S3 upload hook for large files
+ *
+ * Bypasses backend for file transfer using presigned URLs:
+ * 1. Init: Get presigned PUT URL from backend
+ * 2. Upload: PUT file directly to S3 (with progress tracking)
+ * 3. Complete: Notify backend to create attachment record
+ *
+ * Benefits:
+ * - No nginx/backend timeout issues for large files
+ * - Real upload progress from XHR
+ * - Reduced backend memory usage
+ *
+ * @example
+ * const { uploadFile, cancelUpload, isUploading } = useDirectUpload();
+ *
+ * await uploadFile(requestId, file, (progress) => {
+ *   console.log(`${progress.phase}: ${progress.percent}%`);
+ * });
+ */
+export const useDirectUpload = () => {
+  const queryClient = useQueryClient();
+
+  // Track active XHR for cancellation
+  let activeXhr: XMLHttpRequest | null = null;
+  let activeUploadId: string | null = null;
+  let activeRequestId: string | null = null;
+
+  /**
+   * Upload a file directly to S3 using presigned URL
+   */
+  const uploadFile = async (
+    requestId: string,
+    file: File,
+    onProgress?: (progress: DirectUploadProgress) => void
+  ): Promise<Attachment> => {
+    activeRequestId = requestId;
+
+    // Phase 1: Initialize upload - get presigned URL
+    onProgress?.({ phase: 'init', percent: 0 });
+
+    const { data: initData } = await apiClient.post<InitUploadResponse>(
+      `/requests/${requestId}/attachments/init`,
+      {
+        fileName: file.name,
+        contentType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+      }
+    );
+
+    activeUploadId = initData.uploadId;
+    const { uploadUrl } = initData;
+
+    // Phase 2: Upload directly to S3 with progress tracking
+    // Using XHR instead of fetch because fetch doesn't support upload progress
+    onProgress?.({ phase: 'uploading', percent: 0 });
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      activeXhr = xhr;
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress?.({ phase: 'uploading', percent });
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        activeXhr = null;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        activeXhr = null;
+        reject(new Error('Upload failed - network error'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        activeXhr = null;
+        reject(new Error('Upload cancelled'));
+      });
+
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.send(file);
+    });
+
+    // Phase 3: Complete upload - create attachment record
+    onProgress?.({ phase: 'completing', percent: 100 });
+
+    const { data: completeData } = await apiClient.post<{ attachment: Attachment }>(
+      `/requests/${requestId}/attachments/complete`,
+      { uploadId: activeUploadId }
+    );
+
+    // Clear tracking
+    activeUploadId = null;
+    activeRequestId = null;
+
+    // Invalidate attachments query to show new file
+    queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(requestId) });
+
+    return completeData.attachment;
+  };
+
+  /**
+   * Cancel an in-progress upload
+   */
+  const cancelUpload = async (): Promise<void> => {
+    // Abort XHR if in progress
+    if (activeXhr) {
+      activeXhr.abort();
+      activeXhr = null;
+    }
+
+    // Notify backend to clean up pending upload record and any S3 files
+    if (activeUploadId && activeRequestId) {
+      try {
+        await apiClient.delete(`/requests/${activeRequestId}/attachments/cancel`, {
+          data: { uploadId: activeUploadId },
+        });
+      } catch {
+        // Ignore errors during cancellation - cleanup service will handle orphans
+      }
+    }
+
+    activeUploadId = null;
+    activeRequestId = null;
+  };
+
+  return {
+    uploadFile,
+    cancelUpload,
+    /** Check if upload is currently in progress */
+    get isUploading(): boolean {
+      return activeXhr !== null || activeUploadId !== null;
+    },
+  };
+};

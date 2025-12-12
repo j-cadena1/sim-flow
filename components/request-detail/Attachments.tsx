@@ -4,10 +4,13 @@
  * Displays file attachments for a request with upload, download, and delete
  * functionality. Supports drag-and-drop upload and thumbnail previews.
  *
+ * Uses direct S3 uploads with presigned URLs for large file support.
+ *
  * @module components/request-detail/Attachments
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Paperclip,
   Upload,
@@ -27,10 +30,13 @@ import { Attachment, User, UserRole, StorageConfig } from '../../types';
 import {
   useAttachments,
   useStorageConfig,
-  useUploadAttachment,
   useDownloadAttachment,
   useDeleteAttachment,
+  useDirectUpload,
+  DirectUploadProgress,
 } from '../../lib/api/hooks';
+import { queryKeys } from '../../lib/api/queryConfig';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 interface AttachmentsProps {
   requestId: string;
@@ -123,16 +129,39 @@ export const Attachments: React.FC<AttachmentsProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<DirectUploadProgress | null>(null);
+  const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const queryClient = useQueryClient();
+  const { socket } = useNotificationContext();
 
   const { data: attachments = [], isLoading: isLoadingAttachments } = useAttachments(requestId);
   const { data: storageConfig, isLoading: isLoadingConfig } = useStorageConfig();
-  const uploadMutation = useUploadAttachment();
+  const { uploadFile, cancelUpload } = useDirectUpload();
   const downloadMutation = useDownloadAttachment();
   const deleteMutation = useDeleteAttachment();
 
   const userCanUpload = canUpload(currentUser, requestCreatedBy, assignedTo);
   const storageEnabled = storageConfig?.enabled ?? false;
+
+  // Listen for WebSocket events when attachments finish processing
+  // This updates the UI without requiring a manual refresh
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleProcessed = (data: { requestId: string; attachmentId: string; status: string }) => {
+      if (data.requestId === requestId) {
+        // Invalidate attachments query to refetch with updated thumbnails/status
+        queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(requestId) });
+      }
+    };
+
+    socket.on('attachment:processed', handleProcessed);
+    return () => {
+      socket.off('attachment:processed', handleProcessed);
+    };
+  }, [socket, requestId, queryClient]);
 
   const handleUpload = useCallback(
     async (files: FileList | null) => {
@@ -147,8 +176,24 @@ export const Attachments: React.FC<AttachmentsProps> = ({
         }
 
         try {
-          await uploadMutation.mutateAsync({ requestId, file });
+          setUploadingFileName(file.name);
+          setUploadProgress({ phase: 'init', percent: 0 });
+
+          await uploadFile(requestId, file, (progress) => {
+            setUploadProgress(progress);
+          });
+
+          setUploadProgress(null);
+          setUploadingFileName(null);
         } catch (error) {
+          setUploadProgress(null);
+          setUploadingFileName(null);
+
+          // Handle cancellation
+          if (error instanceof Error && error.message === 'Upload cancelled') {
+            return;
+          }
+
           // Extract error message from axios error response
           // Backend returns either { error: 'message' } or { error: { message: '...' } }
           const axiosError = error as { response?: { data?: { error?: string | { message?: string } } } };
@@ -160,8 +205,14 @@ export const Attachments: React.FC<AttachmentsProps> = ({
         }
       }
     },
-    [requestId, storageConfig, uploadMutation]
+    [requestId, storageConfig, uploadFile]
   );
+
+  const handleCancelUpload = useCallback(async () => {
+    await cancelUpload();
+    setUploadProgress(null);
+    setUploadingFileName(null);
+  }, [cancelUpload]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -312,11 +363,38 @@ export const Attachments: React.FC<AttachmentsProps> = ({
         </div>
       )}
 
-      {/* Uploading Indicator */}
-      {uploadMutation.isPending && (
-        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center">
-          <Loader2 className="animate-spin text-blue-500 mr-2" size={16} />
-          <span className="text-sm text-blue-700 dark:text-blue-400">Uploading...</span>
+      {/* Uploading Progress Indicator */}
+      {uploadProgress && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <Loader2 className="animate-spin text-blue-500 mr-2" size={16} />
+              <span className="text-sm text-blue-700 dark:text-blue-400">
+                {uploadProgress.phase === 'init' && 'Initializing upload...'}
+                {uploadProgress.phase === 'uploading' && `Uploading ${uploadingFileName || 'file'}...`}
+                {uploadProgress.phase === 'completing' && 'Finalizing upload...'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                {uploadProgress.percent}%
+              </span>
+              <button
+                onClick={handleCancelUpload}
+                className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
+                title="Cancel upload"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2">
+            <div
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress.percent}%` }}
+            />
+          </div>
         </div>
       )}
 
