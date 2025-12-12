@@ -1130,14 +1130,32 @@ export const useDirectUpload = () => {
         const xhr = new XMLHttpRequest();
         activeXhr = xhr;
 
+        // Track progress to detect stalled uploads (e.g., Cloudflare buffering)
+        let lastProgressTime = Date.now();
+        let lastProgressPercent = 0;
+        const PROGRESS_TIMEOUT_MS = 15000; // 15 seconds without progress = stalled
+
+        // Check for stalled upload every 5 seconds
+        const progressCheckInterval = setInterval(() => {
+          const timeSinceProgress = Date.now() - lastProgressTime;
+          if (timeSinceProgress > PROGRESS_TIMEOUT_MS && lastProgressPercent < 100) {
+            clearInterval(progressCheckInterval);
+            xhr.abort();
+            reject(new Error('Upload stalled - no progress for 15 seconds (possible proxy buffering)'));
+          }
+        }, 5000);
+
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
+            lastProgressTime = Date.now();
+            lastProgressPercent = percent;
             onProgress?.({ phase: 'uploading', percent });
           }
         });
 
         xhr.addEventListener('load', () => {
+          clearInterval(progressCheckInterval);
           activeXhr = null;
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
@@ -1147,11 +1165,13 @@ export const useDirectUpload = () => {
         });
 
         xhr.addEventListener('error', () => {
+          clearInterval(progressCheckInterval);
           activeXhr = null;
           reject(new Error('Upload failed - network error'));
         });
 
         xhr.addEventListener('abort', () => {
+          clearInterval(progressCheckInterval);
           activeXhr = null;
           reject(new Error('Upload cancelled'));
         });
@@ -1161,10 +1181,15 @@ export const useDirectUpload = () => {
         xhr.send(file);
       });
     } catch (uploadError) {
-      // If it was cancelled, re-throw
+      // If it was user-cancelled, re-throw (don't fall back)
       if (uploadError instanceof Error && uploadError.message === 'Upload cancelled') {
         throw uploadError;
       }
+
+      // Log the error for debugging
+      const errorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+      console.warn(`[Upload] Direct S3 upload failed: ${errorMessage}`);
+      console.warn('[Upload] Falling back to backend-proxied upload...');
 
       // Cancel the pending upload record
       if (activeUploadId) {
@@ -1178,8 +1203,7 @@ export const useDirectUpload = () => {
         activeUploadId = null;
       }
 
-      // Fall back to legacy upload (skip reset since we already showed progress)
-      console.warn('[Upload] Direct S3 upload failed, using backend upload:', uploadError);
+      // Fall back to backend-proxied upload (skip progress reset since we already showed progress)
       return uploadViaBackend(requestId, file, onProgress, true);
     }
 
