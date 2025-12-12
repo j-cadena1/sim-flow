@@ -608,7 +608,8 @@ export const completeUpload = asyncHandler(async (req: Request, res: Response) =
   }
 
   // Verify file exists in S3 with correct size
-  const verification = await verifyUploadedFile(pending.storage_key, pending.file_size);
+  // Note: PostgreSQL bigint columns return as strings in node-postgres
+  const verification = await verifyUploadedFile(pending.storage_key, Number(pending.file_size));
 
   if (!verification.exists) {
     throw new ValidationError('File not found in storage. Upload may have failed.');
