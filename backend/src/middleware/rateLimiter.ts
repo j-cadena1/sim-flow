@@ -252,3 +252,27 @@ export const userSensitiveOpLimiter = createUserRateLimiter({
     code: 'RATE_LIMIT_EXCEEDED',
   },
 });
+
+/**
+ * CSP report rate limiter
+ * Prevents log spam from malicious clients flooding CSP violation reports
+ * More permissive than auth limits since legitimate violations can occur in bursts
+ */
+export const cspReportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: getMaxRequests(100, 500), // 100 reports per IP in production, 500 in development
+  message: {
+    error: 'Too many CSP reports.',
+    code: 'RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createStore('csp'),
+  handler: (req, res, next, options) => {
+    logStoreType();
+    logger.warn(`Rate limit exceeded for CSP reports`, {
+      ip: req.ip,
+    });
+    res.status(429).json(options.message);
+  },
+});

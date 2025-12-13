@@ -32,6 +32,7 @@ import auditLogsRouter from './routes/auditLogs';
 import analyticsRouter from './routes/analytics';
 import notificationsRouter from './routes/notifications';
 import attachmentsRouter from './routes/attachments';
+import cspReportRouter from './routes/cspReport';
 import pool from './db';
 
 // Load environment variables
@@ -66,12 +67,14 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https://api.dicebear.com", "blob:"], // Allow avatars and data URIs
       fontSrc: ["'self'"],
-      connectSrc: ["'self'", "wss:", "ws:"], // Allow WebSocket connections
+      connectSrc: ["'self'", "wss:", ...(isProduction ? [] : ["ws:"])], // wss: only in production, ws: allowed in dev
       frameSrc: ["'none'"], // Prevent clickjacking
       objectSrc: ["'none'"], // Block plugins
       baseUri: ["'self'"],
       formAction: ["'self'"],
       frameAncestors: ["'none'"], // Prevent embedding in iframes (clickjacking protection)
+      // CSP violation reporting - violations are logged for security monitoring
+      reportUri: ['/api/csp-report'],
       // Only add upgradeInsecureRequests in production
       ...(isProduction && { upgradeInsecureRequests: [] }),
     },
@@ -114,6 +117,9 @@ app.use('/api/', apiLimiter);
 // Prevents DoS via large request bodies (default is 100kb, we set 1mb for flexibility)
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Parse CSP violation reports (browsers send these with application/csp-report content type)
+app.use(express.json({ type: 'application/csp-report', limit: '10kb' }));
 
 // Add request ID to all requests
 app.use(addRequestId);
@@ -193,6 +199,7 @@ app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api', attachmentsRouter);
+app.use('/api', cspReportRouter);
 
 // 404 handler - must be before error handler
 app.use(notFoundHandler);

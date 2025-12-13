@@ -362,7 +362,7 @@ router.post('/requests/:requestId/attachments/init', authenticate, uploadLimiter
  *       410:
  *         description: Upload expired - must re-initialize
  */
-router.post('/requests/:requestId/attachments/complete', authenticate, completeUpload);
+router.post('/requests/:requestId/attachments/complete', authenticate, uploadLimiter, completeUpload);
 
 /**
  * @swagger
@@ -410,7 +410,7 @@ router.post('/requests/:requestId/attachments/complete', authenticate, completeU
  *       401:
  *         description: Not authenticated
  */
-router.delete('/requests/:requestId/attachments/cancel', authenticate, cancelUpload);
+router.delete('/requests/:requestId/attachments/cancel', authenticate, uploadLimiter, cancelUpload);
 
 // =============================================================================
 // DYNAMIC :attachmentId ROUTES
