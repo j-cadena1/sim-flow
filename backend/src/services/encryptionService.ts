@@ -10,6 +10,10 @@ import { logger } from '../middleware/logger';
 // In production, use: openssl rand -base64 32
 let ENCRYPTION_KEY: Buffer | null = null;
 
+// PBKDF2 parameters for key derivation (when plaintext key is provided)
+const PBKDF2_ITERATIONS = 100000; // OWASP recommended minimum
+const PBKDF2_SALT = 'sim-rq-encryption-v1'; // Static salt (key already has entropy)
+
 // Derive a 32-byte key from the environment variable (lazy-loaded on first use)
 function getEncryptionKey(): Buffer {
   // Return cached key if already initialized
@@ -20,7 +24,7 @@ function getEncryptionKey(): Buffer {
   const ENCRYPTION_KEY_ENV = process.env.ENTRA_SSO_ENCRYPTION_KEY;
 
   if (ENCRYPTION_KEY_ENV) {
-    // If base64 encoded, decode it; otherwise use as-is and hash to correct length
+    // If base64 encoded and exactly 32 bytes, use directly (recommended)
     try {
       const decoded = Buffer.from(ENCRYPTION_KEY_ENV, 'base64');
       if (decoded.length === 32) {
@@ -28,10 +32,20 @@ function getEncryptionKey(): Buffer {
         return ENCRYPTION_KEY;
       }
     } catch {
-      // Not base64, fall through to hash
+      // Not valid base64, fall through to PBKDF2
     }
-    // Hash the key to ensure correct length
-    ENCRYPTION_KEY = crypto.createHash('sha256').update(ENCRYPTION_KEY_ENV).digest();
+    // Use PBKDF2 to derive a proper key from plaintext input
+    // This provides better security margin than simple SHA-256 hashing
+    ENCRYPTION_KEY = crypto.pbkdf2Sync(
+      ENCRYPTION_KEY_ENV,
+      PBKDF2_SALT,
+      PBKDF2_ITERATIONS,
+      32,
+      'sha256'
+    );
+    logger.warn(
+      'Encryption key derived via PBKDF2. For optimal security, use a base64-encoded 32-byte key: openssl rand -base64 32'
+    );
     return ENCRYPTION_KEY;
   }
 
