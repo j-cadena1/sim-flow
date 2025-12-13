@@ -199,14 +199,16 @@ describe('LoginAttemptService', () => {
       );
     });
 
-    it('should fail open on database error', async () => {
+    it('should fail closed on database error (security: prevent brute force during DB outages)', async () => {
       mockQuery.mockRejectedValueOnce(new Error('Database error'));
 
       const result = await checkLockoutStatus('test@example.com');
 
-      // Should not block login on error
-      expect(result.isLocked).toBe(false);
-      expect(result.remainingAttempts).toBe(5);
+      // Should block login on error to prevent brute force attacks during DB outages
+      expect(result.isLocked).toBe(true);
+      expect(result.remainingAttempts).toBe(0);
+      expect(result.failedAttempts).toBe(5);
+      expect(result.lockoutExpiresAt).toBeDefined();
     });
   });
 

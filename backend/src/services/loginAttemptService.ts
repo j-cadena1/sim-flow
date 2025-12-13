@@ -18,6 +18,16 @@
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 
+/**
+ * Mask email for secure logging (prevents PII exposure in logs)
+ */
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  const maskedLocal = local.length <= 3 ? '***' : local.substring(0, 3) + '***';
+  return `${maskedLocal}@${domain}`;
+}
+
 // Configuration
 const MAX_FAILED_ATTEMPTS = 5; // Lock after 5 failed attempts
 const LOCKOUT_DURATION_MINUTES = 15; // Lock for 15 minutes
@@ -49,7 +59,7 @@ export async function recordLoginAttempt(
     );
 
     if (!successful) {
-      logger.warn(`Failed login attempt recorded for: ${email} from IP: ${ipAddress || 'unknown'}`);
+      logger.warn(`Failed login attempt recorded for: ${maskEmail(email)} from IP: ${ipAddress || 'unknown'}`);
     }
   } catch (error) {
     // Don't fail login flow if tracking fails - log and continue
@@ -111,11 +121,13 @@ export async function checkLockoutStatus(email: string): Promise<LockoutStatus> 
     };
   } catch (error) {
     logger.error('Error checking lockout status:', error);
-    // On error, don't block login - fail open to prevent DoS
+    // On error, fail closed to prevent brute force during DB outages
+    // Security > Availability for authentication
     return {
-      isLocked: false,
-      remainingAttempts: MAX_FAILED_ATTEMPTS,
-      failedAttempts: 0,
+      isLocked: true,
+      remainingAttempts: 0,
+      failedAttempts: MAX_FAILED_ATTEMPTS,
+      lockoutExpiresAt: new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000),
     };
   }
 }

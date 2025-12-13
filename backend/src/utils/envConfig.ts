@@ -28,3 +28,17 @@ export function getCorsOrigin(): string {
 export function getFrontendUrl(): string {
   return getCorsOrigin();
 }
+
+/**
+ * Validate that a redirect URL is safe (matches configured CORS origin)
+ * Prevents open redirect vulnerabilities in SSO callbacks
+ */
+export function isValidRedirectUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    const corsUrl = new URL(getCorsOrigin());
+    return parsedUrl.host === corsUrl.host;
+  } catch {
+    return false;
+  }
+}

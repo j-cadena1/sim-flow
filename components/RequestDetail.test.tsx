@@ -112,6 +112,9 @@ vi.mock('../lib/api/hooks', async (importOriginal) => {
     useUpdateRequestDescription: () => ({ mutate: vi.fn(), isPending: false }),
     useUpdateRequestTitle: () => ({ mutate: vi.fn(), isPending: false }),
     useReviewTitleChangeRequest: () => ({ mutate: vi.fn(), isPending: false }),
+    useAttachments: () => ({ data: [], isLoading: false, isError: false }),
+    useUploadAttachment: () => ({ mutate: vi.fn(), isPending: false }),
+    useDeleteAttachment: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 

@@ -359,12 +359,17 @@ export const streamDownload = asyncHandler(async (req: Request, res: Response) =
 
   const attachment = result.rows[0];
 
-  // Authorization check: creator, assigned engineer, managers, admins
+  // Authorization check: request creator, assigned engineer, managers, admins
+  // Note: created_by and assigned_to come from the joined request table (r.created_by, r.assigned_to)
+  // These represent REQUEST ownership, not attachment ownership
+  const requestCreatedBy = attachment.created_by;
+  const requestAssignedTo = attachment.assigned_to;
+
   const canDownload =
     userRole === 'Admin' ||
     userRole === 'Manager' ||
-    attachment.created_by === userId ||
-    attachment.assigned_to === userId;
+    requestCreatedBy === userId ||
+    requestAssignedTo === userId;
 
   if (!canDownload) {
     throw new AuthorizationError('You do not have permission to download this file');

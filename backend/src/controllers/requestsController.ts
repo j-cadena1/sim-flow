@@ -33,6 +33,7 @@ import {
 } from '../utils/errors';
 import { asyncHandler } from '../middleware/errorHandler';
 import { sendNotification, sendNotificationToMultipleUsers } from '../services/notificationHelpers';
+import { deleteFile } from '../services/storageService';
 
 /** Maximum number of requests that can be returned in a single query */
 const MAX_LIMIT = 1000;
@@ -670,9 +671,9 @@ export const updateRequestStatus = asyncHandler(async (req: Request, res: Respon
   const userId = req.user?.userId;
   const userName = req.user?.name || 'Unknown';
 
-  // Get the current request to check for allocated hours and project
+  // Get the current request to check for allocated hours, project, and ownership
   const currentRequest = await query(
-    'SELECT project_id, allocated_hours, status as current_status FROM requests WHERE id = $1',
+    'SELECT project_id, allocated_hours, status as current_status, created_by, assigned_to FROM requests WHERE id = $1',
     [id]
   );
 
@@ -680,7 +681,20 @@ export const updateRequestStatus = asyncHandler(async (req: Request, res: Respon
     throw new NotFoundError('Request', id);
   }
 
-  const { project_id: projectId, allocated_hours: allocatedHours, current_status: currentStatus } = currentRequest.rows[0];
+  const {
+    project_id: projectId,
+    allocated_hours: allocatedHours,
+    current_status: currentStatus,
+    assigned_to: assignedTo,
+  } = currentRequest.rows[0];
+
+  // Authorization: Engineers can only update requests assigned to them
+  const userRole = req.user?.role;
+  if (userRole === 'Engineer') {
+    if (assignedTo !== userId) {
+      throw new AuthorizationError('You can only update status on requests assigned to you');
+    }
+  }
 
   // Handle hour deallocation when request is denied
   if (status === 'Denied' && projectId && allocatedHours && allocatedHours > 0) {
@@ -1060,7 +1074,30 @@ export const addComment = async (req: Request, res: Response) => {
 export const deleteRequest = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  // First delete related comments
+  // Get attachments before deleting to clean up S3
+  const attachments = await query(
+    'SELECT storage_key, thumbnail_key FROM attachments WHERE request_id = $1',
+    [id]
+  );
+
+  // Delete S3 files (best effort - don't fail if S3 cleanup fails)
+  for (const att of attachments.rows) {
+    try {
+      if (att.storage_key) {
+        await deleteFile(att.storage_key);
+      }
+      if (att.thumbnail_key) {
+        await deleteFile(att.thumbnail_key);
+      }
+    } catch (err) {
+      logger.warn(`Failed to delete S3 file during request deletion: ${att.storage_key}`, err);
+    }
+  }
+
+  // Delete attachments from DB
+  await query('DELETE FROM attachments WHERE request_id = $1', [id]);
+
+  // Delete related comments
   await query('DELETE FROM comments WHERE request_id = $1', [id]);
 
   // Then delete the request
@@ -1125,6 +1162,22 @@ export const addTimeEntry = async (req: Request, res: Response) => {
       return res.status(400).json({
         error: 'Hours must be a positive number',
         details: { field: 'hours', min: 0.01 },
+      });
+    }
+
+    // Verify engineer is assigned to this request (Admins can log on any request)
+    const requestCheck = await query(
+      'SELECT assigned_to, status FROM requests WHERE id = $1',
+      [id]
+    );
+    if (requestCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    const userRole = req.user?.role;
+    if (userRole !== 'Admin' && requestCheck.rows[0].assigned_to !== userId) {
+      return res.status(403).json({
+        error: 'You can only log time on requests assigned to you',
       });
     }
 

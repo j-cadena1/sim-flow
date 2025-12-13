@@ -497,8 +497,11 @@ describe('RequestsController', () => {
       const res = createMockResponse();
       const next = createMockNext();
 
+      // Include assigned_to matching userId for Engineer authorization
       mockQuery
-        .mockResolvedValueOnce(mockResult({ rows: [{ project_id: null, allocated_hours: 0, current_status: 'Engineering Review' }] }))
+        .mockResolvedValueOnce(mockResult({
+          rows: [{ project_id: null, allocated_hours: 0, current_status: 'Engineering Review', created_by: 'other', assigned_to: 'user-123' }],
+        }))
         .mockResolvedValueOnce(mockResult({ rows: [{ id: 'req-123', status: 'In Progress' }] }))
         .mockResolvedValueOnce(mockResult({ rows: [] })); // Activity log
 
@@ -679,6 +682,8 @@ describe('RequestsController', () => {
       const next = createMockNext();
 
       mockQuery
+        .mockResolvedValueOnce(mockResult({ rows: [] })) // SELECT attachments
+        .mockResolvedValueOnce(mockResult({ rows: [] })) // DELETE attachments
         .mockResolvedValueOnce(mockResult({ rows: [] })) // DELETE comments
         .mockResolvedValueOnce(mockResult({ rows: [{ id: 'req-123' }] })); // DELETE request
 
@@ -699,6 +704,8 @@ describe('RequestsController', () => {
       const next = createMockNext();
 
       mockQuery
+        .mockResolvedValueOnce(mockResult({ rows: [] })) // SELECT attachments
+        .mockResolvedValueOnce(mockResult({ rows: [] })) // DELETE attachments
         .mockResolvedValueOnce(mockResult({ rows: [] })) // DELETE comments
         .mockResolvedValueOnce(mockResult({ rows: [] })); // DELETE request (not found)
 
@@ -751,6 +758,7 @@ describe('RequestsController', () => {
       };
 
       mockQuery
+        .mockResolvedValueOnce(mockResult({ rows: [{ assigned_to: 'eng-1', status: 'In Progress' }] })) // Auth check
         .mockResolvedValueOnce(mockResult({ rows: [newEntry] })) // INSERT
         .mockResolvedValueOnce(mockResult({
           rows: [{ title: 'Request', created_by: 'user-1', project_id: 'proj-1' }],

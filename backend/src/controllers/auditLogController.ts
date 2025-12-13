@@ -85,7 +85,10 @@ export const exportAuditLogsCSV = async (req: Request, res: Response) => {
     if (startDate) filters.startDate = new Date(startDate as string);
     if (endDate) filters.endDate = new Date(endDate as string);
 
-    // Get all logs without pagination for export
+    // Limit export to prevent excessive memory usage and DoS
+    const MAX_CSV_RECORDS = 10000;
+    filters.limit = MAX_CSV_RECORDS;
+
     const logs = await getAuditLogs(filters);
 
     // Generate CSV

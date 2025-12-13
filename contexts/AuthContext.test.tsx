@@ -372,7 +372,7 @@ describe('AuthContext', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      let thrownError: Error | null = null;
+      let thrownError: Error | undefined;
       await act(async () => {
         try {
           await result.current.login('test@example.com', 'wrong-password');
@@ -381,7 +381,8 @@ describe('AuthContext', () => {
         }
       });
 
-      expect(thrownError?.message).toBe('Invalid credentials');
+      expect(thrownError).toBeDefined();
+      expect(thrownError!.message).toBe('Invalid credentials');
       expect(result.current.error).toBe('Invalid credentials');
       expect(result.current.user).toBeNull();
     });
@@ -519,7 +520,10 @@ describe('AuthContext', () => {
         </AuthProvider>
       );
 
-      expect(screen.getByTestId('child')).toBeInTheDocument();
+      // Wait for auth state to settle
+      await waitFor(() => {
+        expect(screen.getByTestId('child')).toBeInTheDocument();
+      });
       expect(screen.getByText('Child Content')).toBeInTheDocument();
     });
 

@@ -22,7 +22,7 @@ import bcrypt from 'bcrypt';
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
-import { getFrontendUrl } from '../utils/envConfig';
+import { getFrontendUrl, isValidRedirectUrl } from '../utils/envConfig';
 import {
   isSSOEnabled,
   getSSOConfig,
@@ -63,6 +63,17 @@ interface User {
   passwordHash: string;
   role: string;
   avatarUrl: string;
+}
+
+/**
+ * Mask email for secure logging (prevents PII exposure in logs)
+ * e.g., "john.doe@example.com" → "joh***@example.com"
+ */
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  const maskedLocal = local.length <= 3 ? '***' : local.substring(0, 3) + '***';
+  return `${maskedLocal}@${domain}`;
 }
 
 /**
@@ -116,7 +127,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     const minutesRemaining = lockoutStatus.lockoutExpiresAt
       ? Math.ceil((lockoutStatus.lockoutExpiresAt.getTime() - Date.now()) / 60000)
       : 15;
-    logger.warn(`Login blocked - account locked: ${normalizedEmail}`);
+    logger.warn(`Login blocked - account locked: ${maskEmail(normalizedEmail)}`);
     throw new AuthenticationError(
       `Account temporarily locked due to too many failed attempts. Try again in ${minutesRemaining} minutes.`,
       ErrorCode.AUTH_INVALID_CREDENTIALS
@@ -133,7 +144,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     // Record failed attempt before throwing error
     await recordLoginAttempt(normalizedEmail, ipAddress, false);
     // Generic error message to prevent user enumeration
-    logger.warn(`Failed login attempt for email: ${email}`);
+    logger.warn(`Failed login attempt for email: ${maskEmail(email)}`);
     throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
   }
 
@@ -142,7 +153,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   // Check if user is deactivated
   if (user.deletedAt) {
     await recordLoginAttempt(normalizedEmail, ipAddress, false);
-    logger.warn(`Login attempt for deactivated user: ${user.id} (${email})`);
+    logger.warn(`Login attempt for deactivated user: ${user.id}`);
     throw new AuthenticationError('This account has been deactivated. Please contact an administrator.', ErrorCode.AUTH_INVALID_CREDENTIALS);
   }
 
@@ -164,7 +175,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   if (!isPasswordValid) {
     await recordLoginAttempt(normalizedEmail, ipAddress, false);
-    logger.warn(`Failed login attempt for user: ${user.id} (${email})`);
+    logger.warn(`Failed login attempt for user: ${user.id}`);
     throw new AuthenticationError('Invalid email or password', ErrorCode.AUTH_INVALID_CREDENTIALS);
   }
 
@@ -193,7 +204,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     avatarUrl: user.avatarUrl,
   };
 
-  logger.info(`User logged in: ${user.id} (${email}) - Role: ${user.role}`);
+  logger.info(`User logged in: ${user.id} - Role: ${user.role}`);
 
   // Log audit trail
   await logAudit({
@@ -523,11 +534,19 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
     // Redirect to frontend - the session cookie is already set
     // The frontend will detect the session and load the user
     const frontendUrl = getFrontendUrl();
+    if (!isValidRedirectUrl(frontendUrl)) {
+      logger.error(`Invalid redirect URL configured: ${frontendUrl}`);
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
     res.redirect(frontendUrl);
   } catch (error) {
     logger.error('Error handling SSO callback:', error);
     // Redirect to frontend with error
     const frontendUrl = getFrontendUrl();
+    if (!isValidRedirectUrl(frontendUrl)) {
+      logger.error(`Invalid redirect URL configured: ${frontendUrl}`);
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
     res.redirect(`${frontendUrl}/#/login?error=sso_failed`);
   }
 };

@@ -202,7 +202,7 @@ router.post('/:id/comments', authenticate, validate(addCommentSchema), addCommen
  *       403:
  *         description: Not authorized for this status transition
  */
-router.patch('/:id/status', authenticate, validate(updateStatusSchema), updateRequestStatus);
+router.patch('/:id/status', authenticate, requireRole(['Admin', 'Manager', 'Engineer']), validate(updateStatusSchema), updateRequestStatus);
 
 /**
  * @swagger
