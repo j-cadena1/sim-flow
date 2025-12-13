@@ -25,6 +25,31 @@ export function validateConfig(): ConfigValidationResult {
     } else {
       warnings.push(message + ' (acceptable for development)');
     }
+  } else {
+    // Validate CORS_ORIGIN is a valid URL
+    try {
+      const url = new URL(corsOrigin);
+      // Must be http or https
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        const message = `CORS_ORIGIN has invalid protocol "${url.protocol}". Must be http: or https:`;
+        if (isProduction) {
+          errors.push(message);
+        } else {
+          warnings.push(message);
+        }
+      }
+      // In production, should use https (unless localhost)
+      if (isProduction && url.protocol === 'http:' && !url.hostname.includes('localhost')) {
+        warnings.push('CORS_ORIGIN uses HTTP instead of HTTPS. Consider using HTTPS in production.');
+      }
+    } catch {
+      const message = `CORS_ORIGIN "${corsOrigin}" is not a valid URL. Must be a valid URL like "https://example.com"`;
+      if (isProduction) {
+        errors.push(message);
+      } else {
+        warnings.push(message);
+      }
+    }
   }
 
   // Validate DB_PASSWORD

@@ -72,6 +72,9 @@ export async function storeSession(
 /**
  * Validate a session and return user data if valid
  *
+ * Defense-in-depth: Checks expiration at both DB level (via SQL) and
+ * application level (via TypeScript) to protect against clock drift issues.
+ *
  * @throws Error on database/unexpected errors (callers should handle)
  * @returns SessionUser if valid, null if session not found/expired/revoked
  */
@@ -80,8 +83,9 @@ export async function validateSession(sessionId: string): Promise<SessionUser | 
 
   // Let database errors propagate - callers should handle them appropriately
   // This allows proper "fail closed" behavior in security-sensitive contexts
+  // Note: We query expires_at for app-level verification but still check in SQL as primary defense
   const result = await query(
-    `SELECT u.id, u.email, u.name, u.role, u.deleted_at
+    `SELECT u.id, u.email, u.name, u.role, u.deleted_at, rt.expires_at
      FROM refresh_tokens rt
      JOIN users u ON rt.user_id = u.id
      WHERE rt.token_hash = $1
@@ -91,6 +95,13 @@ export async function validateSession(sessionId: string): Promise<SessionUser | 
   );
 
   if (result.rows.length === 0) {
+    return null;
+  }
+
+  // App-level expiration check (defense-in-depth against clock drift between app and DB)
+  const expiresAt = new Date(result.rows[0].expires_at);
+  if (expiresAt <= new Date()) {
+    logger.warn(`Session validation rejected: App-level expiration check failed (DB: ${expiresAt.toISOString()}, Now: ${new Date().toISOString()})`);
     return null;
   }
 
@@ -232,13 +243,15 @@ async function enforceSessionLimit(userId: string): Promise<void> {
 
 /**
  * Clean up expired and revoked sessions (call periodically)
+ * Expired sessions are deleted after 1 hour (reduced from 1 day for faster cleanup)
+ * Revoked sessions are kept for 7 days for audit purposes
  */
 export async function cleanupExpiredSessions(): Promise<number> {
   try {
-    // Delete sessions that are expired OR have been revoked for more than 7 days
+    // Delete sessions that are expired (1 hour grace) OR have been revoked for more than 7 days
     const result = await query(
       `DELETE FROM refresh_tokens
-       WHERE expires_at < NOW() - INTERVAL '1 day'
+       WHERE expires_at < NOW() - INTERVAL '1 hour'
        OR (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL '7 days')`
     );
 

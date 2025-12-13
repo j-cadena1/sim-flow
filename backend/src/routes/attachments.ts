@@ -21,6 +21,7 @@ import {
   cancelUpload,
 } from '../controllers/attachmentsController';
 import { authenticate } from '../middleware/authentication';
+import { uploadLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -209,6 +210,7 @@ router.get('/requests/:requestId/attachments', authenticate, getAttachments);
 router.post(
   '/requests/:requestId/attachments',
   authenticate,
+  uploadLimiter,
   upload.single('file'),
   uploadAttachment
 );
@@ -302,7 +304,7 @@ router.post(
  *       503:
  *         description: File storage is not available
  */
-router.post('/requests/:requestId/attachments/init', authenticate, initUpload);
+router.post('/requests/:requestId/attachments/init', authenticate, uploadLimiter, initUpload);
 
 /**
  * @swagger

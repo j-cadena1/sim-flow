@@ -7,6 +7,8 @@ export enum AuditAction {
   LOGIN = 'LOGIN',
   LOGOUT = 'LOGOUT',
   SSO_LOGIN = 'SSO_LOGIN',
+  AUTH_FAILURE = 'AUTH_FAILURE',
+  ACCESS_DENIED = 'ACCESS_DENIED',
 
   // Request operations
   CREATE_REQUEST = 'CREATE_REQUEST',
@@ -318,4 +320,57 @@ export const getAuditLogCount = async (filters: {
 
   const result = await pool.query(query, values);
   return parseInt(result.rows[0].count);
+};
+
+/**
+ * Log a security event (authentication failure or access denial)
+ * Used by middleware to track 401/403 responses for security analysis
+ */
+export const logSecurityEvent = async (
+  action: AuditAction.AUTH_FAILURE | AuditAction.ACCESS_DENIED,
+  details: {
+    reason: string;
+    path?: string;
+    method?: string;
+    userId?: string;
+    userEmail?: string;
+    requiredRoles?: string[];
+    currentRole?: string;
+  },
+  ipAddress?: string,
+  userAgent?: string
+): Promise<void> => {
+  try {
+    const query = `
+      INSERT INTO audit_logs (
+        user_id, user_email, user_name, action, entity_type,
+        entity_id, details, ip_address, user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `;
+
+    const values = [
+      details.userId || null,
+      details.userEmail || 'anonymous',
+      details.userEmail || 'anonymous',
+      action,
+      EntityType.AUTH,
+      null,
+      JSON.stringify(details),
+      ipAddress || null,
+      userAgent || null,
+    ];
+
+    await pool.query(query, values);
+
+    // Also log at warning level for immediate visibility
+    logger.warn('Security event logged', {
+      action,
+      reason: details.reason,
+      path: details.path,
+      ip: ipAddress,
+    });
+  } catch (error) {
+    // Don't throw - security logging should not break application flow
+    logger.error('Failed to log security event', { error, action, details });
+  }
 };

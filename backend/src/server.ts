@@ -109,9 +109,10 @@ app.use(cookieParser());
 // General API rate limiting (auth endpoints have stricter limits applied in their routes)
 app.use('/api/', apiLimiter);
 
-// Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing with explicit size limits
+// Prevents DoS via large request bodies (default is 100kb, we set 1mb for flexibility)
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Add request ID to all requests
 app.use(addRequestId);

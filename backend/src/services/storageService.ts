@@ -22,6 +22,7 @@ import {
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
+import DOMPurify from 'isomorphic-dompurify';
 import { logger } from '../middleware/logger';
 
 let s3Client: S3Client | null = null;
@@ -247,6 +248,59 @@ const EXTENSION_MIME_MAP: Record<string, string[]> = {
 // Extensions that are text-based and don't have magic bytes
 const TEXT_EXTENSIONS = ['txt', 'csv', 'json', 'xml', 'md', 'svg'];
 
+// Dangerous patterns in SVG files that could enable XSS attacks
+const SVG_DANGEROUS_PATTERNS = [
+  /<script[\s>]/i,
+  /javascript:/i,
+  /on\w+\s*=/i, // Event handlers like onclick, onerror, onload
+  /<foreignObject/i, // Can embed HTML
+  /xlink:href\s*=\s*["']?javascript:/i,
+  /href\s*=\s*["']?javascript:/i,
+];
+
+/**
+ * Validate and sanitize SVG content
+ * Removes potentially dangerous elements that could enable XSS attacks
+ */
+export function validateSvgContent(
+  buffer: Buffer,
+  fileName: string
+): { valid: boolean; error?: string; sanitized?: Buffer } {
+  const content = buffer.toString('utf-8');
+
+  // Check for dangerous patterns before sanitization
+  for (const pattern of SVG_DANGEROUS_PATTERNS) {
+    if (pattern.test(content)) {
+      logger.warn(`SVG file ${fileName} contains potentially dangerous pattern: ${pattern}`);
+      // Use DOMPurify to sanitize the SVG
+      const sanitized = DOMPurify.sanitize(content, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+        ADD_TAGS: ['use'], // Allow <use> for SVG symbols
+        FORBID_TAGS: ['script', 'foreignObject'],
+        FORBID_ATTR: ['onclick', 'onerror', 'onload', 'onmouseover', 'onfocus', 'onblur'],
+      });
+
+      // Verify sanitization removed dangerous content
+      for (const dangerousPattern of SVG_DANGEROUS_PATTERNS) {
+        if (dangerousPattern.test(sanitized)) {
+          return {
+            valid: false,
+            error: `SVG contains disallowed content that could not be sanitized`,
+          };
+        }
+      }
+
+      return {
+        valid: true,
+        sanitized: Buffer.from(sanitized, 'utf-8'),
+      };
+    }
+  }
+
+  // No dangerous patterns found, return as-is
+  return { valid: true };
+}
+
 /**
  * Validate file content by checking magic bytes against declared MIME type
  * This prevents attackers from disguising malicious files with safe extensions
@@ -255,10 +309,20 @@ export async function validateFileContent(
   buffer: Buffer,
   fileName: string,
   _declaredMime: string
-): Promise<{ valid: boolean; error?: string; detectedMime?: string }> {
+): Promise<{ valid: boolean; error?: string; detectedMime?: string; sanitizedBuffer?: Buffer }> {
   const ext = fileName.split('.').pop()?.toLowerCase();
 
-  // Text files have no magic bytes - skip content validation
+  // SVG files need special validation for XSS prevention
+  if (ext === 'svg') {
+    const svgResult = validateSvgContent(buffer, fileName);
+    if (!svgResult.valid) {
+      return { valid: false, error: svgResult.error };
+    }
+    // Return sanitized buffer if SVG was cleaned
+    return { valid: true, sanitizedBuffer: svgResult.sanitized };
+  }
+
+  // Other text files have no magic bytes - skip content validation
   if (ext && TEXT_EXTENSIONS.includes(ext)) {
     return { valid: true };
   }

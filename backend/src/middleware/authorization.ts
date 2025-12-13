@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
 import { authenticate } from './authentication';
+import { logSecurityEvent, AuditAction, getIpFromRequest, getUserAgentFromRequest } from '../services/auditService';
 
 // Re-export authenticate for convenience
 export { authenticate };
@@ -29,6 +30,21 @@ export const requireRole = (allowedRoles: UserRole[]) => {
       // Check if user has required role
       if (!allowedRoles.includes(user.role as UserRole)) {
         logger.warn(`Forbidden access attempt by ${user.role} (${user.userId}) - requires ${allowedRoles.join(', ')}`);
+        // Log security event for access denial
+        logSecurityEvent(
+          AuditAction.ACCESS_DENIED,
+          {
+            reason: 'Insufficient permissions',
+            path: req.path,
+            method: req.method,
+            userId: user.userId,
+            userEmail: user.email,
+            requiredRoles: allowedRoles,
+            currentRole: user.role,
+          },
+          getIpFromRequest(req),
+          getUserAgentFromRequest(req)
+        ).catch(() => {}); // Non-blocking
         return res.status(403).json({
           error: 'Insufficient permissions',
           required: allowedRoles,

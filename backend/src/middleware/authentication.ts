@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
 import { SESSION_COOKIE_NAME } from '../config/session';
 import { validateSession, SessionUser } from '../services/sessionService';
+import { logSecurityEvent, AuditAction, getIpFromRequest, getUserAgentFromRequest } from '../services/auditService';
 
 // Extend Express Request to include user info and session ID
 declare global {
@@ -23,6 +24,13 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     if (!sessionId) {
       logger.warn('Authentication failed: No session cookie');
+      // Log security event for missing session
+      logSecurityEvent(
+        AuditAction.AUTH_FAILURE,
+        { reason: 'No session cookie', path: req.path, method: req.method },
+        getIpFromRequest(req),
+        getUserAgentFromRequest(req)
+      ).catch(() => {}); // Non-blocking
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -30,6 +38,13 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     if (!user) {
       logger.warn('Authentication failed: Invalid or expired session');
+      // Log security event for invalid session
+      logSecurityEvent(
+        AuditAction.AUTH_FAILURE,
+        { reason: 'Invalid or expired session', path: req.path, method: req.method },
+        getIpFromRequest(req),
+        getUserAgentFromRequest(req)
+      ).catch(() => {}); // Non-blocking
       return res.status(401).json({ error: 'Invalid session' });
     }
 

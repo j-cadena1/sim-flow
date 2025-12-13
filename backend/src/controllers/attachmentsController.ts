@@ -189,16 +189,21 @@ export const uploadAttachment = asyncHandler(async (req: Request, res: Response)
   }
 
   // Validate file content (magic bytes) to prevent extension spoofing
+  // For SVG files, this also sanitizes potentially dangerous content
   const contentValidation = await validateFileContent(file.buffer, file.originalname, file.mimetype);
   if (!contentValidation.valid) {
     throw new ValidationError(contentValidation.error || 'File content validation failed');
   }
 
+  // Use sanitized buffer if SVG was cleaned, otherwise use original
+  const uploadBuffer = contentValidation.sanitizedBuffer || file.buffer;
+  const uploadSize = contentValidation.sanitizedBuffer ? contentValidation.sanitizedBuffer.length : file.size;
+
   // Generate storage key and upload
   const storageKey = generateStorageKey(requestId, file.originalname);
   const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
 
-  await uploadFile(storageKey, file.buffer, file.mimetype, file.size);
+  await uploadFile(storageKey, uploadBuffer, file.mimetype, uploadSize);
 
   // Save to database
   const result = await query(
@@ -213,7 +218,7 @@ export const uploadAttachment = asyncHandler(async (req: Request, res: Response)
       sanitizedFileName,
       file.originalname,
       file.mimetype,
-      file.size,
+      uploadSize, // Use sanitized size for SVG files
       storageKey,
       userId,
       userName,

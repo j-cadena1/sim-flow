@@ -6,6 +6,7 @@ import { toCamelCase } from '../utils/caseConverter';
 import { getDirectoryUsers, syncUserFromDirectory } from '../services/graphService';
 import { logRequestAudit, AuditAction, EntityType } from '../services/auditService';
 import { sendNotification } from '../services/notificationHelpers';
+import { revokeAllUserSessions } from '../services/sessionService';
 import {
   isQAdminDisabled,
   disableQAdmin,
@@ -415,7 +416,10 @@ export const deactivateUser = async (req: Request, res: Response) => {
       [id]
     );
 
-    logger.info(`User ${id} (${result.rows[0].email}) deactivated by admin ${admin?.userId}`);
+    // Immediately revoke all sessions for the deactivated user
+    // This ensures they are logged out right away rather than on next request
+    const revokedCount = await revokeAllUserSessions(id, 'user_deactivated');
+    logger.info(`User ${id} (${result.rows[0].email}) deactivated by admin ${admin?.userId}, ${revokedCount} session(s) revoked`);
 
     // Log audit trail
     await logRequestAudit(

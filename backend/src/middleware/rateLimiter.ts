@@ -164,3 +164,91 @@ export const sensitiveOpLimiter = rateLimit({
     res.status(429).json(options.message);
   },
 });
+
+/**
+ * File upload rate limiter
+ * Prevents abuse of storage resources through excessive uploads
+ * Stricter than general API limits due to resource cost of file storage
+ */
+export const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: getMaxRequests(20, 100), // 20 uploads in production, 100 in development
+  message: {
+    error: 'Too many file uploads. Please try again after 15 minutes.',
+    code: 'RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createStore('upload'),
+  handler: (req, res, next, options) => {
+    logStoreType();
+    logger.warn(`Rate limit exceeded for file upload`, {
+      ip: req.ip,
+      path: req.path,
+      method: req.method,
+      userId: req.user?.userId,
+    });
+    res.status(429).json(options.message);
+  },
+});
+
+/**
+ * Create a user-based rate limiter
+ * Keys rate limits by authenticated user ID instead of (or in addition to) IP
+ * Prevents abuse from authenticated users across multiple IPs
+ *
+ * @param options - Rate limit configuration
+ * @returns Express middleware function
+ */
+export function createUserRateLimiter(options: {
+  windowMs: number;
+  max: number;
+  prefix: string;
+  message?: { error: string; code: string };
+}) {
+  return rateLimit({
+    windowMs: options.windowMs,
+    max: disableRateLimiting ? 100000 : (isProduction ? options.max : options.max * 5),
+    message: options.message || {
+      error: 'Too many requests. Please try again later.',
+      code: 'RATE_LIMIT_EXCEEDED',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createStore(`user-${options.prefix}`),
+    // Key by user ID if authenticated, fall back to IP
+    keyGenerator: (req) => {
+      const userId = req.user?.userId;
+      if (userId) {
+        return `user:${userId}`;
+      }
+      // Fall back to IP for unauthenticated requests
+      return req.ip || 'unknown';
+    },
+    handler: (req, res, next, handlerOptions) => {
+      logStoreType();
+      logger.warn(`User rate limit exceeded`, {
+        ip: req.ip,
+        path: req.path,
+        method: req.method,
+        userId: req.user?.userId,
+        prefix: options.prefix,
+      });
+      res.status(429).json(handlerOptions.message);
+    },
+  });
+}
+
+/**
+ * User-based rate limiter for sensitive operations
+ * Limits actions per user regardless of IP address
+ */
+export const userSensitiveOpLimiter = createUserRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // 50 sensitive operations per hour per user
+  prefix: 'sensitive',
+  message: {
+    error: 'Too many sensitive operations. Please try again later.',
+    code: 'RATE_LIMIT_EXCEEDED',
+  },
+});
