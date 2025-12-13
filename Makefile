@@ -1,4 +1,4 @@
-.PHONY: help dev dev-build dev-logs dev-down prod prod-build prod-logs prod-down test test-e2e test-e2e-build clean db-shell db-backup db-restore status
+.PHONY: help dev dev-build dev-logs dev-down dev-ssl dev-ssl-build dev-ssl-staging dev-ssl-logs dev-ssl-down prod prod-build prod-logs prod-down prod-ssl prod-ssl-build prod-ssl-staging prod-ssl-logs prod-ssl-down ssl-status ssl-renew ssl-test test test-e2e test-e2e-build clean db-shell db-backup db-restore status
 
 # Default target - show help
 help:
@@ -12,11 +12,27 @@ help:
 	@echo "     make dev-logs       View development logs (live)"
 	@echo "     make dev-down       Stop development environment"
 	@echo ""
-	@echo "  🏭 PRODUCTION"
-	@echo "     make prod           Start production environment"
+	@echo "  🔒 DEVELOPMENT SSL (Native HTTPS - ports 8443/8080)"
+	@echo "     make dev-ssl        Start dev with native SSL"
+	@echo "     make dev-ssl-build  Rebuild and start dev with SSL"
+	@echo "     make dev-ssl-staging Start dev with Let's Encrypt staging"
+	@echo "     make dev-ssl-logs   View dev SSL logs"
+	@echo "     make dev-ssl-down   Stop dev SSL environment"
+	@echo ""
+	@echo "  🏭 PRODUCTION (HTTP - use with reverse proxy)"
+	@echo "     make prod           Start production environment (port 8080)"
 	@echo "     make prod-build     Rebuild and start production environment"
 	@echo "     make prod-logs      View production logs (live)"
 	@echo "     make prod-down      Stop production environment"
+	@echo ""
+	@echo "  🔒 PRODUCTION SSL (Native HTTPS - Let's Encrypt)"
+	@echo "     make prod-ssl       Start with native SSL (ports 443, 80)"
+	@echo "     make prod-ssl-build Rebuild and start with SSL"
+	@echo "     make prod-ssl-staging  Start with Let's Encrypt staging (testing)"
+	@echo "     make prod-ssl-logs  View SSL production logs"
+	@echo "     make prod-ssl-down  Stop SSL production environment"
+	@echo "     make ssl-status     Show certificate info (CN, SANs, expiry)"
+	@echo "     make ssl-renew      Force certificate renewal"
 	@echo ""
 	@echo "  🧪 TESTING"
 	@echo "     make test           Run unit tests in containers"
@@ -64,6 +80,73 @@ dev-down:
 	@echo "✅ Development environment stopped"
 
 # ============================================================================
+# DEVELOPMENT SSL COMMANDS (Native HTTPS - ports 8443/8080)
+# ============================================================================
+
+dev-ssl:
+	@echo "🔒 Starting development environment with native SSL..."
+	@echo ""
+	@if [ -z "$$DEV_SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: DEV_SSL_DOMAIN environment variable is required"; \
+		echo ""; \
+		echo "   Set in .env file:"; \
+		echo "     DEV_SSL_DOMAIN=simrq-dev.example.com"; \
+		echo "     SSL_EMAIL=admin@example.com"; \
+		echo "     CLOUDFLARE_API_TOKEN=your-token"; \
+		echo ""; \
+		exit 1; \
+	fi
+	docker compose -p sim-rq-dev -f docker-compose.dev.yaml -f docker-compose.ssl-dev.yaml up -d
+	@echo ""
+	@echo "✅ Development SSL environment started!"
+	@echo ""
+	@echo "   HTTPS: https://$$DEV_SSL_DOMAIN:8443"
+	@echo "   HTTP → HTTPS redirect on port 8080"
+	@echo ""
+	@echo "   Run 'make dev-ssl-logs' to view logs"
+
+dev-ssl-build:
+	@echo "🔨 Building development SSL environment..."
+	@if [ -z "$$DEV_SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: DEV_SSL_DOMAIN environment variable is required"; \
+		exit 1; \
+	fi
+	docker compose -p sim-rq-dev -f docker-compose.dev.yaml -f docker-compose.ssl-dev.yaml up -d --build
+	@echo "✅ Development SSL environment rebuilt and started!"
+
+dev-ssl-staging:
+	@echo "🧪 Starting development with Let's Encrypt STAGING certificates..."
+	@echo "   (Certificates will NOT be trusted by browsers - for testing only)"
+	@echo ""
+	@if [ -z "$$DEV_SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: DEV_SSL_DOMAIN environment variable is required"; \
+		exit 1; \
+	fi
+	LETSENCRYPT_STAGING=true docker compose -p sim-rq-dev -f docker-compose.dev.yaml -f docker-compose.ssl-dev.yaml up -d
+	@echo ""
+	@echo "✅ Development SSL (STAGING) environment started!"
+	@echo ""
+	@echo "   ⚠️  Using Let's Encrypt STAGING - certificates not trusted"
+	@echo "   HTTPS: https://$$DEV_SSL_DOMAIN:8443 (browser will show warning)"
+	@echo ""
+	@echo "   When ready for production, run:"
+	@echo "     make dev-ssl-down"
+	@echo "     docker volume rm sim-rq-dev-certs"
+	@echo "     make dev-ssl"
+
+dev-ssl-logs:
+	@echo "📋 Showing development SSL logs (Ctrl+C to exit)..."
+	docker compose -p sim-rq-dev -f docker-compose.dev.yaml -f docker-compose.ssl-dev.yaml logs -f
+
+dev-ssl-down:
+	@echo "🛑 Stopping development SSL environment..."
+	docker compose -p sim-rq-dev -f docker-compose.dev.yaml -f docker-compose.ssl-dev.yaml down
+	@echo "✅ Development SSL environment stopped"
+	@echo ""
+	@echo "   Note: Certificates are preserved in the sim-rq-dev-certs volume"
+	@echo "   To remove certificates: docker volume rm sim-rq-dev-certs"
+
+# ============================================================================
 # PRODUCTION COMMANDS
 # ============================================================================
 
@@ -89,6 +172,117 @@ prod-down:
 	@echo "🛑 Stopping production environment..."
 	docker compose -p sim-rq-prod down
 	@echo "✅ Production environment stopped"
+
+# ============================================================================
+# PRODUCTION SSL COMMANDS (Native HTTPS with Let's Encrypt)
+# ============================================================================
+
+prod-ssl:
+	@echo "🔒 Starting production environment with native SSL..."
+	@echo ""
+	@if [ -z "$$SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: SSL_DOMAIN environment variable is required"; \
+		echo ""; \
+		echo "   Set in .env file:"; \
+		echo "     SSL_DOMAIN=simrq.example.com"; \
+		echo "     SSL_EMAIL=admin@example.com"; \
+		echo "     CLOUDFLARE_API_TOKEN=your-token"; \
+		echo ""; \
+		exit 1; \
+	fi
+	docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml up -d
+	@echo ""
+	@echo "✅ Production SSL environment started!"
+	@echo ""
+	@echo "   HTTPS: https://$$SSL_DOMAIN"
+	@echo "   HTTP → HTTPS redirect enabled"
+	@echo ""
+	@echo "   Run 'make prod-ssl-logs' to view logs"
+	@echo "   Run 'make ssl-status' to check certificate status"
+
+prod-ssl-build:
+	@echo "🔨 Building production SSL environment..."
+	@if [ -z "$$SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: SSL_DOMAIN environment variable is required"; \
+		exit 1; \
+	fi
+	docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml up -d --build
+	@echo "✅ Production SSL environment rebuilt and started!"
+
+prod-ssl-staging:
+	@echo "🧪 Starting production with Let's Encrypt STAGING certificates..."
+	@echo "   (Certificates will NOT be trusted by browsers - for testing only)"
+	@echo ""
+	@if [ -z "$$SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: SSL_DOMAIN environment variable is required"; \
+		exit 1; \
+	fi
+	LETSENCRYPT_STAGING=true docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml up -d
+	@echo ""
+	@echo "✅ Production SSL (STAGING) environment started!"
+	@echo ""
+	@echo "   ⚠️  Using Let's Encrypt STAGING - certificates not trusted"
+	@echo "   HTTPS: https://$$SSL_DOMAIN (browser will show warning)"
+	@echo ""
+	@echo "   When ready for production, run:"
+	@echo "     make prod-ssl-down"
+	@echo "     docker volume rm sim-rq-certs"
+	@echo "     make prod-ssl"
+
+prod-ssl-logs:
+	@echo "📋 Showing production SSL logs (Ctrl+C to exit)..."
+	docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml logs -f
+
+prod-ssl-down:
+	@echo "🛑 Stopping production SSL environment..."
+	docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml down
+	@echo "✅ Production SSL environment stopped"
+	@echo ""
+	@echo "   Note: Certificates are preserved in the sim-rq-certs volume"
+	@echo "   To remove certificates: docker volume rm sim-rq-certs"
+
+ssl-status:
+	@echo "🔐 Certificate Status:"
+	@echo ""
+	@if [ -z "$$SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: SSL_DOMAIN environment variable is required"; \
+		exit 1; \
+	fi
+	@docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml exec certbot sh -c '\
+		CERT_PATH="/etc/letsencrypt/live/$$SSL_DOMAIN/fullchain.pem"; \
+		if [ -f "$$CERT_PATH" ]; then \
+			echo "Certificate Information:"; \
+			echo ""; \
+			openssl x509 -in "$$CERT_PATH" -noout -subject -issuer -dates -ext subjectAltName 2>/dev/null | head -20; \
+			echo ""; \
+			EXPIRY=$$(openssl x509 -in "$$CERT_PATH" -noout -enddate 2>/dev/null | cut -d= -f2); \
+			EXPIRY_EPOCH=$$(date -d "$$EXPIRY" +%s 2>/dev/null || date -j -f "%b %d %T %Y %Z" "$$EXPIRY" +%s 2>/dev/null); \
+			NOW_EPOCH=$$(date +%s); \
+			DAYS_LEFT=$$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 )); \
+			echo "Days until expiry: $$DAYS_LEFT"; \
+			echo ""; \
+			echo "Certificate path: /etc/letsencrypt/live/$$SSL_DOMAIN/"; \
+		else \
+			echo "❌ No certificate found at $$CERT_PATH"; \
+			echo "   Run 'make prod-ssl' to obtain a certificate"; \
+		fi \
+	' 2>/dev/null || echo "❌ Certbot container not running. Start with 'make prod-ssl'"
+
+ssl-renew:
+	@echo "🔄 Forcing certificate renewal..."
+	@if [ -z "$$SSL_DOMAIN" ]; then \
+		echo "❌ ERROR: SSL_DOMAIN environment variable is required"; \
+		exit 1; \
+	fi
+	docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml exec certbot certbot renew --force-renewal
+	@echo ""
+	@echo "✅ Certificate renewed! Reloading nginx..."
+	docker compose -p sim-rq-prod -f docker-compose.yaml -f docker-compose.ssl.yaml exec frontend nginx -s reload
+	@echo "✅ Nginx reloaded with new certificate"
+
+ssl-test:
+	@echo "🧪 Running SSL configuration tests..."
+	@./tests/ssl/test-ssl-config.sh
 
 # ============================================================================
 # TESTING COMMANDS

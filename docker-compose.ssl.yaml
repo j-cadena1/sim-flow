@@ -1,0 +1,102 @@
+# SSL/TLS Overlay for SimRQ
+# Adds native HTTPS support using Let's Encrypt certificates via Cloudflare DNS-01 challenge
+#
+# Usage:
+#   docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml up -d
+#
+# Or use the Makefile:
+#   make prod-ssl
+#
+# Required environment variables (set in .env):
+#   SSL_DOMAIN=simrq.example.com       # Primary domain (becomes certificate CN)
+#   SSL_EMAIL=admin@example.com        # Email for Let's Encrypt notifications
+#   CLOUDFLARE_API_TOKEN=xxx           # Cloudflare API token with DNS edit permissions
+#
+# Optional environment variables:
+#   SSL_DOMAIN_ALIASES=a.com,b.com     # Additional domains (SANs), comma-separated
+#   LETSENCRYPT_STAGING=true           # Use Let's Encrypt staging (for testing)
+#
+# Certificate Storage:
+#   Certificates are stored in a Docker volume (sim-rq-certs) and persist across restarts.
+#   To force certificate regeneration, remove the volume: docker volume rm sim-rq-certs
+
+services:
+  # Certbot container - obtains and renews Let's Encrypt certificates
+  # Uses Cloudflare DNS-01 challenge (no need to open ports 80/443 for validation)
+  certbot:
+    build:
+      context: .
+      dockerfile: Dockerfile.certbot
+    image: sim-rq-certbot:latest
+    container_name: sim-rq-certbot
+    environment:
+      SSL_DOMAIN: ${SSL_DOMAIN}
+      SSL_DOMAIN_ALIASES: ${SSL_DOMAIN_ALIASES:-}
+      SSL_EMAIL: ${SSL_EMAIL}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      LETSENCRYPT_STAGING: ${LETSENCRYPT_STAGING:-false}
+    volumes:
+      - sim-rq-certs:/etc/letsencrypt
+    healthcheck:
+      # Check that the certificate file exists
+      test: ["CMD", "test", "-f", "/etc/letsencrypt/.ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - sim-rq-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Override frontend service for SSL
+  # Replaces the standard nginx with SSL-enabled version
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.ssl
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20}
+        NGINX_VERSION: ${NGINX_VERSION:-alpine}
+    image: sim-rq-frontend-ssl:latest
+    container_name: sim-rq-frontend-ssl
+    environment:
+      SSL_DOMAIN: ${SSL_DOMAIN}
+    ports:
+      # HTTPS on standard port
+      - "443:443"
+      # HTTP redirect to HTTPS
+      - "80:80"
+    volumes:
+      # Mount certificates from certbot (read-only)
+      - sim-rq-certs:/etc/letsencrypt:ro
+    depends_on:
+      certbot:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # Health check via HTTPS (skip cert verification for staging certs)
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--no-check-certificate", "https://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - sim-rq-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # Persistent volume for Let's Encrypt certificates
+  # Certificates are valid for 90 days and auto-renewed by certbot
+  sim-rq-certs:
+    name: sim-rq-certs

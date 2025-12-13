@@ -1,0 +1,12 @@
+# Certbot with Cloudflare DNS plugin for Let's Encrypt certificates
+# Uses DNS-01 challenge - no need to open ports 80/443 for certificate issuance
+FROM certbot/dns-cloudflare:latest
+
+# Create directories
+RUN mkdir -p /var/www/certbot /etc/letsencrypt
+
+# Copy entrypoint script
+COPY certbot-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

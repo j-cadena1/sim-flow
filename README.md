@@ -104,9 +104,57 @@ make clean        # Remove all containers
 - All real users should authenticate via SSO
 - Disable the local administrator account and delete local users
 
-## Reverse Proxy Setup
+## HTTPS Setup
 
-Sim RQ exposes port **8080** only. Point your reverse proxy there:
+Choose one of two approaches for HTTPS:
+
+### Option 1: Native SSL (Recommended for simplicity)
+
+SimRQ can terminate TLS natively using Let's Encrypt certificates via Cloudflare DNS. No reverse proxy needed.
+
+**Requirements:**
+
+- Domain managed by Cloudflare
+- Cloudflare API token with DNS edit permissions
+
+**Setup:**
+
+1. Create Cloudflare API token at <https://dash.cloudflare.com/profile/api-tokens>
+   - Permissions: Zone > DNS > Edit, Zone > Zone > Read
+
+2. Configure `.env`:
+
+   ```bash
+   # Required
+   SSL_DOMAIN=simrq.example.com
+   SSL_EMAIL=admin@example.com
+   CLOUDFLARE_API_TOKEN=your-token
+   CORS_ORIGIN=https://simrq.example.com
+
+   # Optional: Additional domains (SANs)
+   SSL_DOMAIN_ALIASES=requests.example.com,*.internal.example.com
+   ```
+
+3. Start with SSL:
+
+   ```bash
+   make prod-ssl           # Production with Let's Encrypt
+   make prod-ssl-staging   # Test with staging certs first (recommended)
+   ```
+
+4. SSL Management:
+
+   ```bash
+   make ssl-status         # Check certificate info and expiry
+   make ssl-renew          # Force certificate renewal
+   make prod-ssl-logs      # View certbot/nginx logs
+   ```
+
+Certificates auto-renew every 60 days. No manual intervention needed.
+
+### Option 2: Reverse Proxy
+
+Use an external reverse proxy (Nginx Proxy Manager, Traefik, Caddy, etc.) if you prefer managing TLS separately.
 
 1. Configure your reverse proxy to forward to `http://<server>:8080`
 2. Set environment variables in `.env`:
@@ -117,13 +165,7 @@ Sim RQ exposes port **8080** only. Point your reverse proxy there:
 
 3. Start Sim RQ: `make prod`
 
-### File Attachments
-
-File uploads/downloads use S3-compatible storage (Garage). The built-in nginx proxies storage requests to Garage, enabling presigned URL downloads through your public domain.
-
-`S3_PUBLIC_ENDPOINT` defaults to `CORS_ORIGIN` if not set, so file downloads work automatically once `CORS_ORIGIN` is configured.
-
-### Nginx Example
+**Nginx example:**
 
 ```nginx
 server {
@@ -144,6 +186,12 @@ server {
 ```
 
 Works with: Cloudflare Tunnel, Nginx Proxy Manager, Traefik, Caddy, standard Nginx/Apache.
+
+### File Attachments
+
+File uploads/downloads use S3-compatible storage (Garage). The built-in nginx proxies storage requests to Garage, enabling presigned URL downloads through your public domain.
+
+`S3_PUBLIC_ENDPOINT` defaults to `CORS_ORIGIN` if not set, so file downloads work automatically once `CORS_ORIGIN` is configured.
 
 ## Environment Variables
 
