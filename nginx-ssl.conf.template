@@ -27,6 +27,12 @@ server {
     listen [::]:443 ssl http2;
     server_name _;
 
+    # DNS resolver: Docker internal (127.0.0.11) for container names, external for OCSP
+    resolver 127.0.0.11 1.1.1.1 8.8.8.8 valid=10s ipv6=off;
+    resolver_timeout 5s;
+    set $backend_upstream backend:3001;
+    set $garage_upstream garage:3900;
+
     # SSL certificates from Let's Encrypt
     # Uses primary domain (SSL_DOMAIN) for certificate path
     ssl_certificate /etc/letsencrypt/live/${SSL_DOMAIN}/fullchain.pem;
@@ -47,8 +53,7 @@ server {
     # OCSP Stapling for faster certificate validation
     ssl_stapling on;
     ssl_stapling_verify on;
-    resolver 1.1.1.1 8.8.8.8 valid=300s;
-    resolver_timeout 5s;
+    # Note: Uses resolver defined above
 
     # HSTS (HTTP Strict Transport Security) - 1 year
     # Tells browsers to always use HTTPS for this domain
@@ -83,7 +88,8 @@ server {
 
     # API proxy to backend
     location /api/ {
-        proxy_pass http://backend:3001/api/;
+        # When using variables, we need to explicitly pass the URI
+        proxy_pass http://$backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -104,7 +110,7 @@ server {
 
     # WebSocket proxy for real-time notifications (Socket.IO)
     location /socket.io/ {
-        proxy_pass http://backend:3001/socket.io/;
+        proxy_pass http://$backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -133,7 +139,7 @@ server {
         add_header 'Access-Control-Allow-Origin' '$http_origin' always;
         add_header 'Access-Control-Expose-Headers' 'ETag' always;
 
-        proxy_pass http://garage:3900;
+        proxy_pass http://$garage_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

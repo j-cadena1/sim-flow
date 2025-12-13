@@ -52,6 +52,22 @@ echo "Certificate details:"
 openssl x509 -in "$CERT_PATH" -noout -subject -dates 2>/dev/null || true
 echo ""
 
+# Wait for Docker DNS to be ready (resolves backend service)
+echo "Waiting for Docker DNS to resolve backend service..."
+DNS_WAIT=0
+DNS_MAX_WAIT=60
+while ! getent hosts backend >/dev/null 2>&1; do
+  if [ $DNS_WAIT -ge $DNS_MAX_WAIT ]; then
+    echo "WARNING: Could not resolve 'backend' after ${DNS_MAX_WAIT}s, proceeding anyway"
+    break
+  fi
+  sleep 2
+  DNS_WAIT=$((DNS_WAIT + 2))
+  echo "  Waiting for DNS... (${DNS_WAIT}s)"
+done
+echo "✅ Docker DNS ready"
+echo ""
+
 # Process nginx config template with environment variable substitution
 echo "Generating nginx configuration..."
 envsubst '${SSL_DOMAIN}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf

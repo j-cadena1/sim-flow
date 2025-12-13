@@ -43,7 +43,7 @@ services:
       start_period: 120s
     restart: unless-stopped
     networks:
-      - sim-rq-dev-network
+      - sim-rq-dev
     logging:
       driver: "json-file"
       options:
@@ -81,7 +81,7 @@ services:
       start_period: 15s
     restart: unless-stopped
     networks:
-      - sim-rq-dev-network
+      - sim-rq-dev
     logging:
       driver: "json-file"
       options:
