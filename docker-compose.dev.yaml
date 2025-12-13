@@ -104,7 +104,7 @@ services:
       DB_NAME: sim-rq
       DB_USER: sim-rq_user
       DB_PASSWORD: ${DB_PASSWORD:-SimRQ2025!Secure}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CORS_ORIGIN: ${DEV_CORS_ORIGIN:-http://localhost:5173}
       PORT: 3001
       LOG_LEVEL: debug
       # SSO Configuration (optional - managed via environment variables)

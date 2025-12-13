@@ -22,6 +22,7 @@ import bcrypt from 'bcrypt';
 import { query } from '../db';
 import { logger } from '../middleware/logger';
 import { toCamelCase } from '../utils/caseConverter';
+import { getFrontendUrl } from '../utils/envConfig';
 import {
   isSSOEnabled,
   getSSOConfig,
@@ -521,12 +522,12 @@ export const handleSSOCallback = async (req: Request, res: Response) => {
 
     // Redirect to frontend - the session cookie is already set
     // The frontend will detect the session and load the user
-    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:8080';
+    const frontendUrl = getFrontendUrl();
     res.redirect(frontendUrl);
   } catch (error) {
     logger.error('Error handling SSO callback:', error);
     // Redirect to frontend with error
-    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:8080';
+    const frontendUrl = getFrontendUrl();
     res.redirect(`${frontendUrl}/#/login?error=sso_failed`);
   }
 };

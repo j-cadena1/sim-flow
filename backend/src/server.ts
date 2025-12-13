@@ -9,6 +9,7 @@ import { apiLimiter } from './middleware/rateLimiter';
 import { logger } from './middleware/logger';
 import { addRequestId, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { enforceSecureConfig } from './utils/configValidator';
+import { getCorsOrigin } from './utils/envConfig';
 import { cleanupExpiredSessions } from './services/sessionService';
 import { cleanupOldLoginAttempts } from './services/loginAttemptService';
 import { cleanupExpiredPKCEStates } from './services/msalService';
@@ -99,7 +100,7 @@ app.use(helmet({
  * - No token-based CSRF protection needed when using SameSite: strict
  */
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: getCorsOrigin(),
   credentials: true,
 }));
 

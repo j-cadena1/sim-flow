@@ -16,6 +16,7 @@ import { SESSION_COOKIE_NAME } from '../config/session';
 import { validateSession } from './sessionService';
 import { createPubSubClients, isRedisConnected } from './redisService';
 import { logger } from '../middleware/logger';
+import { getCorsOrigin } from '../utils/envConfig';
 
 let io: SocketIOServer | null = null;
 let pubClient: ReturnType<typeof createPubSubClients> extends infer T
@@ -32,7 +33,7 @@ let subClient: ReturnType<typeof createPubSubClients> extends infer T
 export async function initializeWebSocket(httpServer: HTTPServer): Promise<void> {
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+      origin: getCorsOrigin(),
       credentials: true,
     },
     path: '/socket.io/',

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- markdownlint-disable MD024 -->
 
+## [0.9.7] - 2025-12-13
+
+### Fixed
+
+- **SSO redirect for side-by-side dev/prod deployments** - SSO login now correctly redirects to the originating environment
+  - Previously, SSO callback always redirected to production URL regardless of which environment initiated login
+  - Added `DEV_CORS_ORIGIN` environment variable for development deployments
+  - Created `envConfig.ts` utility with `getCorsOrigin()` and `getFrontendUrl()` helpers
+  - Updated authController, server, websocketService, emailService, and storageService to use environment-aware URLs
+
 ## [0.9.6] - 2025-12-12
 
 ### Security

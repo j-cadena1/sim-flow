@@ -6,6 +6,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { logger } from '../middleware/logger';
 import { Notification } from '../types/notifications';
+import { getFrontendUrl } from '../utils/envConfig';
 
 interface SmtpConfig {
   host: string;
@@ -69,7 +70,7 @@ function getSenderInfo(): { email: string; name: string } {
  * Get the application URL for building links
  */
 function getAppUrl(): string {
-  return process.env.CORS_ORIGIN || 'http://localhost:5173';
+  return getFrontendUrl();
 }
 
 /**

@@ -24,6 +24,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import DOMPurify from 'isomorphic-dompurify';
 import { logger } from '../middleware/logger';
+import { getCorsOrigin } from '../utils/envConfig';
 
 let s3Client: S3Client | null = null;
 let publicS3Client: S3Client | null = null; // Client with public endpoint for browser-accessible signed URLs
@@ -123,7 +124,7 @@ export async function initializeStorage(): Promise<void> {
 
   const endpoint = process.env.S3_ENDPOINT;
   // For browser-accessible signed URLs: S3_PUBLIC_ENDPOINT > CORS_ORIGIN > S3_ENDPOINT
-  const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT || process.env.CORS_ORIGIN || endpoint;
+  const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT || getCorsOrigin() || endpoint;
   const accessKeyId = process.env.S3_ACCESS_KEY_ID;
   const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
   const region = process.env.S3_REGION || 'garage';
