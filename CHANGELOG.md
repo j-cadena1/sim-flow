@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- markdownlint-disable MD024 -->
 
+## [0.9.8] - 2025-12-13
+
+### Added
+
+- **Video processing progress indicator** - Real-time progress percentage displayed during video compression
+  - WebSocket emits progress updates (throttled to 1 update/second)
+  - Frontend shows "Processing X%" instead of just "Processing..."
+  - Progress scales thumbnail extraction (0-10%) and compression (10-95%)
+
+### Fixed
+
+- **M4V video format support** - Videos from Apple devices with `video/x-m4v` MIME type now accepted for `.mp4` extension
+  - M4V is essentially MP4 with Apple DRM support, commonly used by iOS devices
+
 ## [0.9.7] - 2025-12-13
 
 ### Fixed
@@ -333,6 +347,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics dashboard tests
 - Navigation and UI tests
 
+[0.9.8]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.8
+[0.9.7]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.7
 [0.9.6]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.6
 [0.9.5]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.5
 [0.9.4]: https://github.com/j-cadena1/sim-rq/releases/tag/v0.9.4

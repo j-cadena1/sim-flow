@@ -131,6 +131,7 @@ export const Attachments: React.FC<AttachmentsProps> = ({
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<DirectUploadProgress | null>(null);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(null);
+  const [processingProgress, setProcessingProgress] = useState<Record<string, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
@@ -145,20 +146,36 @@ export const Attachments: React.FC<AttachmentsProps> = ({
   const userCanUpload = canUpload(currentUser, requestCreatedBy, assignedTo);
   const storageEnabled = storageConfig?.enabled ?? false;
 
-  // Listen for WebSocket events when attachments finish processing
-  // This updates the UI without requiring a manual refresh
+  // Listen for WebSocket events for processing progress and completion
   useEffect(() => {
     if (!socket) return;
 
+    const handleProgress = (data: { requestId: string; attachmentId: string; percent: number }) => {
+      if (data.requestId === requestId) {
+        setProcessingProgress(prev => ({
+          ...prev,
+          [data.attachmentId]: data.percent,
+        }));
+      }
+    };
+
     const handleProcessed = (data: { requestId: string; attachmentId: string; status: string }) => {
       if (data.requestId === requestId) {
+        // Clear progress for this attachment
+        setProcessingProgress(prev => {
+          const updated = { ...prev };
+          delete updated[data.attachmentId];
+          return updated;
+        });
         // Invalidate attachments query to refetch with updated thumbnails/status
         queryClient.invalidateQueries({ queryKey: queryKeys.attachments.byRequest(requestId) });
       }
     };
 
+    socket.on('attachment:progress', handleProgress);
     socket.on('attachment:processed', handleProcessed);
     return () => {
+      socket.off('attachment:progress', handleProgress);
       socket.off('attachment:processed', handleProcessed);
     };
   }, [socket, requestId, queryClient]);
@@ -436,7 +453,10 @@ export const Attachments: React.FC<AttachmentsProps> = ({
                   {formatFileSize(attachment.fileSize)} &middot; {attachment.uploadedByName}
                   {attachment.processingStatus === 'processing' && (
                     <span className="ml-2 text-blue-500">
-                      <Loader2 className="inline animate-spin" size={12} /> Processing...
+                      <Loader2 className="inline animate-spin" size={12} /> Processing
+                      {processingProgress[attachment.id] !== undefined
+                        ? ` ${Math.round(processingProgress[attachment.id])}%`
+                        : '...'}
                     </span>
                   )}
                   {attachment.processingStatus === 'failed' && (

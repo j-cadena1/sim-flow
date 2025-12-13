@@ -236,7 +236,7 @@ const EXTENSION_MIME_MAP: Record<string, string[]> = {
   heic: ['image/heic'],
   heif: ['image/heif'],
   // Video
-  mp4: ['video/mp4'],
+  mp4: ['video/mp4', 'video/x-m4v'], // M4V is essentially MP4 with Apple DRM support
   mov: ['video/quicktime'],
   avi: ['video/x-msvideo', 'video/avi'],
   webm: ['video/webm'],

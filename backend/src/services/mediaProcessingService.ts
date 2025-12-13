@@ -43,6 +43,40 @@ interface ProcessingResult {
 }
 
 /**
+ * Notify the uploader of processing progress
+ * Throttled to avoid flooding WebSocket with updates
+ */
+let lastProgressUpdate: Record<string, number> = {};
+const PROGRESS_THROTTLE_MS = 1000; // Send updates at most once per second
+
+async function notifyProcessingProgress(
+  attachmentId: string,
+  requestId: string,
+  percent: number,
+  uploadedBy: string
+): Promise<void> {
+  const now = Date.now();
+  const lastUpdate = lastProgressUpdate[attachmentId] || 0;
+
+  // Throttle updates (except for 100% which should always be sent)
+  if (percent < 100 && now - lastUpdate < PROGRESS_THROTTLE_MS) {
+    return;
+  }
+
+  lastProgressUpdate[attachmentId] = now;
+
+  try {
+    emitToUser(uploadedBy, 'attachment:progress', {
+      attachmentId,
+      requestId,
+      percent: Math.round(percent),
+    });
+  } catch (error) {
+    // Don't fail processing if notification fails
+  }
+}
+
+/**
  * Notify the uploader that media processing has completed
  * This triggers a UI refresh in the frontend Attachments component
  */
@@ -51,6 +85,9 @@ async function notifyProcessingComplete(
   requestId: string,
   status: 'completed' | 'failed'
 ): Promise<void> {
+  // Clean up progress tracking
+  delete lastProgressUpdate[attachmentId];
+
   try {
     // Get the uploader's user ID
     const result = await query(
@@ -127,7 +164,11 @@ async function extractVideoThumbnail(videoPath: string, outputPath: string): Pro
 /**
  * Compress a video file to H.264 720p
  */
-async function compressVideo(inputPath: string, outputPath: string): Promise<void> {
+async function compressVideo(
+  inputPath: string,
+  outputPath: string,
+  onProgress?: (percent: number) => void
+): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .videoCodec('libx264')
@@ -143,6 +184,7 @@ async function compressVideo(inputPath: string, outputPath: string): Promise<voi
       .on('progress', (progress: { percent?: number }) => {
         if (progress.percent) {
           logger.debug(`Video compression progress: ${Math.round(progress.percent)}%`);
+          onProgress?.(progress.percent);
         }
       })
       .on('end', () => resolve())
@@ -216,6 +258,15 @@ export async function processVideo(
   const outputPath = path.join(tempDir, `output-${attachmentId}.mp4`);
   const thumbnailPath = path.join(tempDir, `thumb-${attachmentId}.png`);
 
+  // Get uploader ID for progress notifications
+  let uploadedBy: string | null = null;
+  try {
+    const result = await query('SELECT uploaded_by FROM attachments WHERE id = $1', [attachmentId]);
+    uploadedBy = result.rows[0]?.uploaded_by || null;
+  } catch {
+    // Continue without progress notifications
+  }
+
   try {
     // Update status to processing
     await query(
@@ -226,7 +277,10 @@ export async function processVideo(
     // Write buffer to temp file
     await fs.writeFile(inputPath, fileBuffer);
 
-    // Extract thumbnail
+    // Extract thumbnail (roughly 10% of processing)
+    if (uploadedBy) {
+      notifyProcessingProgress(attachmentId, requestId, 5, uploadedBy);
+    }
     await extractVideoThumbnail(inputPath, thumbnailPath);
 
     // Read thumbnail and convert to WebP
@@ -242,8 +296,18 @@ export async function processVideo(
     const thumbnailKey = generateThumbnailKey(requestId, originalFileName);
     await uploadFile(thumbnailKey, thumbnailWebpBuffer, 'image/webp', thumbnailWebpBuffer.length);
 
-    // Compress video
-    await compressVideo(inputPath, outputPath);
+    if (uploadedBy) {
+      notifyProcessingProgress(attachmentId, requestId, 10, uploadedBy);
+    }
+
+    // Compress video (90% of processing time)
+    await compressVideo(inputPath, outputPath, (percent) => {
+      if (uploadedBy) {
+        // Scale ffmpeg progress (0-100) to our range (10-95)
+        const scaledPercent = 10 + (percent * 0.85);
+        notifyProcessingProgress(attachmentId, requestId, scaledPercent, uploadedBy);
+      }
+    });
 
     // Read compressed video and upload, replacing original
     const compressedBuffer = await fs.readFile(outputPath);
