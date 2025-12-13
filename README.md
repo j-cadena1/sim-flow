@@ -1,7 +1,7 @@
 # Sim RQ
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.9.4--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
+[![Version](https://img.shields.io/badge/version-0.9.8--beta-blue.svg)](https://github.com/j-cadena1/sim-rq/releases)
 [![Docker](https://img.shields.io/badge/Docker-First-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
@@ -42,11 +42,16 @@ Everything you need is managed by Docker Compose. Just install Docker and you're
 - **Role-Based Access**: Admin, Manager, Engineer, End-User
 - **Request Lifecycle**: Full tracking from submission to completion with enforced workflow stages
 - **File Attachments**: S3-compatible storage (Garage) with drag-and-drop uploads up to 3GB
+  - Direct browser-to-S3 uploads for large files (bypasses server)
+  - Video compression to H.264 720p with real-time progress indicator
+  - Automatic thumbnail generation for images and videos
+  - HEIC/HEIF and M4V format support for Apple devices
 - **Project Hour Tracking**: Budget allocation and monitoring
 - **Real-time Notifications**: WebSocket-based in-app notifications with user preferences
 - **SSO**: Microsoft Entra ID (Azure AD) PKCE authentication with production-ready multi-instance support
+- **Native SSL/TLS**: Built-in Let's Encrypt certificate management via Cloudflare DNS-01
 - **Analytics**: Real-time productivity and resource insights
-- **Security**: Session-based auth with atomic session limits, rate limiting, audit logging, database-backed PKCE storage
+- **Security**: Session-based auth, MIME type validation, rate limiting, audit logging, database-backed PKCE storage
 
 ## Quick Start
 
@@ -56,7 +61,7 @@ Everything you need is managed by Docker Compose. Just install Docker and you're
 
 ```bash
 git clone https://github.com/j-cadena1/sim-rq.git
-cd simrq
+cd sim-rq
 make prod
 ```
 
@@ -292,7 +297,7 @@ make test         # Unit tests (backend + frontend in containers)
 make test-e2e     # E2E tests (Playwright in container)
 ```
 
-**Test suite:** 543 tests total (120 E2E + 423 backend unit tests) covering auth, roles, requests, lifecycle, analytics, forms, navigation, and notifications.
+**Test suite:** 509 tests total (86 E2E + 423 backend unit tests) covering auth, roles, requests, lifecycle, analytics, forms, navigation, and notifications.
 
 Test reports are saved to `./playwright-report/` and `./test-results/`.
 
@@ -347,7 +352,7 @@ All authentication flows (including SSO PKCE) will work correctly across instanc
 - [ ] Set strong `DB_PASSWORD` in `.env`
 - [ ] Set `ENTRA_SSO_ENCRYPTION_KEY` (if using SSO) - **REQUIRED** for SSO
 - [ ] Configure `CORS_ORIGIN` to your domain
-- [ ] Use HTTPS with reverse proxy
+- [ ] Use HTTPS (native SSL with `make prod-ssl` or reverse proxy)
 - [ ] Restrict database port (5432) to localhost
 - [ ] Set up regular backups (`make db-backup`)
 - [ ] Keep Docker images updated

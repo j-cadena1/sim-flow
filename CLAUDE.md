@@ -194,7 +194,7 @@ contexts/
 
 ## Testing
 
-- **E2E tests**: `tests/e2e/` (13 spec files, 120 tests covering all major features)
+- **E2E tests**: `tests/e2e/` (13 spec files, 86 tests covering all major features)
 - **Backend unit tests**: `backend/src/services/__tests__/` (423 tests)
 - Rate limiting auto-disabled during `make test-e2e`
 - Test reports saved to `./playwright-report/` and `./test-results/`
