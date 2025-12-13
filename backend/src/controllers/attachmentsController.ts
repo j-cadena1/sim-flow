@@ -770,9 +770,7 @@ async function processMediaFromS3(
   originalFileName: string,
   contentType: string
 ): Promise<void> {
-  // Import dynamically to avoid circular dependencies
-  const { getSignedDownloadUrl } = await import('../services/storageService');
-
+  // Use statically imported getSignedDownloadUrl (already imported at top of file)
   try {
     // Get a signed URL and fetch the file
     const signedUrl = await getSignedDownloadUrl(storageKey);

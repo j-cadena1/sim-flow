@@ -4,7 +4,7 @@
  * Manages Socket.IO connection and provides real-time notification delivery
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { Notification } from '../types';
 
@@ -18,6 +18,8 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
   const socketRef = useRef<Socket | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  // State to trigger re-renders when socket connects/disconnects
+  const [connectedSocket, setConnectedSocket] = useState<Socket | null>(null);
 
   const connect = useCallback(() => {
     if (!userId || !enabled || socketRef.current?.connected) {
@@ -43,6 +45,8 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
     socket.on('connect', () => {
       console.log('[WebSocket] Connected successfully');
       reconnectAttempts.current = 0;
+      // Update state to trigger re-renders in components using this hook
+      setConnectedSocket(socket);
     });
 
     socket.on('notification', (notification: Notification) => {
@@ -52,6 +56,8 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
 
     socket.on('disconnect', (reason) => {
       console.log('[WebSocket] Disconnected:', reason);
+      // Clear state to trigger re-renders
+      setConnectedSocket(null);
     });
 
     socket.on('connect_error', (error) => {
@@ -72,6 +78,7 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
       console.log('[WebSocket] Disconnecting');
       socketRef.current.disconnect();
       socketRef.current = null;
+      setConnectedSocket(null);
     }
   }, []);
 
@@ -92,8 +99,8 @@ export function useWebSocket({ userId, onNotification, enabled = true }: UseWebS
 
   return {
     /** The Socket.IO socket instance, can be used to listen for custom events */
-    socket: socketRef.current,
-    isConnected: socketRef.current?.connected ?? false,
+    socket: connectedSocket,
+    isConnected: connectedSocket?.connected ?? false,
     reconnect: connect,
     disconnect,
   };
