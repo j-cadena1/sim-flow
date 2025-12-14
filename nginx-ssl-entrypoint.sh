@@ -6,7 +6,7 @@
 set -e
 
 echo "============================================"
-echo "SimRQ Nginx SSL Frontend"
+echo "Sim RQ Nginx SSL Frontend"
 echo "============================================"
 
 # Validate required environment variables

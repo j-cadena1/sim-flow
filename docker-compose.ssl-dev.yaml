@@ -1,4 +1,4 @@
-# SSL/TLS Overlay for SimRQ DEVELOPMENT Environment
+# SSL/TLS Overlay for Sim RQ DEVELOPMENT Environment
 # Adds native HTTPS support for dev environment running side-by-side with prod
 #
 # Usage:

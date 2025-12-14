@@ -258,8 +258,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Complete rebrand from "Sim-Flow" to "SimRQ"** - Comprehensive update of all identifiers and branding
-  - Application name: "SimRQ" (user-facing)
+- **Complete rebrand from "Sim-Flow" to "Sim RQ"** - Comprehensive update of all identifiers and branding
+  - Application name: "Sim RQ" (user-facing)
   - Technical identifiers: `sim-rq` (URLs, containers, database, files)
   - GitHub repository: `j-cadena1/sim-rq`
   - Docker containers: `sim-rq-db`, `sim-rq-api`, `sim-rq-frontend`, `sim-rq-playwright`

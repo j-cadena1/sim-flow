@@ -31,7 +31,7 @@ warn() {
 }
 
 echo "============================================"
-echo "SimRQ SSL Configuration Tests"
+echo "Sim RQ SSL Configuration Tests"
 echo "============================================"
 echo ""
 

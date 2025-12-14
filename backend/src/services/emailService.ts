@@ -62,7 +62,7 @@ function getSmtpConfig(): SmtpConfig | null {
 function getSenderInfo(): { email: string; name: string } {
   return {
     email: process.env.SMTP_FROM_EMAIL || 'noreply@sim-rq.local',
-    name: process.env.SMTP_FROM_NAME || 'SimRQ Notifications',
+    name: process.env.SMTP_FROM_NAME || 'Sim RQ Notifications',
   };
 }
 
@@ -171,7 +171,7 @@ export async function sendInstantNotificationEmail(
 
   const text = `${notification.message}
 
-View in SimRQ: ${link}
+View in Sim RQ: ${link}
 
 ---
 You received this email because you have instant email notifications enabled.
@@ -191,7 +191,7 @@ To change your notification preferences, visit: ${appUrl}/settings`;
   </div>
 
   <div style="text-align: center; margin: 24px 0;">
-    <a href="${link}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 500;">View in SimRQ</a>
+    <a href="${link}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 500;">View in Sim RQ</a>
   </div>
 
   <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
@@ -226,7 +226,7 @@ export async function sendDigestEmail(
   const appUrl = getAppUrl();
   const frequencyLabel = frequency.charAt(0).toUpperCase() + frequency.slice(1);
 
-  const subject = `SimRQ ${frequencyLabel} Digest: ${notifications.length} notification${notifications.length === 1 ? '' : 's'}`;
+  const subject = `Sim RQ ${frequencyLabel} Digest: ${notifications.length} notification${notifications.length === 1 ? '' : 's'}`;
 
   // Group notifications by type for summary
   const grouped = groupNotificationsByType(notifications);
@@ -237,7 +237,7 @@ export async function sendDigestEmail(
     .map((n) => `- ${n.title}: ${n.message}`)
     .join('\n');
 
-  const text = `SimRQ ${frequencyLabel} Notification Digest
+  const text = `Sim RQ ${frequencyLabel} Notification Digest
 
 You have ${notifications.length} new notification${notifications.length === 1 ? '' : 's'}:
 
@@ -276,7 +276,7 @@ To change your notification preferences, visit: ${appUrl}/settings`;
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: #2563eb; color: #ffffff; border-radius: 8px 8px 0 0; padding: 20px; text-align: center;">
-    <h1 style="margin: 0; font-size: 24px;">SimRQ ${frequencyLabel} Digest</h1>
+    <h1 style="margin: 0; font-size: 24px;">Sim RQ ${frequencyLabel} Digest</h1>
     <p style="margin: 8px 0 0 0; opacity: 0.9;">${notifications.length} new notification${notifications.length === 1 ? '' : 's'}</p>
   </div>
 

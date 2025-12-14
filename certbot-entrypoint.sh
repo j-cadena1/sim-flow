@@ -3,7 +3,7 @@
 # Supports multiple domains: SSL_DOMAIN (CN) and SSL_DOMAIN_ALIASES (SANs)
 
 echo "============================================"
-echo "SimRQ Certificate Manager (Certbot)"
+echo "Sim RQ Certificate Manager (Certbot)"
 echo "============================================"
 echo ""
 

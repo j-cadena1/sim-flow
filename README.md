@@ -120,7 +120,7 @@ Choose one of two approaches for HTTPS:
 
 ### Option 1: Native SSL (Recommended for simplicity)
 
-SimRQ can terminate TLS natively using Let's Encrypt certificates via Cloudflare DNS. No reverse proxy needed.
+Sim RQ can terminate TLS natively using Let's Encrypt certificates via Cloudflare DNS. No reverse proxy needed.
 
 **Requirements:**
 

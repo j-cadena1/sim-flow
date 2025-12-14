@@ -1,4 +1,4 @@
-# SSL/TLS Overlay for SimRQ
+# SSL/TLS Overlay for Sim RQ
 # Adds native HTTPS support using Let's Encrypt certificates via Cloudflare DNS-01 challenge
 #
 # Usage:
