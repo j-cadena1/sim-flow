@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Backward compatible - no code changes required
   - Tested with full E2E suite (82 passed)
 
+- **Backend dependency upgrades** - Phase 2 of major dependency upgrades
+  - dotenv: 16.3.1 → 17.2.3 (new config options)
+  - bcrypt: 5.1.1 → 6.0.0 (prebuildify migration, faster installs)
+  - helmet: 7.1.0 → 8.1.0 (CSP improvements)
+  - file-type: 20.5.0 → 21.1.1 (better format detection)
+  - sharp: 0.33.5 → 0.34.5 (image processing improvements)
+  - Added node-gyp to devDependencies (enables sharp source builds on Alpine)
+  - All upgrades tested with full E2E suite (82 passed)
+
 ## [0.9.9] - 2025-12-13
 
 ### Added
