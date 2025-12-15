@@ -265,7 +265,7 @@ Restart containers: `make prod-down && make prod`
 - **Backend**: Node.js + Express + TypeScript + Socket.IO
 - **Database**: PostgreSQL 16
 - **Storage**: Garage (S3-compatible) for file attachments
-- **Cache**: Redis 7 (optional - for multi-instance deployments)
+- **Cache**: Redis 8 (optional - for multi-instance deployments)
 - **Auth**: Session cookies + Microsoft Entra ID PKCE
 - **Deployment**: Docker + Docker Compose
 

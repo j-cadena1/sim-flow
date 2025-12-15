@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- markdownlint-disable MD024 -->
 
+## [Unreleased]
+
+### Changed
+
+- **Redis 8 upgrade** - Updated from Redis 7 to Redis 8 (Phase 1 of major dependency upgrades)
+  - 112% throughput improvement with io-threads
+  - Now open source again under AGPLv3
+  - Backward compatible - no code changes required
+  - Tested with full E2E suite (82 passed)
+
 ## [0.9.9] - 2025-12-13
 
 ### Added

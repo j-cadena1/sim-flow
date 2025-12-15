@@ -67,7 +67,7 @@ docker compose -f docker-compose.dev.yaml exec frontend <command>
 - **Backend**: Node.js + Express + TypeScript + Socket.IO (port 3001)
 - **Database**: PostgreSQL 16
 - **Storage**: Garage (S3-compatible) for file attachments (port 3900)
-- **Cache**: Redis 7 (optional - for multi-instance deployments)
+- **Cache**: Redis 8 (optional - for multi-instance deployments)
 - **Auth**: Session cookies (HTTP-only, max 5 concurrent per user) + Microsoft Entra ID PKCE
 
 ### Data Storage

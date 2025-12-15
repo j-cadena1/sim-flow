@@ -59,7 +59,7 @@ services:
   # Provides distributed rate limiting and WebSocket pub/sub
   # No persistence - rate limits reset on restart (acceptable for short windows)
   redis:
-    image: redis:${REDIS_VERSION:-7}-alpine
+    image: redis:${REDIS_VERSION:-8}-alpine
     container_name: sim-rq-redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

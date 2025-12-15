@@ -48,7 +48,7 @@ services:
   # Redis (optional - for multi-instance deployments)
   # Provides distributed rate limiting and WebSocket pub/sub
   redis:
-    image: redis:${REDIS_VERSION:-7}-alpine
+    image: redis:${REDIS_VERSION:-8}-alpine
     container_name: sim-rq-redis-dev
     ports:
       - "6379:6379"
