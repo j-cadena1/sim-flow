@@ -70,17 +70,26 @@ make test-e2e               # E2E tests (86 tests, 4 conditionally skip)
 
 ---
 
-## Phase 3: Zod 4 Migration ⏳ NEXT
+## Phase 3: Zod 4 Migration ✅ COMPLETE
+
+**Status:** Completed 2025-12-16 | Commit: `7bd1d07`
 
 **Risk: LOW-MEDIUM** - Minor API changes possible
 
-**Package:** zod 3.25.76 → 4.x
+**Package:** zod 3.22.4 → 4.2.1
 
-**Files to review after upgrade:**
+**Files reviewed:**
 
-- `backend/src/middleware/validation.ts` - Main validation schemas
-- `backend/src/middleware/errorHandler.ts` - ZodError handling
-- `backend/src/services/websocketService.ts` - Cookie parsing
+- `backend/src/middleware/validation.ts` - No changes needed (schemas compatible)
+- `backend/src/middleware/errorHandler.ts` - No changes needed (ZodError API unchanged)
+
+**Why it worked without changes:**
+
+- All schema definitions use stable Zod 3/4 compatible APIs
+- `z.object()`, `z.string()`, `z.enum()`, `z.number()` unchanged
+- `.min()`, `.max()`, `.transform()`, `.optional()`, `.default()` unchanged
+- `ZodError.errors` and error path handling unchanged
+- `z.string().uuid()` still works (deprecated but functional)
 
 **Commands:**
 
@@ -92,8 +101,8 @@ npm install zod@latest
 **Testing:**
 
 ```bash
-make test                   # Backend unit tests
-make test-e2e               # Full E2E (tests all validation paths)
+make test                   # Backend unit tests (423 passed)
+make test-e2e               # Full E2E (82 passed, 4 conditionally skip)
 ```
 
 ---
@@ -229,8 +238,8 @@ make test-e2e               # Full E2E
 ```text
 Phase 1: Redis 8           → Test → Commit  ✅ DONE (2f91939)
 Phase 2: Safe backend deps → Test → Commit  ✅ DONE (1a578b1)
-Phase 3: Zod 4             → Test → Commit  ⏳ NEXT
-Phase 4: Express 5         → Test → Commit
+Phase 3: Zod 4             → Test → Commit  ✅ DONE (7bd1d07)
+Phase 4: Express 5         → Test → Commit  ⏳ NEXT
 Phase 5: Rate limiter 8    → Test → Commit
 Phase 6a: TypeScript 5.9   → Test → Commit
 Phase 6b: lucide-react     → Test → Commit
